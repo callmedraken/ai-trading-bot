@@ -1,6 +1,15 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43-Q1 consumed BLOCKED; L43 state prerequisite gap
+## Current milestone: Architecture 148 TQQQ/SQQQ application-runtime pivot
+
+
+Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
+
+V1 scope is fixed: intraday-only, long-only, at most one of TQQQ/SQQQ, QQQ as the primary direction reference, two completed-bar confirmation, no same-cycle inverse flip, and forced flat beginning five minutes before official regular-session close. The source-owned hard stop is 3.00% below the reconciled average entry fill and may never be widened. Live readiness requires proving exact full-position stop protection; a broker stop-market order is preferred and software independently treats threshold breach as mandatory EXIT.
+
+Primary application reference: `siropkin/robinhood-ai-trading-bot@1a778749cfbe92c7ab9444b12e3cc73587533ade` (MIT). Adopt its simple cycle shape, not its direct `robin_stocks` credential path, generic write retry, prompt-only risk limits or non-durable order handling. 148-A must produce an explicit parity matrix against that repo, accepted P6/L43 components and current Robinhood MCP behavior before publication.
+
+Next milestone is 148-A SOURCE_ONLY / FAKE_ONLY: market-regime model, desired-position planner, 3% stop policy, session/forced-flat policy, deterministic transition planner, complete fresh broker-fact protocols, durable intent/ref-id/protective-stop model, fakeable application cycle and GUI-facing status projection. No accepted L43/P6 source is deleted during 148-A. No real Robinhood/OAuth/browser/Alpaca/review/place/cancel or production state preparation is authorized.
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
@@ -86,7 +95,7 @@ The separately reviewed Q1 preflight was invoked once after exact local/remote r
 
 Source review narrows the failure to the interval after accepted source identity and before a durable-state snapshot was bound. The production snapshot path is fixed at `F:\AI\arch147-l43-live-state-v1\durable-state.jsonl`; the reader requires an already provisioned journal plus lock and never initializes them. The repository currently has no production L43 provisioning command; only test/fake fixtures create L43 state. The sanitized observation does not expose the underlying exception, so do not claim a specific host cause such as a missing journal or lock without separate evidence.
 
-Next milestone: design and implement a source-owned, provider-free L43 state-provisioning/diagnostic checkpoint. It must preserve the Q62 journal byte-for-byte, use create-new/fail-closed semantics for the fixed L43 root, establish the exact origin/identity/lock prerequisites needed by Q1, and discriminate state-unavailable causes without leaking sensitive material. No second Q1 preflight, Robinhood/Alpaca observation, review/place/cancel, Q63, or `FINAL_HOLDOUT` access is authorized by this handoff.
+The former standalone L43 state-provisioning/diagnostic successor is superseded as the immediate milestone by Architecture 148. If the new application reuses L43 durable-state machinery, provisioning/migration must be owned by the new complete runtime dependency closure. No second Q1 preflight, Robinhood/Alpaca protected observation, review/place/cancel, Q63, or `FINAL_HOLDOUT` access is authorized by this handoff.
 
 ## RHC3 production order-scope admission
 

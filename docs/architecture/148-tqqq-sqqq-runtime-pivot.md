@@ -1,0 +1,319 @@
+# Architecture 148 — TQQQ/SQQQ application-runtime pivot
+
+Status: **DESIGN ACCEPTED / DOCUMENTATION ONLY.**
+
+This architecture is the current product direction. It supersedes extending the
+Architecture-147 L43 checkpoint chain as the application architecture. Existing
+accepted Architecture-147 broker, state, reconciliation, source-authority,
+research, risk, session, GUI and testing components remain reusable safety
+infrastructure and historical evidence. No real provider call, state
+provisioning, review, placement, cancellation, Q1 retry, Q63 action or
+`FINAL_HOLDOUT` access is authorized by this document.
+
+## Product objective
+
+Build the first understandable end-to-end unattended trading application around
+a deliberately narrow universe:
+
+- **TQQQ** when the source-owned market-regime engine is bullish;
+- **SQQQ** when the source-owned market-regime engine is bearish;
+- **FLAT** when direction is neutral, stale, conflicted or unproven.
+
+The first version is intraday-only and long-only. It may own TQQQ, SQQQ or
+nothing, never both at once. It never shorts either ETF and never carries an
+Architecture-148 position intentionally across the regular-session close.
+
+TQQQ targets 3x the daily performance of the Nasdaq-100 and SQQQ targets -3x
+the daily performance of the Nasdaq-100. Their issuer explicitly warns that
+returns over periods longer than one day may differ significantly from the
+daily target. Intraday-only v1 is therefore a deliberate risk and validation
+constraint rather than a claim that overnight holding is always inappropriate.
+
+Reference:
+- https://www.proshares.com/our-etfs/leveraged-and-inverse/tqqq
+- https://www.proshares.com/our-etfs/leveraged-and-inverse/sqqq
+
+## Reference application and reuse policy
+
+Primary application-shape reference:
+
+- `siropkin/robinhood-ai-trading-bot`
+- reviewed main: `1a778749cfbe92c7ab9444b12e3cc73587533ade`
+- MIT licensed
+
+The useful pattern is the simple application loop:
+
+`authenticate -> broker snapshot -> candidate/market data -> indicators ->
+decision -> deterministic validation -> execute -> record -> repeat`.
+
+Do not import its brokerage implementation wholesale. In particular, do not
+adopt direct username/password/TOTP Robinhood login, `robin_stocks`, generic
+retry around broker writes, prompt-only risk limits or its lack of durable
+ambiguous-order reconciliation.
+
+Any source copied rather than independently reimplemented from the MIT project
+must retain the applicable copyright/license notice.
+
+Other existing public-reference evidence remains relevant, including
+`EUGMsub/RobinhoodAgenticTrader`, `kevin1chun/robinhood-for-agents` and
+`abiemann/RobinhoodEquityTradingAgent`. Architecture 148 requires an explicit
+parity matrix before source publication rather than a prose-only survey.
+
+## Final application shape
+
+The production application owns one obvious cycle:
+
+1. lifecycle/GUI Start authorizes the application to run, not to bypass risk;
+2. prove current session and single-run ownership;
+3. obtain a fresh broker snapshot;
+4. obtain current market/research inputs;
+5. compute one market-regime decision;
+6. derive at most one desired target position: TQQQ, SQQQ or FLAT;
+7. run deterministic account, buying-power, tradability, order-scope, risk,
+   stop-protection and source/state gates;
+8. review the exact broker order where the current Robinhood contract requires
+   or provides that safety preview;
+9. persist an exact durable intent and deterministic provider `ref_id`;
+10. place at most the explicitly admitted effect;
+11. reconcile broker facts before any next effect;
+12. publish state/results to the GUI and research history;
+13. repeat on the configured cadence while Start remains enabled.
+
+Checkpoint machinery certifies this application; it must not become the
+user-facing runtime architecture.
+
+## V1 signal instrument and regime engine
+
+The traded universe is fixed to `TQQQ` and `SQQQ`. The primary directional
+reference is `QQQ`; the leveraged ETFs themselves are execution instruments,
+not the sole market-direction oracle.
+
+Use only completed bars. V1 starts with a deterministic, backtestable technical
+regime classifier on completed 5-minute QQQ bars:
+
+- BULLISH candidate:
+  - last completed close > session VWAP;
+  - EMA(20) > EMA(50);
+  - RSI(14) >= 55.
+- BEARISH candidate:
+  - last completed close < session VWAP;
+  - EMA(20) < EMA(50);
+  - RSI(14) <= 45.
+- otherwise NEUTRAL.
+
+A BULLISH or BEARISH candidate becomes entry-eligible only after two consecutive
+completed 5-minute bars classify in the same direction. No entry uses an
+in-progress bar.
+
+The thresholds are a v1 baseline for research/backtesting, not a claim of
+optimal profitability. Architecture-134/142/146 research infrastructure remains
+available to compare and later promote improved classifiers through the existing
+research/promotion discipline.
+
+AI/research may produce explanation, confidence, alternate signals and
+experiments in v1, but it may not directly choose quantity, bypass a deterministic
+gate or turn NEUTRAL into a live order. A later accepted milestone may make an
+AI classifier trade-authoritative only under an explicit tested contract.
+
+## Entry rules
+
+Initial session policy:
+
+- no entry before 15 minutes after the official regular-session open;
+- no new entry during the final 30 minutes before the official regular-session
+  close;
+- official XNYS session authority owns open/close timing, including shortened
+  sessions;
+- BULLISH target -> long TQQQ;
+- BEARISH target -> long SQQQ;
+- NEUTRAL target -> no new position;
+- never hold both TQQQ and SQQQ;
+- never flip directly in one effect: exit, reconcile exact FLAT, then a later
+  cycle may enter the opposite ETF;
+- fresh account state, buying power, symbol tradability/fractional capability,
+  approval state, open orders and current positions must be re-derived at the
+  live effect boundary;
+- exact order arguments must receive broker review when supported by the
+  accepted Robinhood contract;
+- quantity/notional is deterministic source-owned risk output, never model text.
+
+The currently accepted Architecture-147 <=$10 tiny-live acquisition authority
+is not silently enlarged by this pivot. Any larger live notional or whole-share
+requirement needs a separately reviewed risk change.
+
+## Exit rules
+
+V1 exits are deterministic and have strict priority:
+
+1. hard stop;
+2. source/state/broker safety failure requiring flattening;
+3. confirmed regime exit/reversal;
+4. scheduled forced-flat before the regular-session close.
+
+A regime exit occurs after two consecutive completed 5-minute QQQ bars no
+longer support the held direction. An opposite confirmed regime is still an
+exit first; it is not same-cycle authority to enter the inverse ETF.
+
+The forced-flat boundary begins five minutes before the official regular-session
+close. No new Architecture-148 entry follows that boundary during the session.
+
+No fixed take-profit target is required in v1. Research may evaluate take-profit,
+trailing-stop and alternate exit policies without giving them live authority.
+
+## Hard stop-loss invariant
+
+The v1 hard stop is **3.00% below the reconciled average entry fill price of the
+held ETF**.
+
+For an entry average fill `P`, the immutable initial stop price is
+`P * 0.97`, rounded only according to the exact accepted broker price contract.
+
+Rules:
+
+- the stop is based on actual reconciled fill facts, not signal/quote price;
+- it can never be widened downward after entry;
+- a software risk check treats price at/below the threshold as mandatory EXIT;
+- the preferred live protection is a broker-resident sell stop-market order
+  covering the entire exact owned quantity as soon as the position is
+  reconciled enough to place it safely;
+- if exact full-position broker stop protection cannot be proven, live entry is
+  not considered fully ready for promotion;
+- restart/recovery with an owned TQQQ/SQQQ position and missing, malformed,
+  conflicting or under-sized protection blocks new entries and prioritizes
+  protective reconciliation/exit;
+- stop cancellation/replacement is an effect and must obey the same durable
+  intent, `ref_id`, no-ambiguous-retry and reconciliation rules as other
+  writes.
+
+Robinhood currently supports stop-market equity orders for agents. A stop price
+does not guarantee execution price: when triggered it becomes a market order
+and may fill below the stop, particularly in volatile conditions. The hard stop
+is therefore an exit trigger/protection invariant, not a guaranteed maximum
+loss.
+
+Reference:
+- https://robinhood.com/us/en/support/articles/trading-with-your-agent/
+- https://robinhood.com/us/en/support/articles/stop-order/
+
+## Broker parity requirements carried into Architecture 148
+
+The new runtime must not repeat the L43 parity omissions. Before any real
+Architecture-148 observation/effect, source must demonstrate:
+
+- fresh account active/agentic eligibility;
+- fresh portfolio/cash/buying-power facts;
+- fresh TQQQ/SQQQ/QQQ tradability and applicable fractional capability;
+- fresh trade-approval state and typed handling of a provider-created approval
+  request;
+- exact pre-trade broker review with current warnings;
+- deterministic per-logical-order `ref_id`;
+- `ref_id` retained in normalized broker order facts;
+- exhaustive current order/position reads with bounded pagination;
+- durable intent persisted before an ambiguous write;
+- no automatic retry after a write that may have landed;
+- factual reconciliation of an unbound ambiguous write by stable `ref_id` plus
+  exact order facts;
+- single-writer application/state ownership;
+- stop-order lifecycle represented durably, including partial fill, cancel,
+  reject, unknown and restart;
+- current provider schema parity tests against the accepted live tool surface.
+
+## Existing work retained
+
+Reuse rather than rewrite accepted components where their contracts fit:
+
+- Robinhood MCP OAuth/session and structured-content transport;
+- account resolution and agentic-account constraints;
+- RHC2/RHC3 account-wide order-scope evidence;
+- durable MAY_HAVE_OCCURRED/UNKNOWN semantics;
+- RHC3P factual settlement/reconciliation;
+- source identity and exact-state continuity;
+- XNYS calendar/session authority;
+- Alpaca/research acquisition where useful;
+- deterministic risk engine;
+- research/backtest/campaign infrastructure;
+- GUI Start/Stop, status and kill controls;
+- checkpoint/source authority and mapped certification topology.
+
+Architecture-147 Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY. Its
+standalone L43 state-provisioning successor is superseded as the immediate
+milestone. If Architecture 148 reuses that state implementation it must provision
+or migrate it as part of the new complete application dependency closure, not
+as permission to rerun Q1.
+
+Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
+
+## First source milestone: 148-A runtime skeleton and parity closure
+
+148-A is source-only/fake-only. It must not invoke real Robinhood, OAuth,
+browser, Alpaca, broker review/place/cancel, production state preparation or
+`FINAL_HOLDOUT`.
+
+Deliver one coherent runtime skeleton with:
+
+- explicit `MarketRegime = BULLISH | BEARISH | NEUTRAL`;
+- fixed v1 symbols QQQ/TQQQ/SQQQ;
+- completed-bar indicator calculation and two-bar confirmation;
+- desired-position planner;
+- 3% hard-stop policy object;
+- intraday session admission/forced-flat policy;
+- deterministic transition planner that forbids simultaneous TQQQ/SQQQ and
+  same-cycle flips;
+- broker snapshot/provider protocols containing all parity facts above;
+- durable intent/ref-id model including protective-stop intent;
+- application-cycle service that is completely fakeable and effect-free unless
+  handed an explicit admitted effect executor;
+- GUI-facing cycle/status projection;
+- a written parity matrix mapping the siropkin application loop, accepted P6,
+  current Architecture-147 safety components and current Robinhood MCP
+  requirements into Architecture 148.
+
+Do not delete accepted L43/P6 source during 148-A. Compose around it or add the
+new vertical runtime first; removal of obsolete paths is a later separately
+reviewed cleanup after parity tests prove replacement coverage.
+
+## Verification strategy
+
+Focused implementation tests should cover at minimum:
+
+- bullish two-bar confirmation targets TQQQ;
+- bearish two-bar confirmation targets SQQQ;
+- neutral/no confirmation targets FLAT;
+- in-progress bars never influence a decision;
+- no entry in the opening exclusion window;
+- no entry in the closing exclusion window;
+- forced-flat starts exactly five minutes before official close;
+- simultaneous TQQQ+SQQQ is impossible;
+- reversal produces EXIT first and no same-cycle inverse entry;
+- 3% stop derives from reconciled average fill;
+- stop never widens;
+- threshold breach produces mandatory EXIT;
+- restart with unprotected owned position blocks entry;
+- exact broker-stop coverage is required for live-ready state;
+- account/buying-power/tradability/approval/review facts are part of effect
+  admission;
+- deterministic `ref_id` is stable for one logical intent and changes for a
+  new intent;
+- ambiguous placement cannot automatically retry;
+- reconciliation can identify a unique order by `ref_id`;
+- provider calls/effects remain zero under import, construction, help and all
+  fake/source tests.
+
+Codex/Luna should run focused tests only while iterating. The repository's
+general `ops.ps1 admit` remains the required broad prepublication admission
+before the one atomic feature push. The user retains final local broad
+verification ownership unless repository admission itself requires it.
+
+## Subsequent milestones
+
+After 148-A exact-source acceptance/integration:
+
+- 148-B: backtest the fixed v1 regime/entry/exit/3% stop on retained historical
+  data, compare against flat/QQQ controls and record drawdown/whipsaw/turnover;
+- 148-C: desktop/demo integration and GUI status/control path;
+- 148-D: current Robinhood read-only parity/preflight using the new complete
+  runtime dependency closure;
+- 148-E: separately reviewed protective-order and tiny-live effect boundary only
+  after exact stop compatibility and risk/notional authority are proven.
+
+No milestone automatically authorizes the next protected effect.

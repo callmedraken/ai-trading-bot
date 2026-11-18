@@ -1,6 +1,15 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L43-Q1 consumed BLOCKED; L43 state prerequisite gap
+## Current milestone - Architecture 148 TQQQ/SQQQ application-runtime pivot
+
+
+Architecture 148 is now the current product direction under [the frozen pivot design](architecture/148-tqqq-sqqq-runtime-pivot.md). The first application version is intraday-only and may hold exactly one of TQQQ, SQQQ or FLAT. QQQ is the primary direction reference. V1 uses completed 5-minute bars, session VWAP, EMA(20), EMA(50) and RSI(14), requires two consecutive same-direction completed bars before an entry, forbids same-cycle flips, and forces the application flat beginning five minutes before the official regular-session close.
+
+The hard stop-loss invariant is source-owned at 3.00% below the reconciled average entry fill and may never be widened. A broker-resident full-position stop-market order is the preferred live protection; software logic independently treats a stop breach as mandatory EXIT. Live promotion is blocked when exact full-position stop protection cannot be proven. Robinhood's stop execution price is not guaranteed, so this is an exit/protection invariant rather than a guaranteed maximum loss.
+
+Architecture 148 adopts the simple application-loop shape reviewed in `siropkin/robinhood-ai-trading-bot@1a778749cfbe92c7ab9444b12e3cc73587533ade` while retaining this repository's stronger MCP OAuth/session, deterministic risk, durable intent, `ref_id`, UNKNOWN/no-retry reconciliation, source/state continuity, XNYS calendar, research/backtest, GUI and certification components. Direct Robinhood username/password login, `robin_stocks`, generic write retry and prompt-only risk constraints are explicitly not adopted.
+
+148-A is the next source-only/fake-only milestone: create the complete runtime skeleton and provider-parity closure without deleting accepted L43/P6 source and without any real provider or broker effect. Standalone L43 state provisioning is no longer the immediate milestone. Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; no Q1 retry is authorized. Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
 
 L43-Q1 source/certification is independently ACCEPTED and FAST-FORWARD INTEGRATED at HEAD `05f4c4700f82c3d40c83f474c3cf614573d48091` / tree `70aec1c51e63705a68d6710cc3448ac994227e46`. Feature mapped FULL run `44260469616`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and all seven canonical FULL lanes passing. Develop run `44264566809`, attempt 1, is terminal SUCCESS with exact feature-certification reuse; active/FULL/certification jobs were skipped on develop, so no duplicate FULL ran. Local feature/develop reconciliation later reached the same exact clean HEAD/tree.
 
@@ -28,7 +37,7 @@ Q62 is not pending. The accepted tiny-live source was integrated at `f709ec7cc6b
 
 The evidence proves the canonical composition and source identity were obtained, but the qualification did not bind an L43 durable-state snapshot. Source inspection shows the production snapshot reader opens only the fixed pre-provisioned `F:\AI\arch147-l43-live-state-v1\durable-state.jsonl` state plus its lock and never initializes it. No production L43 state-provisioning command currently exists; state creation appears only in fake/test fixtures. Because the sanitized Q1 result intentionally suppresses the underlying exception, it does not prove whether the host failure was a missing journal, missing lock, ownership/identity problem or another `L43StateUnavailable` case.
 
-The next source milestone is therefore a separately reviewed L43 state-provisioning and diagnostic-discrimination checkpoint. It must remain provider/broker-effect free, create or validate only the exact fixed L43 state prerequisite under explicit one-shot authority, preserve Q62 as immutable, and give Q1 a typed fail-closed state reason instead of collapsing this pre-provider class into `QUALIFICATION_INDETERMINATE`. No second Q1 observation is authorized until that source is accepted/integrated and its state-preparation boundary is separately reviewed. L43 order effects remain NOT RUN / NOT AUTHORIZED; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED.
+That former standalone state-provisioning successor is superseded as the immediate milestone by Architecture 148. Any L43 state code reused by the new application must be provisioned or migrated as part of 148's complete runtime dependency closure. The consumed Q1 result is preserved and is not rerun. L43/Architecture-148 order effects remain NOT RUN / NOT AUTHORIZED; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

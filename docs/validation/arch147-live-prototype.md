@@ -1,5 +1,23 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
+## Architecture 148 application pivot — CURRENT SUCCESSOR / design-only
+
+Architecture 147 remains immutable historical and reusable safety evidence, but
+it is no longer the application architecture being extended. The current
+successor is [Architecture 148](../architecture/148-tqqq-sqqq-runtime-pivot.md):
+a simple end-to-end TQQQ/SQQQ intraday application loop with QQQ direction
+classification, deterministic entry/exit planning, 3% hard-stop protection,
+forced flat before regular-session close and explicit broker/provider parity.
+
+The consumed Q1 observation remains `BLOCKED / QUALIFICATION_INDETERMINATE /
+NO AUTOMATIC RETRY` and is not rerun. The previously proposed standalone L43
+state-provisioning checkpoint is superseded as the immediate milestone; any
+reused L43 state is handled inside the Architecture-148 dependency closure.
+
+148-A is SOURCE_ONLY / FAKE_ONLY. It authorizes no Robinhood/OAuth/browser/
+Alpaca call, production state preparation, broker review/place/cancel, Q63 or
+`FINAL_HOLDOUT` access.
+
 ## RHC4 C2 prepublication coverage and stale-current correction — SOURCE_ONLY / exact review correction
 
 The first RHC4 publication was

@@ -365,6 +365,108 @@ OPEN.
 148-B1 is source-only/fake-only. It performs no provider acquisition, reads no
 credentials, does not open `FINAL_HOLDOUT`, and does not authorize B2.
 
+## 148-B2 read-only acquisition and evidence boundary
+
+B2 is split into two authority stages. **148-B2-A** is source-only/fake-only:
+it adds the one-shot acquisition coordinator, source admission, durable attempt
+and request accounting, artifact/evidence writer and synthetic tests. B2-A
+source publication performs zero credential reads and zero provider requests.
+**148-B2-B** is the later separately reviewed real read-only Alpaca acquisition
+on the exact accepted/integrated B2-A source. B2-B is not authorized by source
+publication or by this design document.
+
+The provider contract was rechecked against Alpaca's current public Market Data
+documentation on 2026-11-18. B2 retains the accepted B1 request surface:
+`GET https://data.alpaca.markets/v2/stocks/bars`, one symbol per request,
+`5Min`, OPEN `[2016-01-01, 2024-01-01)`, inclusive provider end
+`2023-12-31T23:59:59.999999Z`, `adjustment=all`, `asof=-`, `feed=sip`,
+`currency=USD`, `sort=asc`, `limit=10000`, and provider
+`next_page_token` exhaustion. Current Alpaca documentation continues to state
+that historical stock data is available from 2016 and that SIP historical
+queries outside the latest-15-minute restriction are available without using a
+separate entitlement-probe request. Account-specific 401/403 therefore remains
+a runtime fact of the first reviewed acquisition request, not a reason to issue
+a separate provider preflight.
+
+References:
+
+- https://docs.alpaca.markets/us/reference/stockbars
+- https://docs.alpaca.markets/us/docs/about-market-data-api
+- https://docs.alpaca.markets/us/docs/historical-api
+
+The accepted published-session resource contains 2,012 OPEN sessions from 2016
+through 2023. With the exact 15 committed early-close sessions, B2 must qualify
+exactly **156,396 five-minute slots per symbol** and **469,188 total bars**.
+The accepted B1 dataset constructor remains the semantic authority for exact
+slot coverage and identical timestamps across QQQ/TQQQ/SQQQ.
+
+B2-B uses the existing current-product Windows Alpaca credential boundary
+`read_current_product_alpaca_secrets` exactly once and the existing
+`StdlibAlpacaHistoricalBarsTransport`. There is no environment fallback,
+interactive-research credential fallback, alternate HTTP client, redirect,
+decompression, or retry path. Secrets remain scoped and redacted. Provider
+request attempts are counted before transport invocation because a transport
+exception can be ambiguous as to whether the GET reached the provider.
+
+The acquisition order is fixed: QQQ, then TQQQ, then SQQQ. Pagination is
+sequential within one symbol and must exhaust before the next symbol begins.
+B1's general parser remains unchanged, but B2 adds a stricter effect ceiling of
+64 pages per symbol and 192 provider request attempts total. The ordinary
+minimum at the 10,000-bar page limit is 16 pages per symbol; if the provider
+requires more than 64 pages for any symbol, B2 stops for review rather than
+issuing an unbounded request train. HTTP 401/403, 429, 5xx, transport ambiguity,
+schema failure, repeated token, page bound, source drift or qualification
+failure all stop immediately with **no automatic retry**.
+
+B2-B writes only to one fresh attempt directory under
+`F:\AI\temp\arch148-b2-<canonical-uuid>`. The directory must be absent,
+its resolved parent must be the exact non-reparse `F:\AI\temp` authority,
+and files are create-once. A durable nonsecret attempt claim is written before
+credential access. Before every provider GET, a create-once nonsecret request
+intent records sequence/symbol/page ordinal and digests of opaque pagination
+material; a matching result record follows only after the request returns.
+An intent with no result is therefore conservatively `MAY_HAVE_OCCURRED` and
+forbids automatic replay.
+
+Every successful provider page is persisted byte-for-byte under the fresh B2
+attempt directory before B1 parsing advances pagination. Raw pages are OPEN
+research data only; no FINAL_HOLDOUT interval is requested. Request IDs are not
+persisted raw: only SHA-256 digests are retained. After all three streams
+qualify, the operator builds the unchanged B1 `IntradayDataset` and
+`IntradayCustodyEvidence`, writes canonical `dataset.json`,
+`custody-evidence.json` and per-symbol canonical normalized CSV, and verifies
+read-back hashes/lengths. It then re-admits exact source identity before writing
+terminal evidence.
+
+Terminal evidence schema is
+`arch148-b2-readonly-acquisition-evidence/v1`. It must bind the exact B2-A
+source HEAD/tree, branch and both live origin refs; attempt UUID; B1 dataset and
+custody schema/identities; schedule identity/digest; request descriptor digest;
+price basis; OPEN bounds; symbols; expected session/slot/bar counts; credential
+read-attempt count; provider request-attempt ceiling/count; per-symbol ordered
+page body SHA-256/size/request-ID-digest vectors; pagination exhaustion;
+canonical dataset/custody/normalized artifact SHA-256 and byte sizes; dataset
+identity; custody evidence ID; sanitized failure classification where
+applicable; `automatic_retry=FORBIDDEN`; and explicit zero Robinhood, broker,
+order, production-state and FINAL_HOLDOUT effects. It contains no credential
+value, raw authentication header, raw request ID, environment dump, traceback
+or arbitrary exception text.
+
+Successful B2-B classification is
+`READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW`, not dataset acceptance and not
+backtest promotion. The operator must print the canonical terminal evidence plus
+its SHA-256/byte length for independent review. ChatGPT must review that exact
+evidence before the real dataset may be used for the Architecture-148 baseline.
+The baseline is deliberately **not** run inside the provider acquisition
+attempt. After evidence acceptance, the already accepted pure B1 simulator may
+run zero-cost and conservative-cost baselines without another provider request.
+
+The existing `arch147-live-prototype` FULL source route remains the owner of
+B2-A publication on `feature/robinhood-live-prototype-current`. B2-A may add
+route-owned source/tests/Ruff paths as needed, but it must not register a new
+provider-capable checkpoint callback and must keep checkpoint `execute=None`.
+The real B2-B call is an explicit separately reviewed operator invocation only.
+
 ## Subsequent milestones
 
 After accepted/integrated 148-A:

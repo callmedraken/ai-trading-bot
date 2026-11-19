@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148-B2-A accepted/integrated; B2-B separately reviewed
+## Current milestone: Architecture 148-B2-B consumed / blocked; B2-A-C1 correction pending exact review
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -23,30 +23,40 @@ reuse step passed and active tests, `full-tests`, `certification-tests` and
 `certification-full` were skipped. No duplicate seven-lane FULL ran.
 
 The canonical feature worktree is
-`F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current`; the local
-integration checkout is `F:\\AI\\worktrees\\ai-trading-bot-p4-integration-e5e800a`.
-Both were verified at the accepted executable source identity with clean
-tracked/index/untracked state. The accepted/certified B2-A executable source
-remains `6957afa159647ece18af876289d8a20637cfc6eb` / tree
-`43701fcaef23990a793359d08a8213d43e434780`. Coordination-only descendants do
-not change those executable/test/workflow bytes. Before B2-B, both live refs and
-the canonical feature checkout must be reconciled to the exact reviewed
-docs-only descendant supplied to the operator. B2-A is source-only/fake-only.
-No Alpaca credential read, provider request, Robinhood/broker action, production
-mutation or `FINAL_HOLDOUT` access occurred.
+`F:\AI\worktrees\ai-trading-bot-live-prototype-current`; the local integration
+checkout is
+`F:\AI\worktrees\ai-trading-bot-p4-integration-e5e800a`. At B2-A integration,
+both were verified clean at the accepted executable source identity. B2-A was
+source-only/fake-only with zero Alpaca credential reads and provider requests.
+The prior docs-only invocation-source shortcut does not apply to B2-A-C1 because
+it changes executable source and tests.
 
-The next boundary is one separately reviewed real read-only B2-B acquisition
-attempt on this exact integrated source. This closeout authorizes no Alpaca
-credential/provider access, retry or fallback. ChatGPT must review and issue
-the exact one-shot B2-B invocation; do not run B2-B from this handoff alone.
+The separately reviewed B2-B attempt
+`fd8aa437-c748-4d5b-a52f-1e58b2ca5953` is CONSUMED / BLOCKED /
+PAGE_LIMIT_REACHED / NO RETRY at
+`F:\AI\temp\arch148-b2-fd8aa437-c748-4d5b-a52f-1e58b2ca5953`. It read
+credentials once, made 64 provider attempts and received 64 successful QQQ
+pages; TQQQ and SQQQ were not requested. QQQ raw/regular-slot/off-slot counts
+were 162426 / 78057 / 84369, and unresolved intent was NONE. The classification
+is ARCH148_B2_PROVIDER_STREAM_SCOPE_ASSUMPTION_DEFECT /
+ARCH148_B2_PAGINATION_CEILING_UNDERSIZED; Robinhood, broker, order, production,
+FINAL_HOLDOUT and baseline effects were zero. The attempt is immutable and
+cannot be retried. See [the B2 acquisition plan](validation/arch148-b2-readonly-acquisition-plan.md)
+for full incident facts, invocation/admission rules and corrected source
+contract.
+
+B2-A-C1 is the frozen corrective source contract; its source and tests must pass exact-source
+publication, mapped certification and independent ChatGPT acceptance before
+integration. After integration and canonical worktree catch-up, ChatGPT may
+review a separately named fresh successor invocation. No provider or credential
+action is authorized before that distinct review.
 
 Architecture 148-B1 is accepted/integrated at `68b9526f022458cbcdd4f25ff268e0de7c56e562` / tree `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`. The initial B1 commit `70b0a8de5cb3b2cf4fb826352b6ada3650c57614` remains preserved with green run `44432367772` but was exact-source rejected; corrective C1 closed the reviewed defects. Feature mapped FULL `44438409583`, attempt 1, is SUCCESS. Develop `44465681331`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. The operator integration report records both canonical F: worktrees and both live refs at the exact accepted HEAD/tree and clean; the feature checkout required no catch-up.
 
-The B2-A source checkpoint is complete. B2-B remains a separately reviewed
-READ_ONLY historical-data acquisition/qualification on the accepted B1 OPEN
-contract and exact integrated B2-A source. This closeout authorizes no provider
-access, credential read, Robinhood/broker action, production mutation or
-`FINAL_HOLDOUT` access.
+B2-B is CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY. B2-A-C1 source
+correction and exact-source acceptance, certification and integration must
+precede review of any fresh successor invocation. No provider/credential,
+Robinhood/broker, production or `FINAL_HOLDOUT` action is authorized here.
 
 
 ### Architecture 148-B1 accepted intraday identity
@@ -67,7 +77,7 @@ access, credential read, Robinhood/broker action, production mutation or
 - schedule identity: `4fe981d0-34ef-57be-a7d1-ffd017460bf5`
 - schedule SHA-256: `a33be70499cdafbfa21f45a04c854ab834425807b6c0314814b7442749aa2bad`
 - source/provider/credential/broker/production/FINAL_HOLDOUT effects during B1: zero
-- B2: NOT RUN / separately reviewed READ_ONLY boundary
+- B2-B: CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY; see the current B2 handoff above.
 
 The accepted B1 simulator executes signals no earlier than the next bar open, then activates the 3% hard stop immediately for the entry bar. Entry-bar gap-through exits use the bar OPEN; otherwise a LOW breach exits at the stop threshold. The shared `live_runtime.strategy.confirmed_regime_exit` rule is used by both runtime and research paths. Dataset and custody schemas are v2 and bind the Architecture-148 schedule commitment separately from the Architecture-146 session-date authority.
 

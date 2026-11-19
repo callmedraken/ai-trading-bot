@@ -367,112 +367,106 @@ credentials, does not open `FINAL_HOLDOUT`, and does not authorize B2.
 
 ## 148-B2 read-only acquisition and evidence boundary
 
-B2 is split into two authority stages. **148-B2-A** is source-only/fake-only:
-it adds the one-shot acquisition coordinator, source admission, durable attempt
-and request accounting, artifact/evidence writer and synthetic tests. B2-A
-source publication performs zero credential reads and zero provider requests.
-**148-B2-B** is the later separately reviewed real read-only Alpaca acquisition
-on the exact accepted/integrated B2-A source. B2-B is not authorized by source
-publication or by this design document.
+B2-A was the source-only/fake-only operator and custody checkpoint. Its accepted
+and integrated executable source is HEAD `6957afa159647ece18af876289d8a20637cfc6eb`
+/ tree `43701fcaef23990a793359d08a8213d43e434780`. Feature source-gate
+`44485930260` and develop source-gate `44489803571` were terminal SUCCESS;
+develop reused the exact feature certification. B2-A itself performed zero
+credential reads and zero provider requests.
 
-The provider contract was rechecked against Alpaca's current public Market Data
-documentation on 2026-11-18. B2 retains the accepted B1 request surface:
-`GET https://data.alpaca.markets/v2/stocks/bars`, one symbol per request,
-`5Min`, OPEN `[2016-01-01, 2024-01-01)`, inclusive provider end
-`2023-12-31T23:59:59.999999Z`, `adjustment=all`, `asof=-`, `feed=sip`,
-`currency=USD`, `sort=asc`, `limit=10000`, and provider
-`next_page_token` exhaustion. Current Alpaca documentation continues to state
-that historical stock data is available from 2016 and that SIP historical
-queries outside the latest-15-minute restriction are available without using a
-separate entitlement-probe request. Account-specific 401/403 therefore remains
-a runtime fact of the first reviewed acquisition request, not a reason to issue
-a separate provider preflight.
+### Consumed B2-B attempt
 
+The separately reviewed B2-B attempt
+`fd8aa437-c748-4d5b-a52f-1e58b2ca5953` is CONSUMED / BLOCKED /
+PAGE_LIMIT_REACHED / NO RETRY. Its retained directory is
+`F:\AI\temp\arch148-b2-fd8aa437-c748-4d5b-a52f-1e58b2ca5953`. It read Alpaca
+credentials once, made 64 provider attempts and received 64 successful pages.
+It requested QQQ only; TQQQ and SQQQ were never requested. The incident is
+classified ARCH148_B2_PROVIDER_STREAM_SCOPE_ASSUMPTION_DEFECT /
+ARCH148_B2_PAGINATION_CEILING_UNDERSIZED. Detailed counts and chronology are
+preserved in [the B2 acquisition plan](../validation/arch148-b2-readonly-acquisition-plan.md).
+The attempt is immutable evidence, not retry authority; automatic retry is
+forbidden. Robinhood, broker, order, production, FINAL_HOLDOUT and baseline
+effects were all zero.
+
+### Corrected B2-A-C1 source contract
+
+Provider documentation was rechecked on 2026-11-18. For
+`GET https://data.alpaca.markets/v2/stocks/bars`, `limit=10000` is a maximum,
+not an expected page size; fewer bars may be returned while more remain, so
+callers must exhaust `next_page_token`. Historical stock minute bars include
+pre-market and aftermarket activity, and the endpoint has no regular-session-
+only filter. No separate entitlement-probe request is issued; account-specific
+401/403 remains a runtime fact of the first reviewed acquisition request.
 References:
+[stock bars](https://docs.alpaca.markets/us/reference/stockbars),
+[market data API](https://docs.alpaca.markets/us/docs/about-market-data-api),
+and [historical API](https://docs.alpaca.markets/us/docs/historical-api).
 
-- https://docs.alpaca.markets/us/reference/stockbars
-- https://docs.alpaca.markets/us/docs/about-market-data-api
-- https://docs.alpaca.markets/us/docs/historical-api
+The B2-A-C1 correction preserves the accepted B1 schedule, dataset, parser,
+custody, simulator, price basis, 156396 expected slots per symbol, 469188 total
+bars, no-lookahead semantics and FINAL_HOLDOUT boundary. The accepted B1 request
+surface remains one symbol per request, `5Min`, OPEN
+`[2016-01-01, 2024-01-01)`, inclusive provider end
+`2023-12-31T23:59:59.999999Z`, `adjustment=all`, `asof=-`, `feed=sip`,
+`currency=USD`, `sort=asc` and requested `limit=10000`. Acquisition order
+remains QQQ, TQQQ, SQQQ, with sequential pagination within each symbol.
 
-The accepted published-session resource contains 2,012 OPEN sessions from 2016
-through 2023. With the exact 15 committed early-close sessions, B2 must qualify
-exactly **156,396 five-minute slots per symbol** and **469,188 total bars**.
-The accepted B1 dataset constructor remains the semantic authority for exact
-slot coverage and identical timestamps across QQQ/TQQQ/SQQQ.
+B2 validates each parsed raw provider bar for the exact requested symbol,
+strict chronological order and duplicate prevention before projection. It
+derives the exact accepted slot set from B1 `expected_open_slots()`. A
+validated raw bar outside that set stays byte-for-byte in its raw page artifact
+but is excluded from the normalized B1 dataset. This deterministic projection
+does not alter raw provider evidence. The unchanged B1 dataset and custody
+constructors still require exactly 156396 accepted regular-session bars per
+symbol, 469188 total, identical QQQ/TQQQ/SQQQ timestamps and all existing B1
+validation. Missing or malformed expected-slot data fails closed.
 
-B2-B uses the existing current-product Windows Alpaca credential boundary
-`read_current_product_alpaca_secrets` exactly once and the existing
-`StdlibAlpacaHistoricalBarsTransport`. There is no environment fallback,
-interactive-research credential fallback, alternate HTTP client, redirect,
-decompression, or retry path. Secrets remain scoped and redacted. Provider
-request attempts are counted before transport invocation because a transport
-exception can be ambiguous as to whether the GET reached the provider.
+Terminal schema advances to
+`arch148-b2-readonly-acquisition-evidence/v2`. Per symbol it reports the raw
+provider bar count, qualified regular-session bar count and excluded
+non-regular-slot bar count, and proves
+`raw_bar_count = qualified_regular_session_bar_count + excluded_non_regular_bar_count`.
+Ordered raw-page SHA-256, raw-page size and request-ID digest vectors remain
+bound. Raw pages are persisted and verified before parsing or projection
+advances. Terminal and failure evidence contain no raw pagination token, raw
+request ID, credential, authentication header, environment value, traceback or
+arbitrary exception text. B1 dataset and custody schemas and identities remain
+unchanged.
 
-The acquisition order is fixed: QQQ, then TQQQ, then SQQQ. Pagination is
-sequential within one symbol and must exhaust before the next symbol begins.
-B1's general parser remains unchanged, but B2 adds a stricter effect ceiling of
-64 pages per symbol and 192 provider request attempts total. The ordinary
-minimum at the 10,000-bar page limit is 16 pages per symbol; if the provider
-requires more than 64 pages for any symbol, B2 stops for review rather than
-issuing an unbounded request train. HTTP 401/403, 429, 5xx, transport ambiguity,
-schema failure, repeated token, page bound, source drift or qualification
-failure all stop immediately with **no automatic retry**.
+The corrected B2-local ceilings are `192` pages per symbol and `576` provider
+request attempts total. Provider-request starts are separated by a deterministic
+minimum `0.5-second` delay after the first. Pacing occurs before authoring the
+next request intent; source identity is rechecked immediately before each
+intent and GET. Pacing grants no retry. HTTP 401/403, 429, 5xx, transport
+ambiguity, malformed data, repeated token, source drift or either ceiling ends
+the attempt immediately. No wait-and-retry, alternate feed, alternate client
+or credential fallback is allowed.
 
-B2-B writes only to one fresh attempt directory under
-`F:\AI\temp\arch148-b2-<canonical-uuid>`. The directory must be absent,
-its resolved parent must be the exact non-reparse `F:\AI\temp` authority,
-and files are create-once. A durable nonsecret attempt claim is written before
-credential access. Before every provider GET, a create-once nonsecret request
-intent records sequence/symbol/page ordinal and digests of opaque pagination
-material; a matching result record follows only after the request returns.
-An intent with no result is therefore conservatively `MAY_HAVE_OCCURRED` and
-forbids automatic replay.
+Before any baseline backtest, ChatGPT must review and accept the exact acquisition
+evidence. After that review, the accepted pure B1 simulator may run zero-cost
+and conservative-cost baselines against flat and QQQ controls, reporting
+drawdown, whipsaw and turnover. Baseline execution makes no provider request.
 
-Every successful provider page is persisted byte-for-byte under the fresh B2
-attempt directory before B1 parsing advances pagination. Raw pages are OPEN
-research data only; no FINAL_HOLDOUT interval is requested. Request IDs are not
-persisted raw: only SHA-256 digests are retained. After all three streams
-qualify, the operator builds the unchanged B1 `IntradayDataset` and
-`IntradayCustodyEvidence`, writes canonical `dataset.json`,
-`custody-evidence.json` and per-symbol canonical normalized CSV, and verifies
-read-back hashes/lengths. It then re-admits exact source identity before writing
-terminal evidence.
+### Review boundary
 
-Terminal evidence schema is
-`arch148-b2-readonly-acquisition-evidence/v1`. It must bind the exact B2-A
-source HEAD/tree, branch and both live origin refs; attempt UUID; B1 dataset and
-custody schema/identities; schedule identity/digest; request descriptor digest;
-price basis; OPEN bounds; symbols; expected session/slot/bar counts; credential
-read-attempt count; provider request-attempt ceiling/count; per-symbol ordered
-page body SHA-256/size/request-ID-digest vectors; pagination exhaustion;
-canonical dataset/custody/normalized artifact SHA-256 and byte sizes; dataset
-identity; custody evidence ID; sanitized failure classification where
-applicable; `automatic_retry=FORBIDDEN`; and explicit zero Robinhood, broker,
-order, production-state and FINAL_HOLDOUT effects. It contains no credential
-value, raw authentication header, raw request ID, environment dump, traceback
-or arbitrary exception text.
-
-Successful B2-B classification is
-`READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW`, not dataset acceptance and not
-backtest promotion. The operator must print the canonical terminal evidence plus
-its SHA-256/byte length for independent review. ChatGPT must review that exact
-evidence before the real dataset may be used for the Architecture-148 baseline.
-The baseline is deliberately **not** run inside the provider acquisition
-attempt. After evidence acceptance, the already accepted pure B1 simulator may
-run zero-cost and conservative-cost baselines without another provider request.
-
-The existing `arch147-live-prototype` FULL source route remains the owner of
-B2-A publication on `feature/robinhood-live-prototype-current`. B2-A may add
-route-owned source/tests/Ruff paths as needed, but it must not register a new
-provider-capable checkpoint callback and must keep checkpoint `execute=None`.
-The real B2-B call is an explicit separately reviewed operator invocation only.
+B2-A-C1 changes executable source and tests, so the earlier docs-only
+descendant shortcut does not apply. The correction requires exact-source
+publication, mapped certification and independent ChatGPT source acceptance,
+then integration and canonical worktree catch-up. Only after those steps may
+ChatGPT review a separately named fresh successor invocation. The consumed
+B2-B attempt cannot be resumed or retried. This document and a source/preflight
+PASS grant no credential or provider authority; future successful acquisition
+evidence remains READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW until independently
+accepted. No Robinhood, broker, order, production, Q63 or FINAL_HOLDOUT action is
+part of B2-A-C1.
 
 ## Subsequent milestones
 
 After accepted/integrated 148-A:
 
 - 148-B1: source-only/fake-only 5-minute QQQ/TQQQ/SQQQ acquisition/custody and no-lookahead backtest contract, reusing existing evidence/holdout authority and selecting only an eligible pre-holdout range; no real provider call;
-- 148-B2: one separately reviewed read-only historical acquisition/qualification on accepted B1 source, followed by the deterministic baseline backtest against flat/QQQ controls with drawdown, whipsaw and turnover reporting. Existing daily-only research history is not sufficient evidence for these intraday rules;
+- 148-B2: complete the B2-A-C1 source correction, independent exact-source acceptance and integration; then review a separately named fresh read-only acquisition successor. Run the deterministic baseline against flat/QQQ controls only after the future acquisition evidence is independently accepted. Existing daily-only research history is not sufficient evidence for these intraday rules;
 - 148-C: desktop/demo integration and GUI status/control path;
 - 148-D: current Robinhood read-only parity/preflight using the new complete
   runtime dependency closure;

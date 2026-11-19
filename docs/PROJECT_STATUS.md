@@ -1,39 +1,30 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148-B2-A accepted/integrated; B2-B separately reviewed
+## Current milestone - Architecture 148-B2-B consumed / blocked; B2-A-C1 correction pending review
 
+The accepted B2-A predecessor is HEAD `6957afa159647ece18af876289d8a20637cfc6eb`
+/ tree `43701fcaef23990a793359d08a8213d43e434780`, parent
+`0f188ed75216855bc13077ed959ae92bc7463222`. Feature source-gate
+`44485930260` and develop source-gate `44489803571` are terminal SUCCESS;
+develop reused the exact feature certification with no duplicate FULL.
 
-Architecture 148-B2-A is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
-INTEGRATED at HEAD `6957afa159647ece18af876289d8a20637cfc6eb` / tree
-`43701fcaef23990a793359d08a8213d43e434780`, with direct parent
-`0f188ed75216855bc13077ed959ae92bc7463222`. The feature source-gate run
-`44485930260`, attempt 1, is terminal SUCCESS with active tests and all seven
-canonical FULL lanes green. Develop source-gate run `44489803571`, attempt 1,
-is terminal SUCCESS with exact feature-certification reuse; its exact-develop-
-reuse step passed and active tests, `full-tests`, `certification-tests` and
-`certification-full` were skipped, so no duplicate seven-lane FULL ran.
+Dashboard: B2-B attempt `fd8aa437-c748-4d5b-a52f-1e58b2ca5953` at
+`F:\AI\temp\arch148-b2-fd8aa437-c748-4d5b-a52f-1e58b2ca5953` is CONSUMED /
+BLOCKED / PAGE_LIMIT_REACHED / NO RETRY. Credential reads: 1; provider
+attempts/pages: 64/64; QQQ raw/regular-slot/off-slot bars: 162426 / 78057 /
+84369; unresolved intent: NONE; Robinhood/broker/order/production/
+FINAL_HOLDOUT/baseline effects: 0. The immutable attempt cannot be retried.
+See [the B2 acquisition plan](validation/arch148-b2-readonly-acquisition-plan.md)
+for the incident record and corrected source contract.
 
-The canonical feature worktree
-`F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current` and the documented
-local integration checkout
-`F:\\AI\\worktrees\\ai-trading-bot-p4-integration-e5e800a` were reconciled at
-the accepted executable source identity and clean tracked/index/untracked state.
-The accepted/certified B2-A executable source remains
-`6957afa159647ece18af876289d8a20637cfc6eb` /
-`43701fcaef23990a793359d08a8213d43e434780`. A later coordination-only
-descendant changes no executable/test/workflow bytes; B2-B source admission must
-bind the exact current clean docs-only descendant only after both live refs and
-the canonical feature worktree are equal at that descendant. B2-A is
-source-only/fake-only: no Alpaca credential read, provider request,
-Robinhood/broker action, production mutation or `FINAL_HOLDOUT` access occurred
-during this checkpoint.
-
-The next boundary is one separately reviewed real read-only B2-B acquisition
-attempt on this exact integrated source. This closeout does not authorize
-Alpaca credential/provider access, retries or fallback. ChatGPT must review and
-issue the exact one-shot B2-B invocation before any provider action; the
-accepted B1 simulator remains the later baseline-analysis owner.
-
+The B2-A-C1 contract preserves B1 and specifies raw-to-B1 slot projection,
+v2 per-symbol
+raw/qualified/excluded evidence counts, ceilings of 192 pages per symbol and
+576 total attempts, and 0.5-second minimum pacing between request starts after
+the first. Its source/test change requires a new exact-source checkpoint,
+mapped certification, independent acceptance, integration and catch-up before
+ChatGPT may review any separately named fresh successor invocation. This
+status record grants no provider or credential authority.
 
 Architecture 148 is now the current product direction under [the frozen pivot design](architecture/148-tqqq-sqqq-runtime-pivot.md). The first application version is intraday-only and may hold exactly one of TQQQ, SQQQ or FLAT. QQQ is the primary direction reference. V1 uses completed 5-minute bars, session VWAP, EMA(20), EMA(50) and RSI(14), requires two consecutive same-direction completed bars before an entry, forbids same-cycle flips, and forces the application flat beginning five minutes before the official regular-session close.
 
@@ -51,7 +42,10 @@ Architecture 148-B1 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
 
 The accepted B1 OPEN contract is completed 5-minute QQQ/TQQQ/SQQQ research data over `[2016-01-01, 2024-01-01)` UTC with `adjustment=all`, SIP, USD and price basis `ALPACA_ALL_ADJUSTED_INTRADAY_PRICE_V1`. Architecture 148 owns the separately committed intraday schedule identity `4fe981d0-34ef-57be-a7d1-ffd017460bf5` / SHA-256 `a33be70499cdafbfa21f45a04c854ab834425807b6c0314814b7442749aa2bad`. The simulator preserves completed-bar no-lookahead entry, conservative immediate entry-bar hard-stop handling, shared regime-exit semantics and deterministic fake-only controls. No real provider, credential, Robinhood, broker, production-state or `FINAL_HOLDOUT` effect occurred during B1.
 
-The next boundary is 148-B2, a separately reviewed READ_ONLY historical-data acquisition/qualification on the exact accepted B1 source, followed only by the deterministic baseline backtest/reporting authorized by its reviewed contract. This closeout does not itself authorize a provider call, credential read, broker action, live effect or `FINAL_HOLDOUT` access. Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
+The initial B2-B attempt is CONSUMED / BLOCKED / NO RETRY. B2-A-C1 must be
+independently accepted and integrated before ChatGPT can review a fresh
+successor invocation. Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; Q63
+remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
 
 L43-Q1 source/certification is independently ACCEPTED and FAST-FORWARD INTEGRATED at HEAD `05f4c4700f82c3d40c83f474c3cf614573d48091` / tree `70aec1c51e63705a68d6710cc3448ac994227e46`. Feature mapped FULL run `44260469616`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and all seven canonical FULL lanes passing. Develop run `44264566809`, attempt 1, is terminal SUCCESS with exact feature-certification reuse; active/FULL/certification jobs were skipped on develop, so no duplicate FULL ran. Local feature/develop reconciliation later reached the same exact clean HEAD/tree.
 

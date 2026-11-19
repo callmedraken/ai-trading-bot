@@ -34,6 +34,22 @@ _REQUEST_ID = "request-id-raw-test-value"
 _PAGE_TOKEN = "pagination-token-raw-test-value"
 
 
+@pytest.fixture(autouse=True)
+def _prevent_real_pacing_sleeps(monkeypatch: pytest.MonkeyPatch):
+    clock = {"now_ns": 0}
+
+    def advance_clock() -> int:
+        clock["now_ns"] += 1_000_000_000
+        return clock["now_ns"]
+
+    monkeypatch.setattr(subject, "monotonic_ns", advance_clock)
+    monkeypatch.setattr(
+        subject,
+        "sleep",
+        lambda seconds: pytest.fail(f"unexpected real pacing sleep: {seconds}"),
+    )
+
+
 def _facts(**changes: str) -> subject.SourceFacts:
     values = {
         "canonical_root": str(subject.CANONICAL_WORKTREE),
@@ -70,23 +86,24 @@ def _page_body(
     *,
     token: str | None = None,
     stamp: str = "2016-01-04T14:30:00Z",
+    stamps: tuple[str, ...] | None = None,
     bars: bool = True,
 ) -> bytes:
+    bar_stamps = stamps if stamps is not None else (stamp,) if bars else ()
     data = {
         "bars": {
             symbol: (
                 [
                     {
-                        "t": stamp,
+                        "t": bar_stamp,
                         "o": 10,
                         "h": 11,
                         "l": 9,
                         "c": 10,
                         "v": 100,
                     }
+                    for bar_stamp in bar_stamps
                 ]
-                if bars
-                else []
             )
         },
         "next_page_token": token,
@@ -140,6 +157,8 @@ def _page_accounting(symbol: str, bars: tuple[Bar, ...]) -> subject._PageAccount
         (hashlib.sha256(raw).hexdigest(),),
         (len(raw),),
         (hashlib.sha256(f"request-{symbol}".encode()).hexdigest(),),
+        len(bars),
+        0,
         bars,
     )
 
@@ -410,8 +429,10 @@ def test_b1_schedule_qualification_counts_are_frozen():
     assert subject.EXPECTED_OPEN_SESSIONS == 2012
     assert subject.EXPECTED_EARLY_CLOSE_SESSIONS == 15
     assert subject.EXPECTED_TOTAL_BARS == 469_188
-    assert subject.MAX_PAGES_PER_SYMBOL == 64
-    assert subject.MAX_PROVIDER_REQUEST_ATTEMPTS == 192
+    assert subject.MAX_PAGES_PER_SYMBOL == 192
+    assert subject.MAX_PROVIDER_REQUEST_ATTEMPTS == 576
+    assert subject.EVIDENCE_SCHEMA == "arch148-b2-readonly-acquisition-evidence/v2"
+    assert subject.MIN_PROVIDER_REQUEST_START_INTERVAL_SECONDS == 0.5
 
 
 def test_fetches_are_ordered_and_raw_pages_precede_b1_parsing(
@@ -482,6 +503,198 @@ def test_fetches_are_ordered_and_raw_pages_precede_b1_parsing(
     assert hashlib.sha256(_PAGE_TOKEN.encode()).hexdigest().encode() in authored
     assert hashlib.sha256(b"request-1-raw").hexdigest().encode() in authored
     assert (attempt / "raw" / "QQQ" / "0001.json").read_bytes() == bodies[0]
+
+
+def test_raw_provider_stream_projects_only_exact_regular_session_slots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(subject, "EVIDENCE_ROOT", tmp_path)
+    monkeypatch.setattr(subject, "_local_live_source_check", lambda expected: None)
+    attempt = tmp_path / f"arch148-b2-{UUID(int=20)}"
+    attempt.mkdir()
+    qqq_raw = _page_body(
+        "QQQ",
+        stamps=(
+            "2016-01-04T09:00:00Z",
+            "2016-01-04T14:30:00Z",
+            "2016-01-04T22:00:00Z",
+        ),
+    )
+    responses = [
+        _response(qqq_raw),
+        *(_response(_page_body(symbol)) for symbol in ("TQQQ", "SQQQ")),
+    ]
+    transport = _FakeTransport(responses, attempt_directory=attempt)
+
+    collected, attempts, successes, failure = subject._fetch_all_symbols(
+        attempt,
+        str(UUID(int=20)),
+        _EXPECTED,
+        transport,
+        "test-api-key",
+        "test-api-secret",
+    )
+
+    assert failure is None
+    assert attempts == successes == 3
+    assert (attempt / "raw" / "QQQ" / "0001.json").read_bytes() == qqq_raw
+    qqq = collected[0]
+    assert qqq.raw_bar_count == 3
+    assert qqq.qualified_regular_session_bar_count == 1
+    assert qqq.excluded_non_regular_bar_count == 2
+    assert qqq.raw_bar_count == (
+        qqq.qualified_regular_session_bar_count + qqq.excluded_non_regular_bar_count
+    )
+    assert tuple(bar.timestamp for bar in qqq.bars) == (
+        intraday.expected_open_slots()[0],
+    )
+    assert [
+        (
+            item.raw_bar_count,
+            item.qualified_regular_session_bar_count,
+            item.excluded_non_regular_bar_count,
+        )
+        for item in collected[1:]
+    ] == [(1, 1, 0), (1, 1, 0)]
+
+
+@pytest.mark.parametrize(
+    "second_off_session_timestamp",
+    ("2016-01-04T08:55:00Z", "2016-01-04T09:00:00Z"),
+    ids=("reordered", "duplicate"),
+)
+def test_cross_page_order_and_duplicate_checks_include_off_session_bars(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    second_off_session_timestamp: str,
+):
+    monkeypatch.setattr(subject, "EVIDENCE_ROOT", tmp_path)
+    monkeypatch.setattr(subject, "_local_live_source_check", lambda expected: None)
+    attempt = tmp_path / f"arch148-b2-{UUID(int=21)}"
+    attempt.mkdir()
+    bodies = (
+        _page_body("QQQ", stamp="2016-01-04T09:00:00Z", token="next-page"),
+        _page_body("QQQ", stamp=second_off_session_timestamp),
+    )
+    transport = _FakeTransport(
+        [_response(body) for body in bodies], attempt_directory=attempt
+    )
+
+    _, attempts, successes, failure = subject._fetch_all_symbols(
+        attempt,
+        str(UUID(int=21)),
+        _EXPECTED,
+        transport,
+        "test-api-key",
+        "test-api-secret",
+    )
+
+    assert failure == "PROVIDER_ORDER_INVALID"
+    assert attempts == 2
+    assert successes == 1
+    assert len(transport.calls) == 2
+    assert (attempt / "raw" / "QQQ" / "0001.json").read_bytes() == bodies[0]
+    assert (attempt / "raw" / "QQQ" / "0002.json").read_bytes() == bodies[1]
+
+
+def test_request_starts_are_paced_globally_without_delaying_first_attempt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(subject, "EVIDENCE_ROOT", tmp_path)
+    monkeypatch.setattr(subject, "_local_live_source_check", lambda expected: None)
+    attempt = tmp_path / f"arch148-b2-{UUID(int=22)}"
+    attempt.mkdir()
+    clock = {"now_ns": 0}
+    sleep_calls: list[float] = []
+    starts: list[int] = []
+    durations = iter((200_000_000, 700_000_000, 100_000_000))
+    monkeypatch.setattr(subject, "monotonic_ns", lambda: clock["now_ns"])
+
+    def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        clock["now_ns"] += round(seconds * 1_000_000_000)
+
+    monkeypatch.setattr(subject, "sleep", fake_sleep)
+
+    class _ClockedTransport(_FakeTransport):
+        def execute(self, request, *, api_key_id: str, api_secret_key: str):
+            starts.append(clock["now_ns"])
+            response = super().execute(
+                request, api_key_id=api_key_id, api_secret_key=api_secret_key
+            )
+            clock["now_ns"] += next(durations)
+            return response
+
+    transport = _ClockedTransport(
+        [_response(_page_body(symbol)) for symbol in intraday.INTRADAY_SYMBOLS],
+        attempt_directory=attempt,
+    )
+
+    _, attempts, successes, failure = subject._fetch_all_symbols(
+        attempt,
+        str(UUID(int=22)),
+        _EXPECTED,
+        transport,
+        "test-api-key",
+        "test-api-secret",
+    )
+
+    assert failure is None
+    assert attempts == successes == 3
+    assert starts == [0, 500_000_000, 1_200_000_000]
+    assert all(
+        later - earlier >= 500_000_000
+        for earlier, later in zip(starts, starts[1:], strict=False)
+    )
+    assert sleep_calls == pytest.approx([0.3])
+
+
+def test_pacing_failure_before_next_intent_preserves_completed_activity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(subject, "EVIDENCE_ROOT", tmp_path)
+    monkeypatch.setattr(subject, "_local_live_source_check", lambda expected: None)
+    monkeypatch.setattr(subject, "monotonic_ns", lambda: 0)
+
+    def failed_sleep(seconds: float) -> None:
+        raise RuntimeError("synthetic pacing interruption")
+
+    monkeypatch.setattr(subject, "sleep", failed_sleep)
+    attempt = tmp_path / f"arch148-b2-{UUID(int=23)}"
+    attempt.mkdir()
+    transport = _FakeTransport(
+        [_response(_page_body("QQQ", token="next-page"))],
+        attempt_directory=attempt,
+    )
+
+    _, attempts, successes, failure = subject._fetch_all_symbols(
+        attempt,
+        str(UUID(int=23)),
+        _EXPECTED,
+        transport,
+        "test-api-key",
+        "test-api-secret",
+    )
+
+    assert failure == "PACING_FAILED"
+    assert attempts == successes == 1
+    assert len(transport.calls) == 1
+    assert (attempt / "journal" / "intents" / "0001.json").is_file()
+    assert not (attempt / "journal" / "intents" / "0002.json").exists()
+    assert (attempt / "journal" / "results" / "0001.json").is_file()
+
+
+def test_missing_regular_slot_is_rejected_by_b1_dataset_construction():
+    dataset, _ = _one_session_dataset()
+    first = dataset.datasets[0]
+    incomplete = replace(first, bars=first.bars[:-1])
+
+    with pytest.raises(intraday.Arch148IntradayError):
+        intraday.IntradayDataset(
+            dataset.start,
+            dataset.end_exclusive,
+            (incomplete, *dataset.datasets[1:]),
+        )
 
 
 @pytest.mark.parametrize(
@@ -574,13 +787,22 @@ def test_page_and_global_request_ceilings_stop_before_the_next_get(
 
     global_attempt = tmp_path / f"arch148-b2-{UUID(int=5)}"
     global_attempt.mkdir()
-    monkeypatch.setattr(subject, "MAX_PROVIDER_REQUEST_ATTEMPTS", 2)
+    monkeypatch.setattr(subject, "MAX_PAGES_PER_SYMBOL", 193)
+    assert subject.MAX_PROVIDER_REQUEST_ATTEMPTS == 576
+    global_responses = []
+    for symbol in intraday.INTRADAY_SYMBOLS:
+        for ordinal in range(1, 193):
+            if ordinal < 192:
+                token = f"{symbol}-page-{ordinal + 1}"
+            elif symbol == "SQQQ":
+                token = "SQQQ-page-193"
+            else:
+                token = None
+            global_responses.append(
+                _response(_page_body(symbol, token=token, bars=False))
+            )
     global_transport = _FakeTransport(
-        [
-            _response(_page_body("QQQ", token="next-1", bars=False)),
-            _response(_page_body("QQQ", token="next-2", bars=False)),
-        ],
-        attempt_directory=global_attempt,
+        global_responses, attempt_directory=global_attempt
     )
     _, attempts, successes, failure = subject._fetch_all_symbols(
         global_attempt,
@@ -591,8 +813,11 @@ def test_page_and_global_request_ceilings_stop_before_the_next_get(
         "test-api-secret",
     )
     assert failure == "GLOBAL_REQUEST_LIMIT_REACHED"
-    assert attempts == successes == 2
-    assert len(global_transport.calls) == 2
+    assert attempts == successes == subject.MAX_PROVIDER_REQUEST_ATTEMPTS
+    assert len(global_transport.calls) == subject.MAX_PROVIDER_REQUEST_ATTEMPTS
+    intents = tuple((global_attempt / "journal" / "intents").glob("*.json"))
+    assert len(intents) == subject.MAX_PROVIDER_REQUEST_ATTEMPTS
+    assert not (global_attempt / "journal" / "intents" / "0577.json").exists()
 
 
 def test_repeated_page_token_stops_before_replaying_the_get(
@@ -965,6 +1190,8 @@ def test_terminal_evidence_binds_zero_effects_and_never_contains_token_or_reques
             (hashlib.sha256(f"page-{symbol}".encode()).hexdigest(),),
             (len(f"page-{symbol}"),),
             (hashlib.sha256(f"request-id-{symbol}".encode()).hexdigest(),),
+            len(dataset.bars_by_symbol[symbol]) + 2,
+            2,
             dataset.bars_by_symbol[symbol],
         )
         for symbol in intraday.INTRADAY_SYMBOLS
@@ -986,6 +1213,7 @@ def test_terminal_evidence_binds_zero_effects_and_never_contains_token_or_reques
     body = canonical_json_bytes(evidence)
 
     assert evidence["classification"] == subject.SUCCESS_CLASSIFICATION
+    assert evidence["schema"] == "arch148-b2-readonly-acquisition-evidence/v2"
     assert evidence["credential_read_attempt_count"] == 1
     assert evidence["provider_request_attempt_count"] == 3
     assert evidence["automatic_retry"] == "FORBIDDEN"
@@ -995,6 +1223,27 @@ def test_terminal_evidence_binds_zero_effects_and_never_contains_token_or_reques
     assert evidence["production_state_mutations"] == 0
     assert evidence["final_holdout_accesses"] == 0
     assert evidence["baseline_backtests"] == 0
+    assert [
+        (
+            item["raw_bar_count"],
+            item["qualified_regular_session_bar_count"],
+            item["excluded_non_regular_bar_count"],
+        )
+        for item in evidence["streams"]
+    ] == [
+        (
+            len(dataset.bars_by_symbol[symbol]) + 2,
+            len(dataset.bars_by_symbol[symbol]),
+            2,
+        )
+        for symbol in intraday.INTRADAY_SYMBOLS
+    ]
+    assert all(
+        item["raw_bar_count"]
+        == item["qualified_regular_session_bar_count"]
+        + item["excluded_non_regular_bar_count"]
+        for item in evidence["streams"]
+    )
     assert _PAGE_TOKEN.encode() not in body
     assert _REQUEST_ID.encode() not in body
 

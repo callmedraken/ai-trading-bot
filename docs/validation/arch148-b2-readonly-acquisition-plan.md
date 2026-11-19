@@ -1,9 +1,10 @@
 # Architecture 148-B2 — Read-only Intraday Acquisition Plan
 
-Status: **B2-A SOURCE/CERTIFICATION ACCEPTED / FAST-FORWARD INTEGRATED; B2-B
-SEPARATELY REVIEWED AND NOT AUTHORIZED.** This plan authorizes no
-Alpaca credential read, provider request, Robinhood/broker action, production
-mutation or FINAL_HOLDOUT access.
+Status: **B2-A SOURCE/CERTIFICATION ACCEPTED / FAST-FORWARD INTEGRATED;
+B2-B ATTEMPT CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY. B2-A-C1
+CORRECTION REQUIRES A NEW SOURCE CHECKPOINT AND ACCEPTANCE.** This plan
+authorizes no Alpaca credential read, provider request, Robinhood/broker
+action, production mutation or FINAL_HOLDOUT access.
 
 B2-A accepted/certified executable source:
 `6957afa159647ece18af876289d8a20637cfc6eb` /
@@ -13,22 +14,33 @@ develop reused the exact feature certification and ran no duplicate seven-lane
 FULL. The canonical feature and documented local integration worktrees were
 verified clean at that executable identity.
 
-A later coordination-only descendant may be the exact B2-B invocation source
-without changing the accepted B2-A executable identity only when all of these
-conditions are independently re-proven immediately before the real attempt:
-the descendant is one-parent/fast-forward lineage from the accepted executable
-source; every intervening change is strictly documentation-only; the B2
-operator, B1 data/custody source, route-owned tests and workflow bytes are
-byte-identical to `6957afa159647ece18af876289d8a20637cfc6eb`; its docs-only
-source gate is terminal green; the canonical feature checkout is clean at that
-exact descendant; and live feature and develop refs both equal that same exact
-HEAD. The operator's `--expected-head` / `--expected-tree` bind this current
-reviewed invocation source, while the accepted executable provenance remains the
-B2-A identity above. Any source/test/workflow change requires a new source
-checkpoint and mapped certification, not this descendant rule.
+The previously documented docs-only invocation-source shortcut is no longer
+available for the correction described here because B2-A-C1 changes executable
+source and tests. Any future provider invocation requires a newly published and
+certified exact source, independent ChatGPT source acceptance, integration and
+canonical worktree catch-up, followed by review of a separately named fresh
+successor invocation. It is not a retry of the consumed attempt.
 
-Only a later separately reviewed B2-B invocation may read credentials or
-contact Alpaca.
+## Consumed B2-B attempt
+
+Attempt: `fd8aa437-c748-4d5b-a52f-1e58b2ca5953`
+Retained directory:
+`F:\AI\temp\arch148-b2-fd8aa437-c748-4d5b-a52f-1e58b2ca5953`
+Outcome: CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY.
+Classification: ARCH148_B2_PROVIDER_STREAM_SCOPE_ASSUMPTION_DEFECT /
+ARCH148_B2_PAGINATION_CEILING_UNDERSIZED.
+Credential reads: 1. Provider attempts: 64. Successful pages: 64.
+Unresolved intent: NONE. Automatic retry: FORBIDDEN.
+
+The attempt requested QQQ only; TQQQ and SQQQ were never requested. Its 64 raw
+pages contained 162426 unique QQQ bars from 2016-01-01T00:00:00Z through
+2019-12-31T12:30:00Z. Exactly 78057 timestamps matched B1 regular-session slots
+and 84369 did not. There were no duplicate timestamps. Every page retained a
+next_page_token. Page sizes ranged from 2246 to 2669 bars, median 2568. The
+attempt did not qualify the required B1 dataset. Robinhood, broker, order,
+production, FINAL_HOLDOUT and baseline effects were all zero. This retained
+evidence is immutable and must not be resumed, replayed or treated as retry
+authority.
 
 ## Frozen predecessor
 
@@ -51,36 +63,50 @@ the operator/evidence boundary described below and run fake/focused tests, Ruff,
 diff/admission and mapped source certification. B2-A must perform zero real
 credential reads and zero real provider calls.
 
-148-B2-B is one later separately reviewed real read-only acquisition attempt on
-the exact accepted/integrated B2-A source. B2-B is not automatically authorized
-by B2-A success. There is no provider retry or fallback.
+The initial B2-B attempt recorded above is consumed and cannot be resumed or
+retried. B2-A-C1 is a source-only/fake-only corrective checkpoint. Any future
+real read-only acquisition requires its own separately reviewed fresh successor
+invocation after the corrected exact source is published, certified, accepted,
+integrated and reconciled locally. No provider or credential operation is
+authorized by this plan.
 
 ## Provider and dataset contract
 
-Use only the accepted B1 request builder and parser for QQQ, TQQQ and SQQQ, in
-that order. Each symbol uses the exact OPEN request contract: `5Min`,
-`adjustment=all`, `asof=-`, SIP, USD, ascending order, limit 10,000 and
-pagination to `next_page_token=None`.
+Use the accepted B1 request builder and page parser for QQQ, TQQQ and SQQQ in
+that order. Each request is one symbol with `5Min` bars over OPEN
+`[2016-01-01, 2024-01-01)`, inclusive provider end
+`2023-12-31T23:59:59.999999Z`, `adjustment=all`, `asof=-`, SIP, USD,
+ascending sort, requested limit 10000, and pagination through
+`next_page_token=None`. Limit 10000 is a maximum, not an expected page size;
+the provider may return fewer bars while more remain. Historical stock minute
+bars include pre-market and aftermarket activity, and the endpoint provides no
+regular-session-only filter. This provider behavior was independently
+rechecked on 2026-11-18:
+- [Stock bars](https://docs.alpaca.markets/us/reference/stockbars)
+- [About market data](https://docs.alpaca.markets/us/docs/about-market-data-api)
+- [Historical API](https://docs.alpaca.markets/us/docs/historical-api)
 
-The provider end is inclusive, so B1's exact
-`2023-12-31T23:59:59.999999Z` end remains required for the half-open OPEN
-dataset ending 2024-01-01.
-
-The accepted session/schedule contracts imply:
+The provider end remains inclusive for the half-open OPEN dataset ending
+2024-01-01. The accepted session/schedule contracts imply:
 
 ```text
 OPEN sessions                    2012
 early-close sessions               15
 expected 5-minute slots/symbol  156396
 expected total bars             469188
-minimum pages/symbol at 10000       16
-B2 page ceiling/symbol               64
-B2 provider-attempt ceiling         192
+MAX_PAGES_PER_SYMBOL              192
+MAX_PROVIDER_REQUEST_ATTEMPTS     576
+minimum delay between request starts 0.5 seconds
 ```
 
-Fewer/more bars, missing/unexpected slots, unequal symbol timestamps, duplicate
-timestamps, off-grid data, noncanonical OHLCV, pagination loops, unexpected
-symbols or any other B1 validation failure block qualification.
+Before projection, validate every parsed raw bar for exact requested symbol,
+strict chronological order and duplicate prevention. Derive the exact accepted
+slot set from B1 `expected_open_slots()`. Raw bars outside that set remain
+byte-for-byte in their raw page artifacts but are excluded from the normalized
+B1 dataset. The unchanged B1 dataset/custody constructor still requires exactly
+156396 qualified regular-session bars per symbol, 469188 total, identical
+QQQ/TQQQ/SQQQ timestamps and every existing B1 qualification. Missing,
+duplicate, reordered, malformed or unexpected expected-slot data fails closed.
 
 ## Reuse requirements
 
@@ -113,9 +139,12 @@ FEATURE source authority PASS
 PROSPECTIVE_DEVELOP source authority PASS
 ```
 
-A mismatch blocks before any further provider request. Source drift discovered
-after a provider attempt preserves the partial attempt and returns a blocked
-result; it never retries or repairs source.
+For a future invocation, operator flags `--expected-head` and `--expected-tree` bind the exact current reviewed source; the accepted B2-A executable provenance remains the predecessor identity recorded above.
+
+A mismatch blocks
+before any further provider request. Source drift discovered after a provider
+attempt preserves the partial attempt and returns a blocked result; it never
+retries or repairs source.
 
 ## Attempt durability and output
 
@@ -138,17 +167,25 @@ No delete, overwrite, cleanup, resume or automatic retry belongs to B2-B.
 
 ## Credential and provider accounting
 
-The current-product credential reader may be invoked at most once. The credential
-scope is closed on every exit. The provider attempt counter increments before
-each transport invocation.
+The existing `read_current_product_alpaca_secrets` credential reader may be
+invoked at most once. Its secret scope closes on every exit. Use the existing
+`StdlibAlpacaHistoricalBarsTransport` for fixed-host TLS GETs. There is no
+environment fallback, Architecture-146 interactive-research credential
+fallback, alternate HTTP client, redirect or decompression. Provider attempts are counted before transport invocation because a
+transport exception can be ambiguous as to whether the GET reached the provider.
 
-No automatic retry is allowed for transport failure, HTTP failure, 401/403,
-429, 5xx, malformed response, repeated token, pagination bound or process/source
-ambiguity. Alpaca's generic recommendation to retry some server failures does
-not override this project's one-shot evidence discipline.
+B2-owned ceilings are 192 pages per symbol and 576 provider request attempts
+total. Stop before the next GET at either ceiling; do not use the B1 generic
+10000-page ceiling or create an unbounded path. Insert a deterministic,
+injectable/monkeypatchable minimum delay of 0.5 seconds between provider-request
+starts after the first. Pace before authoring the next request intent, then
+recheck exact source immediately before that intent and its GET. Focused tests
+must not sleep.
 
-The stricter B2 ceiling is 64 provider pages per symbol and 192 total attempts.
-Exceeding either ceiling blocks before the next request.
+No automatic retry or fallback is allowed for HTTP 401/403, 429, 5xx, transport
+failure or ambiguity, malformed response, repeated token, page or total
+ceiling, source drift, process ambiguity or qualification failure. Pacing does
+not authorize wait-and-retry.
 
 ## Success artifacts
 
@@ -174,15 +211,23 @@ claiming success.
 
 ## Terminal evidence
 
-Use schema `arch148-b2-readonly-acquisition-evidence/v1`.
+Use schema `arch148-b2-readonly-acquisition-evidence/v2`.
 
-It must bind exact source identity, both live refs, attempt identity, B1
-contract identities, schedule identity/digest, request digest, price basis,
-expected counts, credential/provider attempt counts, ordered per-page body
-digests/sizes/request-ID digests, pagination exhaustion, dataset/custody
-identities and canonical artifact digests/sizes.
+Bind exact source identity and both live refs; attempt identity; B1 contract,
+dataset and custody identities; schedule identity/digest; request digest; price
+basis; OPEN bounds; symbols; expected counts; credential and provider attempt
+counts; ordered per-page body SHA-256/size/request-ID-digest vectors; pagination
+exhaustion; canonical dataset, custody and normalized artifact hashes/sizes;
+and sanitized failure classification when applicable.
 
-It must also state:
+For each symbol, successful terminal evidence explicitly reports raw provider
+bar count, qualified regular-session bar count and excluded non-regular-slot
+bar count, and proves:
+
+`raw_bar_count = qualified_regular_session_bar_count + excluded_non_regular_bar_count`
+
+B1 dataset and custody schemas and identities remain unchanged. Evidence also
+states:
 
 ```text
 automatic_retry = FORBIDDEN
@@ -194,10 +239,10 @@ final_holdout_accesses = 0
 baseline_backtests = 0
 ```
 
-Raw credentials, authentication headers, raw request IDs, environment values,
-tracebacks, arbitrary exception text and raw provider bodies must not appear in
-`evidence.json`. Raw successful OPEN page bodies are separate bounded
-artifacts under the attempt directory.
+Raw pagination tokens, raw request IDs, credentials, authentication headers,
+environment values, tracebacks, arbitrary exception text and raw provider
+bodies must not appear in terminal/failure evidence. Raw successful OPEN page
+bodies remain separate create-once files under the attempt directory.
 
 SUCCESS is exactly
 `READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW`. It grants no dataset acceptance,
@@ -223,31 +268,45 @@ one-shot acquisition entry point with an exact interlock string. Import,
 construction, help, source preflight and every source/fake test must prove zero
 credential/provider calls.
 
-## Required B2-A focused tests
+## Required B2-A-C1 focused tests
 
-Cover source/ref/cleanliness drift; output path aliases/reparse/preexistence;
-attempt claim/write-once behavior; credential read 0/1 accounting; exact request
-order; 64-page and 192-request ceilings; no retry on every transport/HTTP
-failure class; request intent before transport; ambiguous intent-without-result;
-raw response persistence before parse progression; request-ID/token digest-only
-evidence; 156,396-slot qualification; wrong/missing/duplicate slot rejection;
-dataset/custody canonical roundtrip; artifact read-back drift; post-provider
-source drift; secret/exception leakage; and explicit zero Robinhood/broker/
-FINAL_HOLDOUT/baseline effects.
+Cover source/ref/cleanliness drift; output path aliases, reparse and
+preexistence; attempt claim/write-once behavior; credential read 0/1
+accounting; exact request order; 192-page-per-symbol and 576-total ceilings;
+no retry on every transport/HTTP failure class; request intent before
+transport; ambiguous intent-without-result; raw response persistence before
+parse/projection; request-ID/token digest-only evidence; 156396-slot
+qualification; wrong/missing/duplicate slot rejection; dataset/custody
+canonical roundtrip; artifact read-back drift; post-provider source drift;
+secret/exception leakage; and explicit zero Robinhood/broker/FINAL_HOLDOUT/
+baseline effects.
 
-Use only fake transports/credentials/filesystem seams in B2-A tests.
+Also prove that a mixed pre-market/regular/after-hours page preserves all raw
+bytes while only exact B1 slots enter qualified bars; raw/qualified/excluded
+counts reconcile exactly; missing expected regular slots reject final dataset
+construction; duplicate/out-of-order raw timestamps fail before projection;
+pagination tokens are exhausted sequentially; pacing occurs between request
+starts but never before the first attempt and causes no real test sleep; and v2
+success evidence binds all three counts per symbol without exposing raw
+tokens, request IDs or secrets.
+
+Use only fake transports, credentials and filesystem seams in B2-A-C1 tests.
 
 ## Publication and later real attempt
 
-Codex Sol High coordinates B2-A only; Luna Extra High implements and runs focused
-checks. Codex must not implement, stage, commit, push, merge or execute B2-B.
+B2-A-C1 is a source-only/fake-only checkpoint. It does not perform real
+credential access or contact Alpaca. The correction must complete focused checks, then exact-file staging and one
+atomic commit. Run general `ops.ps1 admit` on that clean candidate and require
+FEATURE plus PROSPECTIVE_DEVELOP PASS before one ordinary feature push. The
+single push-triggered CI run owns the mapped canonical FULL. Do not duplicate
+that FULL locally. Do not add a provider-capable
+checkpoint callback; checkpoint `execute=None` remains unchanged. Preserve any
+terminal CI evidence and do not rerun an unchanged source gate.
 
-B2-A publication uses one coherent atomic feature commit, general admission,
-one ordinary feature push and one mapped FULL run. After ChatGPT exact-source
-acceptance, use the canonical local fast-forward integration procedure and
-closeout/catch-up before any B2-B provider action.
-
-Only then may ChatGPT review an exact B2-B invocation. The real operator must
-print canonical `evidence.json` plus its SHA-256 and byte length. ChatGPT must
-review that evidence before any baseline backtest. Baseline analysis uses the
-accepted B1 simulator and performs no provider request.
+ChatGPT owns independent exact-source review and acceptance. Only after that
+acceptance, integration and canonical worktree catch-up may ChatGPT review an
+exact, separately named fresh successor invocation. The real operator must
+print canonical `evidence.json` plus SHA-256 and byte length; ChatGPT reviews
+that exact evidence before any baseline backtest. Baseline analysis uses the
+accepted B1 simulator and performs no provider request. The consumed B2-B
+attempt is never retried.

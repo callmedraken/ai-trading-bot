@@ -1,9 +1,9 @@
 """Architecture 148-B2 one-shot OPEN acquisition and evidence boundary.
 
-Import, construction, help and source preflight are effect-free.  The explicit
-acquisition entry point is reserved for a later, separately reviewed B2-B run.
-It reuses the accepted B1 parser, dataset and custody contracts and never retries
-an ambiguous provider request.
+Import, construction, help and source preflight are effect-free. The explicit
+acquisition entry point is reserved for a future, separately reviewed fresh
+successor invocation. It reuses the accepted B1 parser, dataset and custody
+contracts and never retries an ambiguous provider request.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from time import monotonic_ns, sleep
 from typing import Final
 from uuid import UUID, uuid4
 
@@ -58,7 +59,7 @@ from trading_bot.review_paper.alpaca_windows_credentials import (
     read_current_product_alpaca_secrets,
 )
 
-EVIDENCE_SCHEMA: Final = "arch148-b2-readonly-acquisition-evidence/v1"
+EVIDENCE_SCHEMA: Final = "arch148-b2-readonly-acquisition-evidence/v2"
 SUCCESS_CLASSIFICATION: Final = "READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW"
 ACQUISITION_INTERLOCK: Final = "ACQUIRE ARCH148 B2 OPEN DATA ONCE; READ-ONLY; NO RETRY"
 FEATURE_BRANCH: Final = "feature/robinhood-live-prototype-current"
@@ -67,8 +68,12 @@ CANONICAL_WORKTREE: Final = Path(
     r"F:\AI\worktrees\ai-trading-bot-live-prototype-current"
 )
 EVIDENCE_ROOT: Final = Path(r"F:\AI\temp")
-MAX_PAGES_PER_SYMBOL: Final = 64
-MAX_PROVIDER_REQUEST_ATTEMPTS: Final = 192
+MAX_PAGES_PER_SYMBOL: Final = 192
+MAX_PROVIDER_REQUEST_ATTEMPTS: Final = 576
+MIN_PROVIDER_REQUEST_START_INTERVAL_SECONDS: Final = 0.5
+_MIN_PROVIDER_REQUEST_START_INTERVAL_NS: Final = int(
+    MIN_PROVIDER_REQUEST_START_INTERVAL_SECONDS * 1_000_000_000
+)
 EXPECTED_OPEN_SESSIONS: Final = 2012
 EXPECTED_EARLY_CLOSE_SESSIONS: Final = 15
 EXPECTED_SLOTS_PER_SYMBOL: Final = 156_396
@@ -153,11 +158,17 @@ class _PageAccounting:
     raw_page_sha256: tuple[str, ...]
     raw_page_byte_size: tuple[int, ...]
     request_id_sha256: tuple[str, ...]
+    raw_bar_count: int
+    excluded_non_regular_bar_count: int
     bars: tuple[Bar, ...]
+
+    @property
+    def qualified_regular_session_bar_count(self) -> int:
+        return len(self.bars)
 
 
 def operator_help() -> str:
-    """Return effect-free usage text for the later reviewed B2-B invocation."""
+    """Return effect-free usage for a future reviewed successor invocation."""
 
     return (
         "Architecture 148-B2-A source-only boundary. Import, help and source "
@@ -776,11 +787,15 @@ def _fetch_all_symbols(
     all_collected: list[_PageAccounting] = []
     provider_attempts = 0
     successful_pages = 0
+    previous_request_start_ns: int | None = None
+    regular_session_slots = set(expected_open_slots())
     for symbol in INTRADAY_SYMBOLS:
         token: str | None = None
         seen_tokens: set[str | None] = set()
         symbol_attempts = 0
-        bars: list[object] = []
+        bars: list[Bar] = []
+        raw_bar_count = 0
+        excluded_non_regular_bar_count = 0
         page_hashes: list[str] = []
         page_sizes: list[int] = []
         request_id_hashes: list[str] = []
@@ -807,6 +822,25 @@ def _fetch_all_symbols(
                     successful_pages,
                     "PAGINATION_TOKEN_LOOP",
                 )
+            seen_tokens.add(token)
+            ordinal = symbol_attempts + 1
+            request = HistoricalIntradayRequest(symbol=symbol, page_token=token)
+            try:
+                provider_request = build_alpaca_intraday_request(request)
+            except Exception:
+                return (
+                    tuple(all_collected),
+                    provider_attempts,
+                    successful_pages,
+                    "REQUEST_CONSTRUCTION_FAILED",
+                )
+            if not _pace_provider_request_start(previous_request_start_ns):
+                return (
+                    tuple(all_collected),
+                    provider_attempts,
+                    successful_pages,
+                    "PACING_FAILED",
+                )
             source_failure = _local_live_source_check(expected)
             if source_failure is not None:
                 return (
@@ -815,9 +849,6 @@ def _fetch_all_symbols(
                     successful_pages,
                     source_failure,
                 )
-            seen_tokens.add(token)
-            ordinal = symbol_attempts + 1
-            request = HistoricalIntradayRequest(symbol=symbol, page_token=token)
             sequence = provider_attempts + 1
             intent = {
                 "schema": "arch148-b2-request-intent/v1",
@@ -845,11 +876,20 @@ def _fetch_all_symbols(
                 )
 
             # An intent with no result is conservatively MAY_HAVE_OCCURRED.
+            try:
+                previous_request_start_ns = monotonic_ns()
+            except Exception:
+                return (
+                    tuple(all_collected),
+                    provider_attempts,
+                    successful_pages,
+                    "REQUEST_START_TIME_UNAVAILABLE",
+                )
             symbol_attempts += 1
             provider_attempts += 1
             try:
                 response = transport.execute(
-                    build_alpaca_intraday_request(request),
+                    provider_request,
                     api_key_id=api_key_id,
                     api_secret_key=api_secret_key,
                 )
@@ -962,7 +1002,11 @@ def _fetch_all_symbols(
                         "PROVIDER_ORDER_INVALID",
                     )
                 previous_timestamp = bar.timestamp
-                bars.append(bar)
+                raw_bar_count += 1
+                if bar.timestamp in regular_session_slots:
+                    bars.append(bar)
+                else:
+                    excluded_non_regular_bar_count += 1
             page_hashes.append(body_sha256)
             page_sizes.append(body_size)
             request_id_hashes.append(result["request_id_sha256"])
@@ -975,11 +1019,34 @@ def _fetch_all_symbols(
                         tuple(page_hashes),
                         tuple(page_sizes),
                         tuple(request_id_hashes),
+                        raw_bar_count,
+                        excluded_non_regular_bar_count,
                         tuple(bars),
                     )
                 )
                 break
     return tuple(all_collected), provider_attempts, successful_pages, None
+
+
+def _pace_provider_request_start(previous_start_ns: int | None) -> bool:
+    """Enforce the B2 minimum start interval without authoring a request intent."""
+
+    if previous_start_ns is None:
+        return True
+    try:
+        elapsed_ns = monotonic_ns() - previous_start_ns
+        if elapsed_ns < 0:
+            return False
+        remaining_ns = _MIN_PROVIDER_REQUEST_START_INTERVAL_NS - elapsed_ns
+        if remaining_ns > 0:
+            sleep(remaining_ns / 1_000_000_000)
+            if monotonic_ns() - previous_start_ns < (
+                _MIN_PROVIDER_REQUEST_START_INTERVAL_NS
+            ):
+                return False
+        return True
+    except Exception:
+        return False
 
 
 def _http_failure_code(error: AlpacaHttpStatusError) -> str:
@@ -1125,9 +1192,22 @@ def _terminal_evidence(
             == len(item.request_id_sha256)
         ):
             raise Arch148B2OperatorError("PAGE_EVIDENCE_INCOMPLETE")
+        qualified_count = item.qualified_regular_session_bar_count
+        if (
+            type(item.raw_bar_count) is not int
+            or type(item.excluded_non_regular_bar_count) is not int
+            or item.raw_bar_count < 0
+            or item.excluded_non_regular_bar_count < 0
+            or item.raw_bar_count
+            != qualified_count + item.excluded_non_regular_bar_count
+        ):
+            raise Arch148B2OperatorError("RAW_BAR_ACCOUNTING_MISMATCH")
         evidence_streams.append(
             {
                 "symbol": item.symbol,
+                "raw_bar_count": item.raw_bar_count,
+                "qualified_regular_session_bar_count": qualified_count,
+                "excluded_non_regular_bar_count": item.excluded_non_regular_bar_count,
                 "raw_page_sha256": list(item.raw_page_sha256),
                 "raw_page_byte_size": list(item.raw_page_byte_size),
                 "request_id_sha256": list(item.request_id_sha256),

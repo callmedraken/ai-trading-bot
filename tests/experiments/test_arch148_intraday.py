@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -17,6 +19,7 @@ from trading_bot.live_runtime.models import (
     SignalAnalysis,
     SignalPoint,
 )
+from trading_bot.live_runtime.strategy import SessionReason
 
 
 def _bars_for(symbol: str, day: date, *, opens: dict[datetime, Decimal] | None = None):
@@ -47,6 +50,20 @@ def _dataset(day: date = date(2023, 11, 24), *, tqqq_opens=None):
                 _bars_for(symbol, day, opens=tqqq_opens if symbol == "TQQQ" else None),
             )
             for symbol in subject.INTRADAY_SYMBOLS
+        ),
+    )
+
+
+def _with_tqqq_bar(dataset, index: int, **changes):
+    bars = list(dataset.bars_by_symbol["TQQQ"])
+    bars[index] = replace(bars[index], **changes)
+    return subject.IntradayDataset(
+        dataset.start,
+        dataset.end_exclusive,
+        (
+            dataset.datasets[0],
+            subject.IntradaySymbolDataset("TQQQ", tuple(bars)),
+            dataset.datasets[2],
         ),
     )
 
@@ -287,6 +304,82 @@ def test_normal_and_early_close_slot_coverage_rejects_missing_slots(which: str) 
         )
 
 
+def test_frozen_early_close_dates_and_dst_schedule_instants() -> None:
+    expected_early_close_dates = frozenset(
+        {
+            date(2016, 11, 25),
+            date(2017, 7, 3),
+            date(2017, 11, 24),
+            date(2018, 7, 3),
+            date(2018, 11, 23),
+            date(2018, 12, 24),
+            date(2019, 7, 3),
+            date(2019, 11, 29),
+            date(2019, 12, 24),
+            date(2020, 11, 27),
+            date(2020, 12, 24),
+            date(2021, 11, 26),
+            date(2022, 11, 25),
+            date(2023, 7, 3),
+            date(2023, 11, 24),
+        }
+    )
+    assert subject.EARLY_CLOSE_DATES == expected_early_close_dates
+    assert len(subject.session_slots(date(2016, 7, 1))) == 78
+    assert len(subject.session_slots(date(2016, 12, 23))) == 78
+    assert len(subject.session_slots(date(2016, 11, 25))) == 42
+
+    authority = subject.HistoricalIntradaySessionAuthority()
+    new_york = ZoneInfo("America/New_York")
+    normal_dst = authority.schedule_for(date(2016, 7, 1))
+    assert normal_dst is not None
+    assert normal_dst.opens_at == datetime(2016, 7, 1, 9, 30, tzinfo=new_york)
+    assert normal_dst.closes_at == datetime(2016, 7, 1, 16, 0, tzinfo=new_york)
+    assert normal_dst.opens_at.astimezone(UTC) == datetime(
+        2016, 7, 1, 13, 30, tzinfo=UTC
+    )
+    assert normal_dst.closes_at.astimezone(UTC) == datetime(
+        2016, 7, 1, 20, 0, tzinfo=UTC
+    )
+
+    early_dst = authority.schedule_for(date(2017, 7, 3))
+    assert early_dst is not None
+    assert early_dst.opens_at == datetime(2017, 7, 3, 9, 30, tzinfo=new_york)
+    assert early_dst.closes_at == datetime(2017, 7, 3, 13, 0, tzinfo=new_york)
+    assert early_dst.opens_at.astimezone(UTC) == datetime(
+        2017, 7, 3, 13, 30, tzinfo=UTC
+    )
+    assert early_dst.closes_at.astimezone(UTC) == datetime(
+        2017, 7, 3, 17, 0, tzinfo=UTC
+    )
+
+    normal_standard = authority.schedule_for(date(2016, 12, 23))
+    assert normal_standard is not None
+    assert normal_standard.opens_at == datetime(2016, 12, 23, 9, 30, tzinfo=new_york)
+    assert normal_standard.closes_at == datetime(2016, 12, 23, 16, 0, tzinfo=new_york)
+    assert normal_standard.opens_at.astimezone(UTC) == datetime(
+        2016, 12, 23, 14, 30, tzinfo=UTC
+    )
+    assert normal_standard.closes_at.astimezone(UTC) == datetime(
+        2016, 12, 23, 21, 0, tzinfo=UTC
+    )
+
+    early_standard = authority.schedule_for(date(2018, 12, 24))
+    assert early_standard is not None
+    assert early_standard.opens_at == datetime(2018, 12, 24, 9, 30, tzinfo=new_york)
+    assert early_standard.closes_at == datetime(2018, 12, 24, 13, 0, tzinfo=new_york)
+    assert early_standard.opens_at.astimezone(UTC) == datetime(
+        2018, 12, 24, 14, 30, tzinfo=UTC
+    )
+    assert early_standard.closes_at.astimezone(UTC) == datetime(
+        2018, 12, 24, 18, 0, tzinfo=UTC
+    )
+
+    for non_session in (date(2016, 12, 26), date(2018, 12, 5)):
+        assert authority.schedule_for(non_session) is None
+        assert subject.session_slots(non_session, authority) == ()
+
+
 def test_session_slot_counts_and_out_of_session_bar_are_frozen() -> None:
     assert len(subject.session_slots(date(2023, 11, 22))) == 78
     assert len(subject.session_slots(date(2023, 11, 24))) == 42
@@ -330,6 +423,8 @@ def test_deterministic_dataset_and_custody_serialization() -> None:
     )
     evidence = subject.build_intraday_custody_evidence(dataset, collected)
     subject.verify_intraday_custody_evidence(dataset, evidence)
+    assert dataset.to_dict()["schema"] == "arch148-intraday-dataset/v2"
+    assert evidence.to_dict()["schema"] == "arch148-intraday-custody-evidence/v2"
     mismatched = list(collected)
     mismatched[0] = subject.CollectedIntradayPages(
         "QQQ", dataset.bars_by_symbol["QQQ"][1:], ("b" * 64,), (123,)
@@ -344,10 +439,91 @@ def test_deterministic_dataset_and_custody_serialization() -> None:
         subject.IntradayCustodyEvidence.from_json(evidence.to_json()).evidence_id
         == evidence.evidence_id
     )
+    restored_dataset = subject.IntradayDataset.from_json(dataset.to_json())
+    restored_evidence = subject.IntradayCustodyEvidence.from_json(evidence.to_json())
+    assert (
+        restored_dataset.schedule_identity == subject.ARCH148_INTRADAY_SCHEDULE_IDENTITY
+    )
+    assert restored_dataset.schedule_digest == subject.ARCH148_INTRADAY_SCHEDULE_DIGEST
+    assert (
+        restored_evidence.schedule_identity
+        == subject.ARCH148_INTRADAY_SCHEDULE_IDENTITY
+    )
+    assert restored_evidence.schedule_digest == subject.ARCH148_INTRADAY_SCHEDULE_DIGEST
     assert (
         dataset.to_json()
         == subject.IntradayDataset.from_json(dataset.to_json()).to_json()
     )
+
+
+def test_schedule_commitment_changes_with_early_close_semantics() -> None:
+    changed_dates = subject.EARLY_CLOSE_DATES | {date(2016, 7, 1)}
+    changed_identity, changed_digest = subject.arch148_intraday_schedule_commitment(
+        changed_dates
+    )
+    assert changed_identity != subject.ARCH148_INTRADAY_SCHEDULE_IDENTITY
+    assert changed_digest != subject.ARCH148_INTRADAY_SCHEDULE_DIGEST
+
+
+@pytest.mark.parametrize(
+    "field,wrong_value",
+    [
+        ("schedule_identity", "wrong-schedule-identity"),
+        ("schedule_digest", "0" * 64),
+    ],
+)
+def test_dataset_and_custody_reject_wrong_schedule_commitment(
+    field: str, wrong_value: str
+) -> None:
+    dataset = _dataset()
+    collected = tuple(
+        subject.CollectedIntradayPages(
+            symbol, dataset.bars_by_symbol[symbol], ("a" * 64,), (123,)
+        )
+        for symbol in subject.INTRADAY_SYMBOLS
+    )
+    evidence = subject.build_intraday_custody_evidence(dataset, collected)
+    with pytest.raises(subject.Arch148IntradayError, match="provenance is frozen"):
+        replace(dataset, **{field: wrong_value})
+    with pytest.raises(subject.Arch148IntradayError, match="provenance is frozen"):
+        replace(evidence, **{field: wrong_value})
+
+    bad_dataset = dataset.to_dict()
+    bad_dataset[field] = wrong_value
+    with pytest.raises(subject.Arch148IntradayError, match="provenance is frozen"):
+        subject.IntradayDataset.from_json(
+            json.dumps(bad_dataset, sort_keys=True, separators=(",", ":"))
+        )
+
+    bad_evidence = evidence.to_dict()
+    bad_evidence[field] = wrong_value
+    with pytest.raises(subject.Arch148IntradayError, match="provenance is frozen"):
+        subject.IntradayCustodyEvidence.from_json(
+            json.dumps(bad_evidence, sort_keys=True, separators=(",", ":"))
+        )
+
+
+def test_arch146_date_authority_cannot_stand_in_for_arch148_schedule() -> None:
+    dataset = _dataset()
+    collected = tuple(
+        subject.CollectedIntradayPages(
+            symbol, dataset.bars_by_symbol[symbol], ("a" * 64,), (123,)
+        )
+        for symbol in subject.INTRADAY_SYMBOLS
+    )
+    evidence = subject.build_intraday_custody_evidence(dataset, collected)
+    with pytest.raises(subject.Arch148IntradayError, match="provenance is frozen"):
+        replace(
+            dataset,
+            schedule_identity=subject.AUTHORITY_IDENTITY,
+            schedule_digest=subject.AUTHORITY_DIGEST,
+        )
+    with pytest.raises(subject.Arch148IntradayError, match="provenance is frozen"):
+        replace(
+            evidence,
+            schedule_identity=subject.AUTHORITY_IDENTITY,
+            schedule_digest=subject.AUTHORITY_DIGEST,
+        )
 
 
 def test_next_bar_entry_costs_controls_and_deterministic_replay() -> None:
@@ -382,6 +558,169 @@ def test_next_bar_entry_costs_controls_and_deterministic_replay() -> None:
         conservative.cost_adjusted_strategy_return < conservative.gross_strategy_return
     )
     assert conservative.turnover > 0
+
+
+def test_entry_bar_low_can_trigger_the_new_hard_stop() -> None:
+    day = date(2023, 11, 24)
+    slots = subject.session_slots(day)
+    dataset = _with_tqqq_bar(
+        _dataset(day),
+        3,
+        open=Decimal("100"),
+        high=Decimal("101"),
+        low=Decimal("96"),
+        close=Decimal("100"),
+    )
+
+    def bullish(market, *, authority):
+        return (
+            _signal(MarketRegime.BULLISH, confirmed=MarketRegime.BULLISH)
+            if market.as_of == slots[3]
+            else _signal(MarketRegime.NEUTRAL)
+        )
+
+    result = subject.run_backtest(dataset, analyzer=bullish)
+    assert result.stop_hit_count == 1
+    assert result.trade_count == 1
+    assert result.trades[0].entry_at == slots[3]
+    assert result.trades[0].exit_at == slots[3]
+    assert result.trades[0].exit_reason == "STOP"
+    assert result.trades[0].exit_price == Decimal("97.00")
+    assert result.trades[0].holding_duration == timedelta()
+
+
+def test_entry_bar_gap_uses_open_and_sell_slippage() -> None:
+    day = date(2023, 11, 24)
+    slots = subject.session_slots(day)
+    dataset = _with_tqqq_bar(
+        _dataset(day),
+        3,
+        open=Decimal("100"),
+        high=Decimal("101"),
+        low=Decimal("99"),
+        close=Decimal("100"),
+    )
+    cost_model = subject.BacktestCostModel(
+        "SYNTHETIC_1000_BPS", Decimal("1000"), Decimal("0")
+    )
+
+    def bullish(market, *, authority):
+        return (
+            _signal(MarketRegime.BULLISH, confirmed=MarketRegime.BULLISH)
+            if market.as_of == slots[3]
+            else _signal(MarketRegime.NEUTRAL)
+        )
+
+    result = subject.run_backtest(dataset, analyzer=bullish, cost_model=cost_model)
+    trade = result.trades[0]
+    assert trade.entry_at == trade.exit_at == slots[3]
+    assert trade.exit_reason == "STOP"
+    assert trade.exit_price == Decimal("100")
+    assert trade.gross_pnl == Decimal("0")
+    assert trade.cost_adjusted_pnl == trade.quantity * Decimal(
+        "90"
+    ) - trade.quantity * Decimal("110")
+
+
+def test_entry_bar_low_above_stop_carries_position_to_next_bar() -> None:
+    day = date(2023, 11, 24)
+    slots = subject.session_slots(day)
+    dataset = _with_tqqq_bar(
+        _dataset(day),
+        4,
+        open=Decimal("100"),
+        high=Decimal("101"),
+        low=Decimal("96"),
+        close=Decimal("100"),
+    )
+
+    def bullish(market, *, authority):
+        return (
+            _signal(MarketRegime.BULLISH, confirmed=MarketRegime.BULLISH)
+            if market.as_of == slots[3]
+            else _signal(MarketRegime.NEUTRAL)
+        )
+
+    result = subject.run_backtest(dataset, analyzer=bullish)
+    assert result.stop_hit_count == 1
+    assert result.trade_count == 1
+    assert result.trades[0].entry_at == slots[3]
+    assert result.trades[0].exit_at == slots[4]
+    assert result.trades[0].exit_price == Decimal("97.00")
+
+
+def test_entry_bar_stop_does_not_reenter_in_the_same_cycle() -> None:
+    day = date(2023, 11, 24)
+    slots = subject.session_slots(day)
+    dataset = _with_tqqq_bar(
+        _dataset(day),
+        3,
+        open=Decimal("100"),
+        high=Decimal("101"),
+        low=Decimal("96"),
+        close=Decimal("100"),
+    )
+    calls_at_entry_bar = 0
+
+    def changing_signal(market, *, authority):
+        nonlocal calls_at_entry_bar
+        if market.as_of == slots[3]:
+            calls_at_entry_bar += 1
+            regime = (
+                MarketRegime.BULLISH
+                if calls_at_entry_bar == 1
+                else MarketRegime.BEARISH
+            )
+            return _signal(regime, confirmed=regime)
+        return _signal(MarketRegime.NEUTRAL)
+
+    result = subject.run_backtest(dataset, analyzer=changing_signal)
+    assert calls_at_entry_bar == 1
+    assert result.trade_count == 1
+    assert result.trades[0].symbol == "TQQQ"
+    assert result.trades[0].entry_at == result.trades[0].exit_at == slots[3]
+
+
+def test_stop_keeps_priority_over_regime_and_forced_flat() -> None:
+    day = date(2023, 11, 24)
+    slots = subject.session_slots(day)
+    dataset = _with_tqqq_bar(
+        _dataset(day),
+        4,
+        open=Decimal("100"),
+        high=Decimal("101"),
+        low=Decimal("96"),
+        close=Decimal("100"),
+    )
+
+    def conflicting_signal(market, *, authority):
+        if market.as_of == slots[3]:
+            return _signal(MarketRegime.BULLISH, confirmed=MarketRegime.BULLISH)
+        if market.as_of == slots[4]:
+            return _signal(
+                MarketRegime.BEARISH,
+                confirmed=MarketRegime.BEARISH,
+                paired=True,
+            )
+        return _signal(MarketRegime.NEUTRAL)
+
+    def force_flat_on_stop_bar(as_of):
+        if as_of == slots[4]:
+            return subject.SessionDecision(None, False, True, SessionReason.FORCED_FLAT)
+        return subject.session_decision(
+            as_of, authority=subject.HistoricalIntradaySessionAuthority()
+        )
+
+    result = subject.run_backtest(
+        dataset,
+        analyzer=conflicting_signal,
+        session_policy=force_flat_on_stop_bar,
+    )
+    assert result.trades[0].exit_reason == "STOP"
+    assert result.trades[0].exit_at == slots[4]
+    assert result.stop_hit_count == 1
+    assert result.reversal_exits == 0
+    assert result.forced_flat_count == 0
 
 
 def test_stop_priority_gap_and_intrabar_threshold_conventions() -> None:

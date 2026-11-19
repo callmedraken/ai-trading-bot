@@ -46,6 +46,8 @@ from trading_bot.live_runtime.models import (
     ReviewStatus,
     RuntimeState,
     ScopeFacts,
+    SignalAnalysis,
+    SignalPoint,
     SourceIdentity,
     TargetPosition,
     TradabilityFacts,
@@ -54,6 +56,7 @@ from trading_bot.live_runtime.strategy import (
     HardStopPolicy,
     SessionReason,
     analyze_market,
+    confirmed_regime_exit,
     session_decision,
 )
 from trading_bot.review_paper.nyse_published_regular_sessions import (
@@ -446,6 +449,46 @@ def test_completed_bar_regimes_warmup_vwap_and_confirmation() -> None:
 
     warmup = analyze_market(_market(include_previous=False))
     assert warmup.quality is MarketQuality.INSUFFICIENT_WARMUP
+
+
+def test_shared_regime_exit_requires_two_completed_non_supporting_bars() -> None:
+    previous = SignalPoint(
+        _AS_OF - timedelta(minutes=5),
+        Decimal("99"),
+        Decimal("100"),
+        Decimal("101"),
+        Decimal("102"),
+        Decimal("40"),
+        MarketRegime.BEARISH,
+    )
+    latest = SignalPoint(
+        _AS_OF,
+        Decimal("98"),
+        Decimal("100"),
+        Decimal("100"),
+        Decimal("101"),
+        Decimal("42"),
+        MarketRegime.BEARISH,
+    )
+    one_completed = SignalAnalysis(
+        MarketQuality.READY,
+        MarketRegime.BEARISH,
+        None,
+        latest,
+        None,
+        "ONE_COMPLETED_BAR",
+    )
+    two_completed = SignalAnalysis(
+        MarketQuality.READY,
+        MarketRegime.BEARISH,
+        MarketRegime.BEARISH,
+        latest,
+        previous,
+        "TWO_COMPLETED_BARS",
+    )
+    assert not confirmed_regime_exit(one_completed, TargetPosition.TQQQ)
+    assert confirmed_regime_exit(two_completed, TargetPosition.TQQQ)
+    assert not confirmed_regime_exit(two_completed, TargetPosition.SQQQ)
 
 
 def test_in_progress_bars_are_ignored_and_missing_completed_slot_blocks() -> None:

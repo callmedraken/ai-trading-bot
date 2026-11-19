@@ -312,6 +312,59 @@ Independent exact-source review accepted the source-only runtime and confirmed t
 
 `ARCH148_A_CONNECTOR_INTEGRATION_MECHANISM_DEVIATION` records the connector-only non-force expected-old-SHA GitHub ref fast-forward used for this integration instead of the workflow-preferred admitted local `merge --ff-only` plus ordinary push. The exact accepted one-parent result and certification provenance were preserved.
 
+## 148-B1 OPEN data and simulator contract
+
+Architecture-148 intraday research uses the frozen OPEN interval
+`[2016-01-01, 2024-01-01)` UTC and exactly `QQQ`, `TQQQ`, and `SQQQ` on
+`5Min` bars with `adjustment=all`, `feed=sip`, and `currency=USD`. `QQQ` is the
+signal instrument; `TQQQ` and `SQQQ` are the only simulated position symbols.
+The frozen price basis is `ALPACA_ALL_ADJUSTED_INTRADAY_PRICE_V1`.
+`FINAL_HOLDOUT` begins at 2024-01-01 and remains sealed.
+
+The accepted Architecture-146 authority commits published session dates. It
+does not encode Architecture-148's projected 5-minute open/close schedule.
+Architecture 148 therefore owns a separate immutable schedule commitment,
+which binds the accepted Architecture-146 authority identity/digest and source
+bundle/manifest, `America/New_York`, the 09:30 regular open, 16:00 regular
+close, 13:00 early close, schema/version, and this exact 2016-2023 early-close
+set:
+
+- 2016-11-25
+- 2017-07-03, 2017-11-24
+- 2018-07-03, 2018-11-23, 2018-12-24
+- 2019-07-03, 2019-11-29, 2019-12-24
+- 2020-11-27, 2020-12-24
+- 2021-11-26
+- 2022-11-25
+- 2023-07-03, 2023-11-24
+
+No other dates are modeled as early closes by this projection.
+
+The schedule identity is
+`4fe981d0-34ef-57be-a7d1-ffd017460bf5`, version
+`arch148-intraday-session-schedule-identity/v1`, with SHA-256
+`a33be70499cdafbfa21f45a04c854ab834425807b6c0314814b7442749aa2bad` over
+canonical schedule material. The dataset and custody evidence identities and
+serialized forms bind both values; parsing rejects any mismatch. The
+Architecture-146 date authority alone cannot stand in for this projected
+schedule commitment. The required commitment fields are carried by dataset and
+custody schema v2, with corresponding v2 semantic identity versions.
+
+Backtest signals use completed bar N and cannot execute before bar N+1 OPEN.
+After an entry fills at that open using configured buy slippage, its 3% hard
+stop is active for the rest of the entry bar. If the bar OPEN is at or below the
+threshold, the conservative stop exit uses the OPEN; otherwise, if the bar LOW
+reaches the threshold, the exit uses the threshold. The same cost/slippage model
+applies to the stop sell. A stop may therefore produce `entry_at == exit_at`,
+zero holding duration, one stop hit, and a FLAT simulator state; no other entry
+may occur in that cycle/bar. Stop remains ahead of regime and forced-flat exits.
+This protective-stop observation does not authorize a same-bar signal fill.
+Non-stop regime and scheduled forced-flat exits continue to use the next bar
+OPEN.
+
+148-B1 is source-only/fake-only. It performs no provider acquisition, reads no
+credentials, does not open `FINAL_HOLDOUT`, and does not authorize B2.
+
 ## Subsequent milestones
 
 After accepted/integrated 148-A:

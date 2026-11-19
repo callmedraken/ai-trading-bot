@@ -32,6 +32,8 @@ from trading_bot.experiments.historical_research_custody import (
 from trading_bot.experiments.historical_research_sessions import (
     AUTHORITY_DIGEST,
     AUTHORITY_IDENTITY,
+    SOURCE_BUNDLE_SHA256,
+    SOURCE_MANIFEST_SHA256,
     published_historical_session_authority,
 )
 from trading_bot.live_runtime.models import (
@@ -51,12 +53,15 @@ from trading_bot.live_runtime.strategy import (
 )
 from trading_bot.review_paper.session_admission import ReviewPaperSessionSchedule
 
-ARCH148_INTRADAY_DATASET_SCHEMA = "arch148-intraday-dataset/v1"
-ARCH148_INTRADAY_EVIDENCE_SCHEMA = "arch148-intraday-custody-evidence/v1"
-ARCH148_INTRADAY_IDENTITY_VERSION = "arch148-intraday-dataset-identity/v1"
-ARCH148_INTRADAY_EVIDENCE_IDENTITY_VERSION = "arch148-intraday-custody-identity/v1"
+ARCH148_INTRADAY_DATASET_SCHEMA = "arch148-intraday-dataset/v2"
+ARCH148_INTRADAY_EVIDENCE_SCHEMA = "arch148-intraday-custody-evidence/v2"
+ARCH148_INTRADAY_SCHEDULE_SCHEMA = "arch148-intraday-session-schedule/v1"
+ARCH148_INTRADAY_SCHEDULE_VERSION = "arch148-intraday-session-schedule-identity/v1"
+ARCH148_INTRADAY_IDENTITY_VERSION = "arch148-intraday-dataset-identity/v2"
+ARCH148_INTRADAY_EVIDENCE_IDENTITY_VERSION = "arch148-intraday-custody-identity/v2"
 ARCH148_INTRADAY_IDENTITY_NAMESPACE = UUID("f0f7f3e1-4ad7-5b71-9e5b-2eb8e6a13d0c")
 ARCH148_INTRADAY_EVIDENCE_NAMESPACE = UUID("a33e2ad9-6c1e-5b02-88c0-2dc7c4e5e2c2")
+ARCH148_INTRADAY_SCHEDULE_NAMESPACE = UUID("56a3f326-6fd1-5f5c-921d-30c169db5181")
 
 QQQ = "QQQ"
 TQQQ_SYMBOL = "TQQQ"
@@ -79,7 +84,11 @@ MAX_PROVIDER_PAGE_BYTES = 4 * 1024 * 1024
 MAX_PAGES_PER_SYMBOL = 10_000
 MAX_PAGE_TOKEN_LENGTH = 4096
 MAX_VOLUME = (1 << 63) - 1
-_NEW_YORK = ZoneInfo("America/New_York")
+SCHEDULE_TIMEZONE = "America/New_York"
+REGULAR_OPEN = "09:30"
+REGULAR_CLOSE = "16:00"
+EARLY_CLOSE = "13:00"
+_NEW_YORK = ZoneInfo(SCHEDULE_TIMEZONE)
 _BAR_WIDTH = timedelta(minutes=5)
 _DECIMAL_CONTEXT = Context(prec=50)
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -87,15 +96,11 @@ _PROVIDER_TIMESTAMP = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$"
 )
 
-# The accepted Architecture-146 published session resource records session
-# dates.  Its cited ICE/NYSE source bundle also records these historical 13:00
-# regular-session closes; this additive schedule projection never changes the
-# accepted date authority or reads any market data/holdout artifact.
+# This frozen Architecture-148 schedule projection is separately committed
+# from Architecture-146's accepted session-date authority.
 EARLY_CLOSE_DATES = frozenset(
     {
-        date(2016, 7, 1),
         date(2016, 11, 25),
-        date(2016, 12, 23),
         date(2017, 7, 3),
         date(2017, 11, 24),
         date(2018, 7, 3),
@@ -111,6 +116,41 @@ EARLY_CLOSE_DATES = frozenset(
         date(2023, 7, 3),
         date(2023, 11, 24),
     }
+)
+
+
+def arch148_intraday_schedule_commitment(
+    early_close_dates: frozenset[date] = EARLY_CLOSE_DATES,
+) -> tuple[str, str]:
+    """Return the deterministic identity and digest for an Arch-148 schedule."""
+
+    if type(early_close_dates) is not frozenset or any(
+        type(item) is not date or item < date(2016, 1, 1) or item >= date(2024, 1, 1)
+        for item in early_close_dates
+    ):
+        raise Arch148IntradayError("early-close dates must be frozen 2016-2023 dates")
+    material = {
+        "schema": ARCH148_INTRADAY_SCHEDULE_SCHEMA,
+        "version": ARCH148_INTRADAY_SCHEDULE_VERSION,
+        "upstream_authority_identity": AUTHORITY_IDENTITY,
+        "upstream_authority_digest": AUTHORITY_DIGEST,
+        "upstream_source_bundle_sha256": SOURCE_BUNDLE_SHA256,
+        "upstream_source_manifest_sha256": SOURCE_MANIFEST_SHA256,
+        "timezone": SCHEDULE_TIMEZONE,
+        "regular_open": REGULAR_OPEN,
+        "regular_close": REGULAR_CLOSE,
+        "early_close": EARLY_CLOSE,
+        "early_close_dates": [item.isoformat() for item in sorted(early_close_dates)],
+    }
+    canonical = canonical_json_bytes(material)
+    return (
+        str(uuid5(ARCH148_INTRADAY_SCHEDULE_NAMESPACE, canonical.decode("utf-8"))),
+        sha256(canonical).hexdigest(),
+    )
+
+
+ARCH148_INTRADAY_SCHEDULE_IDENTITY, ARCH148_INTRADAY_SCHEDULE_DIGEST = (
+    arch148_intraday_schedule_commitment()
 )
 
 
@@ -280,11 +320,15 @@ class HistoricalIntradaySessionAuthority:
             raise TypeError("session_date must be exactly date")
         if session_date not in self.published.sessions:
             return None
-        close_hour = 13 if session_date in EARLY_CLOSE_DATES else 16
+        close_time = EARLY_CLOSE if session_date in EARLY_CLOSE_DATES else REGULAR_CLOSE
         return ReviewPaperSessionSchedule(
             session_date=session_date,
-            opens_at=datetime.combine(session_date, time(9, 30), _NEW_YORK),
-            closes_at=datetime.combine(session_date, time(close_hour), _NEW_YORK),
+            opens_at=datetime.combine(
+                session_date, time.fromisoformat(REGULAR_OPEN), _NEW_YORK
+            ),
+            closes_at=datetime.combine(
+                session_date, time.fromisoformat(close_time), _NEW_YORK
+            ),
         )
 
 
@@ -748,6 +792,8 @@ class IntradayDataset:
     calendar_identity: str = AUTHORITY_IDENTITY
     calendar_digest: str = AUTHORITY_DIGEST
     price_basis: str = PRICE_BASIS
+    schedule_identity: str = ARCH148_INTRADAY_SCHEDULE_IDENTITY
+    schedule_digest: str = ARCH148_INTRADAY_SCHEDULE_DIGEST
     identity: str = field(init=False)
 
     def __post_init__(self) -> None:
@@ -771,6 +817,8 @@ class IntradayDataset:
             self.price_basis != PRICE_BASIS
             or self.calendar_identity != AUTHORITY_IDENTITY
             or self.calendar_digest != AUTHORITY_DIGEST
+            or self.schedule_identity != ARCH148_INTRADAY_SCHEDULE_IDENTITY
+            or self.schedule_digest != ARCH148_INTRADAY_SCHEDULE_DIGEST
         ):
             raise Arch148IntradayError("dataset provenance is frozen")
         try:
@@ -813,6 +861,8 @@ class IntradayDataset:
             self.price_basis,
             self.calendar_identity,
             self.calendar_digest,
+            self.schedule_identity,
+            self.schedule_digest,
             sha256(self.request_descriptor_json.encode()).hexdigest(),
             [
                 [
@@ -856,6 +906,8 @@ class IntradayDataset:
             "price_basis": self.price_basis,
             "calendar_identity": self.calendar_identity,
             "calendar_digest": self.calendar_digest,
+            "schedule_identity": self.schedule_identity,
+            "schedule_digest": self.schedule_digest,
             "request_descriptor": json.loads(self.request_descriptor_json),
             "datasets": [
                 {
@@ -894,6 +946,8 @@ class IntradayDataset:
             "price_basis",
             "calendar_identity",
             "calendar_digest",
+            "schedule_identity",
+            "schedule_digest",
             "request_descriptor",
             "datasets",
         }
@@ -923,6 +977,8 @@ class IntradayDataset:
             raw["calendar_identity"],
             raw["calendar_digest"],
             raw["price_basis"],
+            raw["schedule_identity"],
+            raw["schedule_digest"],
         )
         if raw["identity"] != result.identity or result.to_json() != body.decode(
             "utf-8"
@@ -975,6 +1031,8 @@ class IntradayCustodyEvidence:
     calendar_identity: str = AUTHORITY_IDENTITY
     calendar_digest: str = AUTHORITY_DIGEST
     price_basis: str = PRICE_BASIS
+    schedule_identity: str = ARCH148_INTRADAY_SCHEDULE_IDENTITY
+    schedule_digest: str = ARCH148_INTRADAY_SCHEDULE_DIGEST
     schema: str = field(default=ARCH148_INTRADAY_EVIDENCE_SCHEMA, init=False)
     evidence_id: str = field(init=False)
 
@@ -993,10 +1051,18 @@ class IntradayCustodyEvidence:
             or tuple(item.symbol for item in self.normalized) != INTRADAY_SYMBOLS
         ):
             raise Arch148IntradayError("evidence symbols are not fixed and ordered")
-        if (self.calendar_identity, self.calendar_digest, self.price_basis) != (
+        if (
+            self.calendar_identity,
+            self.calendar_digest,
+            self.price_basis,
+            self.schedule_identity,
+            self.schedule_digest,
+        ) != (
             AUTHORITY_IDENTITY,
             AUTHORITY_DIGEST,
             PRICE_BASIS,
+            ARCH148_INTRADAY_SCHEDULE_IDENTITY,
+            ARCH148_INTRADAY_SCHEDULE_DIGEST,
         ):
             raise Arch148IntradayError("evidence provenance is frozen")
         material = {
@@ -1023,6 +1089,8 @@ class IntradayCustodyEvidence:
             "calendar_identity": self.calendar_identity,
             "calendar_digest": self.calendar_digest,
             "price_basis": self.price_basis,
+            "schedule_identity": self.schedule_identity,
+            "schedule_digest": self.schedule_digest,
         }
         object.__setattr__(
             self,
@@ -1064,6 +1132,8 @@ class IntradayCustodyEvidence:
             "calendar_identity": self.calendar_identity,
             "calendar_digest": self.calendar_digest,
             "price_basis": self.price_basis,
+            "schedule_identity": self.schedule_identity,
+            "schedule_digest": self.schedule_digest,
         }
 
     def to_json(self) -> str:
@@ -1093,6 +1163,8 @@ class IntradayCustodyEvidence:
             "calendar_identity",
             "calendar_digest",
             "price_basis",
+            "schedule_identity",
+            "schedule_digest",
         }
         if (
             type(raw) is not dict
@@ -1129,6 +1201,8 @@ class IntradayCustodyEvidence:
             raw["calendar_identity"],
             raw["calendar_digest"],
             raw["price_basis"],
+            raw["schedule_identity"],
+            raw["schedule_digest"],
         )
         if raw["evidence_id"] != result.evidence_id or result.to_json() != body.decode(
             "utf-8"
@@ -1188,6 +1262,8 @@ def verify_intraday_custody_evidence(
     if (
         custody.dataset_identity != dataset.identity
         or custody.request_digest != dataset.request_digest
+        or custody.schedule_identity != dataset.schedule_identity
+        or custody.schedule_digest != dataset.schedule_digest
     ):
         raise Arch148IntradayError("custody evidence is not bound to the dataset")
     for item in dataset.datasets:
@@ -1317,6 +1393,37 @@ def _return(value: Decimal, base: Decimal) -> Decimal:
         return value / base if base else Decimal("0")
 
 
+def _settle_backtest_exit(
+    position: _OpenBacktestPosition,
+    as_of: datetime,
+    exit_raw: Decimal,
+    exit_reason: str,
+    cost_model: BacktestCostModel,
+) -> tuple[Decimal, BacktestTrade, Decimal]:
+    fill = _execution_price(exit_raw, OrderSide.SELL, cost_model)
+    commission = cost_model.commission_per_side
+    proceeds = position.quantity * fill - commission
+    gross_pnl = position.quantity * (exit_raw - position.entry_raw)
+    cost_pnl = (
+        proceeds - position.quantity * position.entry_fill - position.entry_commission
+    )
+    base = position.quantity * position.entry_raw
+    trade = BacktestTrade(
+        position.symbol,
+        position.entry_at,
+        position.entry_raw,
+        as_of,
+        exit_raw,
+        position.quantity,
+        gross_pnl,
+        cost_pnl,
+        _return(cost_pnl, base),
+        exit_reason,
+        as_of - position.entry_at,
+    )
+    return proceeds, trade, base + position.quantity * exit_raw
+
+
 def run_backtest(
     dataset: IntradayDataset,
     *,
@@ -1325,7 +1432,12 @@ def run_backtest(
     analyzer: Callable[..., SignalAnalysis] = analyze_market,
     session_policy: Callable[[datetime], SessionDecision] | None = None,
 ) -> BacktestResult:
-    """Replay the accepted 148-A strategy with next-bar-open execution only."""
+    """Replay completed-bar signals with next-open entries and active hard stops.
+
+    Signals use only previously completed bars and enter no earlier than the
+    next bar open. A protective stop activates after that fill and can exit
+    during the entry bar; other exits use the next bar open.
+    """
 
     if (
         type(dataset) is not IntradayDataset
@@ -1421,34 +1533,12 @@ def run_backtest(
                     in (MarketRegime.BULLISH, MarketRegime.BEARISH)
                 )
         if position is not None and exit_reason is not None and exit_raw is not None:
-            raw_entry = position.entry_raw
-            fill = _execution_price(exit_raw, OrderSide.SELL, cost_model)
-            commission = cost_model.commission_per_side
-            proceeds = position.quantity * fill - commission
+            proceeds, trade, added_turnover = _settle_backtest_exit(
+                position, as_of, exit_raw, exit_reason, cost_model
+            )
             cash += proceeds
-            gross_pnl = position.quantity * (exit_raw - raw_entry)
-            cost_pnl = (
-                proceeds
-                - position.quantity * position.entry_fill
-                - position.entry_commission
-            )
-            base = position.quantity * raw_entry
-            trades.append(
-                BacktestTrade(
-                    position.symbol,
-                    position.entry_at,
-                    raw_entry,
-                    as_of,
-                    exit_raw,
-                    position.quantity,
-                    gross_pnl,
-                    cost_pnl,
-                    _return(cost_pnl, base),
-                    exit_reason,
-                    as_of - position.entry_at,
-                )
-            )
-            turnover += base + position.quantity * exit_raw
+            trades.append(trade)
+            turnover += added_turnover
             position = None
             acted = True
 
@@ -1477,6 +1567,21 @@ def run_backtest(
                     target, quantity, as_of, raw_entry, fill, stop_price, commission
                 )
                 acted = True
+                if target_bar.open <= stop_price:
+                    entry_bar_stop_raw = target_bar.open
+                elif target_bar.low <= stop_price:
+                    entry_bar_stop_raw = stop_price
+                else:
+                    entry_bar_stop_raw = None
+                if entry_bar_stop_raw is not None:
+                    stop_hits += 1
+                    proceeds, trade, added_turnover = _settle_backtest_exit(
+                        position, as_of, entry_bar_stop_raw, "STOP", cost_model
+                    )
+                    cash += proceeds
+                    trades.append(trade)
+                    turnover += added_turnover
+                    position = None
 
         signal_history.append(
             CompletedBar(
@@ -1542,6 +1647,10 @@ __all__ = [
     "ADJUSTMENT_SEMANTICS",
     "ARCH148_INTRADAY_DATASET_SCHEMA",
     "ARCH148_INTRADAY_EVIDENCE_SCHEMA",
+    "ARCH148_INTRADAY_SCHEDULE_DIGEST",
+    "ARCH148_INTRADAY_SCHEDULE_IDENTITY",
+    "ARCH148_INTRADAY_SCHEDULE_SCHEMA",
+    "ARCH148_INTRADAY_SCHEDULE_VERSION",
     "AlpacaIntradayPageTransport",
     "BacktestCostModel",
     "BacktestResult",
@@ -1565,9 +1674,11 @@ __all__ = [
     "OPEN_END_EXCLUSIVE",
     "OPEN_START",
     "PRICE_BASIS",
+    "SCHEDULE_TIMEZONE",
     "TIMEFRAME",
     "ZERO_COST",
     "acquire_intraday_dataset",
+    "arch148_intraday_schedule_commitment",
     "build_alpaca_intraday_request",
     "build_intraday_custody_evidence",
     "collect_intraday_pages",
@@ -1576,6 +1687,9 @@ __all__ = [
     "parse_alpaca_intraday_page",
     "run_backtest",
     "session_slots",
+    "REGULAR_OPEN",
+    "REGULAR_CLOSE",
+    "EARLY_CLOSE",
     "validate_intraday_session_coverage",
     "verify_intraday_custody_evidence",
 ]

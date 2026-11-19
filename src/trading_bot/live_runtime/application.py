@@ -263,7 +263,7 @@ class CycleApplicationService:
                 mandatory_exit_reasons.append(AdmissionBlocker.STOP_BREACH)
             if _requires_safety_flatten(blockers, signal.quality):
                 mandatory_exit_reasons.append(AdmissionBlocker.SAFETY_FAILURE)
-            if _confirmed_regime_exit(signal, actual):
+            if confirmed_regime_exit(signal, actual):
                 mandatory_exit_reasons.append(AdmissionBlocker.REGIME_EXIT)
             if session.force_flat:
                 mandatory_exit_reasons.append(AdmissionBlocker.FORCED_FLAT)
@@ -1675,10 +1675,6 @@ def _stop_coverage(
     if order.state is not OrderState.OPEN:
         return False, AdmissionBlocker.STOP_CONFLICT
     return True, None
-
-
-def _confirmed_regime_exit(signal, actual: TargetPosition) -> bool:
-    return confirmed_regime_exit(signal, actual)
 
 
 def _action_blockers(

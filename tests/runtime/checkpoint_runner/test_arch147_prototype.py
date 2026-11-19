@@ -189,6 +189,27 @@ def test_prototype_has_no_protected_dispatch_and_maps_full():
     assert all(m in full for m in runner.ARCH147_PROTOTYPE_TESTS if m.endswith(".py"))
 
 
+def test_arch148_b2_operator_is_prototype_owned_and_checkpoint_stays_nonexecuting():
+    root = Path(runner.__file__).resolve().parents[1]
+    source = "src/trading_bot/experiments/arch148_b2_operator.py"
+    test = "tests/experiments/test_arch148_b2_operator.py"
+    spec = runner._checkpoint_specs()[runner.ARCH147_PROTOTYPE_NAME]
+    inventory = certification.discover_inventory(root)
+    full = certification.select_inventory(inventory, "full")
+
+    assert (root / source).is_file()
+    assert (root / test).is_file()
+    assert runner.ARCH147_PROTOTYPE_RUFF.count(source) == 1
+    assert spec.ruff_paths.count(source) == 1
+    assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
+    assert spec.tests.count(test) == 1
+    assert inventory.count(test) == 1
+    assert full.count(test) == 1
+    assert spec.execute is None
+    assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
 def test_b2o_source_and_test_are_prototype_owned_but_checkpoint_stays_manual():
     root = Path(runner.__file__).resolve().parents[1]
     observer_source = (

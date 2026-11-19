@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148-A accepted/integrated; 148-B1 source-only next
+## Current milestone: Architecture 148-B1 accepted/integrated; 148-B2 read-only acquisition next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -11,8 +11,32 @@ Primary application reference: `siropkin/robinhood-ai-trading-bot@1a778749cfbe92
 
 148-A is accepted/integrated at `df48cdd40bcd18f2bfdc65dda201cfe2b6f199bd` / tree `2e139bdd886ee6ce8f92da57cc11ea38f341114f`, parent `ec0f33b7c15521c1901d749d5a933564360448c7`. Feature mapped FULL `44411012023`, attempt 1, is SUCCESS. Develop `44423510835`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. Real provider calls and broker effects were zero.
 
-The next milestone is 148-B1 SOURCE_ONLY / FAKE_ONLY. It must reuse the existing historical acquisition/custody evidence patterns to define a completed 5-minute QQQ/TQQQ/SQQQ dataset contract and deterministic no-lookahead backtest for the frozen 148-A strategy. It must inspect existing final-holdout/custody authority and select only an eligible pre-holdout range; it must not open `FINAL_HOLDOUT` or perform a real Alpaca/Robinhood provider acquisition. B2 is the later separately reviewed read-only acquisition boundary.
+Architecture 148-B1 is accepted/integrated at `68b9526f022458cbcdd4f25ff268e0de7c56e562` / tree `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`. The initial B1 commit `70b0a8de5cb3b2cf4fb826352b6ada3650c57614` remains preserved with green run `44432367772` but was exact-source rejected; corrective C1 closed the reviewed defects. Feature mapped FULL `44438409583`, attempt 1, is SUCCESS. Develop `44465681331`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. The operator integration report records both canonical F: worktrees and both live refs at the exact accepted HEAD/tree and clean; the feature checkout required no catch-up.
 
+The next milestone is 148-B2 READ_ONLY historical-data acquisition/qualification. It may operate only on the accepted B1 OPEN contract and remains a separately reviewed provider boundary. This closeout authorizes no provider access, credential read, Robinhood/broker action, production mutation or `FINAL_HOLDOUT` access.
+
+
+### Architecture 148-B1 accepted intraday identity
+
+- HEAD: `68b9526f022458cbcdd4f25ff268e0de7c56e562`
+- tree: `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`
+- direct parent / initial B1: `70b0a8de5cb3b2cf4fb826352b6ada3650c57614`
+- integrated develop predecessor: `9237cfe5fe3b617e00f7b2885ab171eb06542334`
+- original B1 mapped FULL: `44432367772`, attempt 1, terminal SUCCESS, preserved but exact-source rejected
+- C1 mapped feature FULL: `44438409583`, attempt 1, terminal SUCCESS
+- develop source gate: `44465681331`, attempt 1, terminal SUCCESS
+- develop reuse: `DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`
+- develop identity: `IDENTITY_STABLE=True`
+- duplicate develop FULL: NO
+- OPEN interval: `[2016-01-01, 2024-01-01)` UTC
+- symbols: `QQQ`, `TQQQ`, `SQQQ`
+- timeframe / basis: `5Min` / `ALPACA_ALL_ADJUSTED_INTRADAY_PRICE_V1`
+- schedule identity: `4fe981d0-34ef-57be-a7d1-ffd017460bf5`
+- schedule SHA-256: `a33be70499cdafbfa21f45a04c854ab834425807b6c0314814b7442749aa2bad`
+- source/provider/credential/broker/production/FINAL_HOLDOUT effects during B1: zero
+- B2: NOT RUN / separately reviewed READ_ONLY boundary
+
+The accepted B1 simulator executes signals no earlier than the next bar open, then activates the 3% hard stop immediately for the entry bar. Entry-bar gap-through exits use the bar OPEN; otherwise a LOW breach exits at the stop threshold. The shared `live_runtime.strategy.confirmed_regime_exit` rule is used by both runtime and research paths. Dataset and custody schemas are v2 and bind the Architecture-148 schedule commitment separately from the Architecture-146 session-date authority.
 
 ### Architecture 148-A accepted runtime identity
 

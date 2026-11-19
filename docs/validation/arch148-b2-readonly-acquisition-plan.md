@@ -5,13 +5,30 @@ SEPARATELY REVIEWED AND NOT AUTHORIZED.** This plan authorizes no
 Alpaca credential read, provider request, Robinhood/broker action, production
 mutation or FINAL_HOLDOUT access.
 
-B2-A exact source: `6957afa159647ece18af876289d8a20637cfc6eb` /
+B2-A accepted/certified executable source:
+`6957afa159647ece18af876289d8a20637cfc6eb` /
 `43701fcaef23990a793359d08a8213d43e434780`. Feature source-gate
 `44485930260` and develop source-gate `44489803571` are terminal SUCCESS;
 develop reused the exact feature certification and ran no duplicate seven-lane
 FULL. The canonical feature and documented local integration worktrees were
-verified clean at this identity. Only a later separately reviewed B2-B
-invocation may read credentials or contact Alpaca.
+verified clean at that executable identity.
+
+A later coordination-only descendant may be the exact B2-B invocation source
+without changing the accepted B2-A executable identity only when all of these
+conditions are independently re-proven immediately before the real attempt:
+the descendant is one-parent/fast-forward lineage from the accepted executable
+source; every intervening change is strictly documentation-only; the B2
+operator, B1 data/custody source, route-owned tests and workflow bytes are
+byte-identical to `6957afa159647ece18af876289d8a20637cfc6eb`; its docs-only
+source gate is terminal green; the canonical feature checkout is clean at that
+exact descendant; and live feature and develop refs both equal that same exact
+HEAD. The operator's `--expected-head` / `--expected-tree` bind this current
+reviewed invocation source, while the accepted executable provenance remains the
+B2-A identity above. Any source/test/workflow change requires a new source
+checkpoint and mapped certification, not this descendant rule.
+
+Only a later separately reviewed B2-B invocation may read credentials or
+contact Alpaca.
 
 ## Frozen predecessor
 

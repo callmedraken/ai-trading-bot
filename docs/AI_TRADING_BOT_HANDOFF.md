@@ -25,10 +25,15 @@ reuse step passed and active tests, `full-tests`, `certification-tests` and
 The canonical feature worktree is
 `F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current`; the local
 integration checkout is `F:\\AI\\worktrees\\ai-trading-bot-p4-integration-e5e800a`.
-Both were verified at the accepted source identity with clean tracked/index/
-untracked state, and both live remote refs now point to the accepted HEAD.
-B2-A is source-only/fake-only. No Alpaca credential read, provider request,
-Robinhood/broker action, production mutation or `FINAL_HOLDOUT` access occurred.
+Both were verified at the accepted executable source identity with clean
+tracked/index/untracked state. The accepted/certified B2-A executable source
+remains `6957afa159647ece18af876289d8a20637cfc6eb` / tree
+`43701fcaef23990a793359d08a8213d43e434780`. Coordination-only descendants do
+not change those executable/test/workflow bytes. Before B2-B, both live refs and
+the canonical feature checkout must be reconciled to the exact reviewed
+docs-only descendant supplied to the operator. B2-A is source-only/fake-only.
+No Alpaca credential read, provider request, Robinhood/broker action, production
+mutation or `FINAL_HOLDOUT` access occurred.
 
 The next boundary is one separately reviewed real read-only B2-B acquisition
 attempt on this exact integrated source. This closeout authorizes no Alpaca

@@ -17,11 +17,16 @@ The canonical feature worktree
 `F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current` and the documented
 local integration checkout
 `F:\\AI\\worktrees\\ai-trading-bot-p4-integration-e5e800a` were reconciled at
-the accepted source identity and clean tracked/index/untracked state. Remote
-`feature/robinhood-live-prototype-current` and `develop` both point to the
-accepted HEAD. B2-A is source-only/fake-only: no Alpaca credential read,
-provider request, Robinhood/broker action, production mutation or
-`FINAL_HOLDOUT` access occurred during this checkpoint.
+the accepted executable source identity and clean tracked/index/untracked state.
+The accepted/certified B2-A executable source remains
+`6957afa159647ece18af876289d8a20637cfc6eb` /
+`43701fcaef23990a793359d08a8213d43e434780`. A later coordination-only
+descendant changes no executable/test/workflow bytes; B2-B source admission must
+bind the exact current clean docs-only descendant only after both live refs and
+the canonical feature worktree are equal at that descendant. B2-A is
+source-only/fake-only: no Alpaca credential read, provider request,
+Robinhood/broker action, production mutation or `FINAL_HOLDOUT` access occurred
+during this checkpoint.
 
 The next boundary is one separately reviewed real read-only B2-B acquisition
 attempt on this exact integrated source. This closeout does not authorize

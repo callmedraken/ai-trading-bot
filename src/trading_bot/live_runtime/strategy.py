@@ -29,6 +29,7 @@ from .models import (
     MarketSnapshot,
     SignalAnalysis,
     SignalPoint,
+    TargetPosition,
 )
 
 _PRECISION = 48
@@ -294,6 +295,25 @@ def analyze_market(
         latest,
         previous,
         "COMPLETED_BAR_CLASSIFICATION",
+    )
+
+
+def confirmed_regime_exit(signal: SignalAnalysis, held: TargetPosition) -> bool:
+    """Return whether two completed bars no longer support the held ETF."""
+
+    if (
+        signal.quality is not MarketQuality.READY
+        or signal.latest is None
+        or signal.previous is None
+        or held not in (TargetPosition.TQQQ, TargetPosition.SQQQ)
+    ):
+        return False
+    held_regime = (
+        MarketRegime.BULLISH if held is TargetPosition.TQQQ else MarketRegime.BEARISH
+    )
+    return (
+        signal.latest.candidate is not held_regime
+        and signal.previous.candidate is not held_regime
     )
 
 

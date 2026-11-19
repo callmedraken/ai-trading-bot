@@ -59,6 +59,7 @@ from .strategy import (
     SessionDecision,
     SessionReason,
     analyze_market,
+    confirmed_regime_exit,
     session_decision,
 )
 
@@ -1677,19 +1678,7 @@ def _stop_coverage(
 
 
 def _confirmed_regime_exit(signal, actual: TargetPosition) -> bool:
-    if (
-        signal.quality is not MarketQuality.READY
-        or signal.latest is None
-        or signal.previous is None
-    ):
-        return False
-    held_regime = (
-        MarketRegime.BULLISH if actual is TargetPosition.TQQQ else MarketRegime.BEARISH
-    )
-    return (
-        signal.latest.candidate is not held_regime
-        and signal.previous.candidate is not held_regime
-    )
+    return confirmed_regime_exit(signal, actual)
 
 
 def _action_blockers(

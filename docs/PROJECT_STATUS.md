@@ -1,6 +1,33 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148-B1 accepted/integrated; 148-B2 read-only acquisition next
+## Current milestone - Architecture 148-B2-A accepted/integrated; B2-B separately reviewed
+
+
+Architecture 148-B2-A is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
+INTEGRATED at HEAD `6957afa159647ece18af876289d8a20637cfc6eb` / tree
+`43701fcaef23990a793359d08a8213d43e434780`, with direct parent
+`0f188ed75216855bc13077ed959ae92bc7463222`. The feature source-gate run
+`44485930260`, attempt 1, is terminal SUCCESS with active tests and all seven
+canonical FULL lanes green. Develop source-gate run `44489803571`, attempt 1,
+is terminal SUCCESS with exact feature-certification reuse; its exact-develop-
+reuse step passed and active tests, `full-tests`, `certification-tests` and
+`certification-full` were skipped, so no duplicate seven-lane FULL ran.
+
+The canonical feature worktree
+`F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current` and the documented
+local integration checkout
+`F:\\AI\\worktrees\\ai-trading-bot-p4-integration-e5e800a` were reconciled at
+the accepted source identity and clean tracked/index/untracked state. Remote
+`feature/robinhood-live-prototype-current` and `develop` both point to the
+accepted HEAD. B2-A is source-only/fake-only: no Alpaca credential read,
+provider request, Robinhood/broker action, production mutation or
+`FINAL_HOLDOUT` access occurred during this checkpoint.
+
+The next boundary is one separately reviewed real read-only B2-B acquisition
+attempt on this exact integrated source. This closeout does not authorize
+Alpaca credential/provider access, retries or fallback. ChatGPT must review and
+issue the exact one-shot B2-B invocation before any provider action; the
+accepted B1 simulator remains the later baseline-analysis owner.
 
 
 Architecture 148 is now the current product direction under [the frozen pivot design](architecture/148-tqqq-sqqq-runtime-pivot.md). The first application version is intraday-only and may hold exactly one of TQQQ, SQQQ or FLAT. QQQ is the primary direction reference. V1 uses completed 5-minute bars, session VWAP, EMA(20), EMA(50) and RSI(14), requires two consecutive same-direction completed bars before an entry, forbids same-cycle flips, and forces the application flat beginning five minutes before the official regular-session close.

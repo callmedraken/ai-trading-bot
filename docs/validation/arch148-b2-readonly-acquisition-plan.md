@@ -1,8 +1,17 @@
 # Architecture 148-B2 — Read-only Intraday Acquisition Plan
 
-Status: **DESIGN FROZEN / SOURCE NOT YET IMPLEMENTED.** This plan authorizes no
+Status: **B2-A SOURCE/CERTIFICATION ACCEPTED / FAST-FORWARD INTEGRATED; B2-B
+SEPARATELY REVIEWED AND NOT AUTHORIZED.** This plan authorizes no
 Alpaca credential read, provider request, Robinhood/broker action, production
 mutation or FINAL_HOLDOUT access.
+
+B2-A exact source: `6957afa159647ece18af876289d8a20637cfc6eb` /
+`43701fcaef23990a793359d08a8213d43e434780`. Feature source-gate
+`44485930260` and develop source-gate `44489803571` are terminal SUCCESS;
+develop reused the exact feature certification and ran no duplicate seven-lane
+FULL. The canonical feature and documented local integration worktrees were
+verified clean at this identity. Only a later separately reviewed B2-B
+invocation may read credentials or contact Alpaca.
 
 ## Frozen predecessor
 

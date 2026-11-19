@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148-B1 accepted/integrated; 148-B2 read-only acquisition next
+## Current milestone: Architecture 148-B2-A accepted/integrated; B2-B separately reviewed
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -11,9 +11,37 @@ Primary application reference: `siropkin/robinhood-ai-trading-bot@1a778749cfbe92
 
 148-A is accepted/integrated at `df48cdd40bcd18f2bfdc65dda201cfe2b6f199bd` / tree `2e139bdd886ee6ce8f92da57cc11ea38f341114f`, parent `ec0f33b7c15521c1901d749d5a933564360448c7`. Feature mapped FULL `44411012023`, attempt 1, is SUCCESS. Develop `44423510835`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. Real provider calls and broker effects were zero.
 
+### Architecture 148-B2-A accepted/integrated identity
+
+B2-A is accepted and integrated at HEAD `6957afa159647ece18af876289d8a20637cfc6eb` /
+tree `43701fcaef23990a793359d08a8213d43e434780`, direct parent
+`0f188ed75216855bc13077ed959ae92bc7463222`. Feature source-gate run
+`44485930260`, attempt 1, is terminal SUCCESS with active tests and all seven
+canonical FULL lanes green. Develop source-gate run `44489803571`, attempt 1,
+is terminal SUCCESS with exact feature-certification reuse; the exact-develop-
+reuse step passed and active tests, `full-tests`, `certification-tests` and
+`certification-full` were skipped. No duplicate seven-lane FULL ran.
+
+The canonical feature worktree is
+`F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current`; the local
+integration checkout is `F:\\AI\\worktrees\\ai-trading-bot-p4-integration-e5e800a`.
+Both were verified at the accepted source identity with clean tracked/index/
+untracked state, and both live remote refs now point to the accepted HEAD.
+B2-A is source-only/fake-only. No Alpaca credential read, provider request,
+Robinhood/broker action, production mutation or `FINAL_HOLDOUT` access occurred.
+
+The next boundary is one separately reviewed real read-only B2-B acquisition
+attempt on this exact integrated source. This closeout authorizes no Alpaca
+credential/provider access, retry or fallback. ChatGPT must review and issue
+the exact one-shot B2-B invocation; do not run B2-B from this handoff alone.
+
 Architecture 148-B1 is accepted/integrated at `68b9526f022458cbcdd4f25ff268e0de7c56e562` / tree `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`. The initial B1 commit `70b0a8de5cb3b2cf4fb826352b6ada3650c57614` remains preserved with green run `44432367772` but was exact-source rejected; corrective C1 closed the reviewed defects. Feature mapped FULL `44438409583`, attempt 1, is SUCCESS. Develop `44465681331`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. The operator integration report records both canonical F: worktrees and both live refs at the exact accepted HEAD/tree and clean; the feature checkout required no catch-up.
 
-The next milestone is 148-B2 READ_ONLY historical-data acquisition/qualification. It may operate only on the accepted B1 OPEN contract and remains a separately reviewed provider boundary. This closeout authorizes no provider access, credential read, Robinhood/broker action, production mutation or `FINAL_HOLDOUT` access.
+The B2-A source checkpoint is complete. B2-B remains a separately reviewed
+READ_ONLY historical-data acquisition/qualification on the accepted B1 OPEN
+contract and exact integrated B2-A source. This closeout authorizes no provider
+access, credential read, Robinhood/broker action, production mutation or
+`FINAL_HOLDOUT` access.
 
 
 ### Architecture 148-B1 accepted intraday identity

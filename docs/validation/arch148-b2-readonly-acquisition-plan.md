@@ -1,25 +1,33 @@
 # Architecture 148-B2 — Read-only Intraday Acquisition Plan
 
-Status: **B2-A SOURCE/CERTIFICATION ACCEPTED / FAST-FORWARD INTEGRATED;
-B2-B ATTEMPT CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY. B2-A-C1
-CORRECTION REQUIRES A NEW SOURCE CHECKPOINT AND ACCEPTANCE.** This plan
-authorizes no Alpaca credential read, provider request, Robinhood/broker
-action, production mutation or FINAL_HOLDOUT access.
+Status: **B2-A-C1 SOURCE/CERTIFICATION ACCEPTED / FAST-FORWARD INTEGRATED;
+B2-B ATTEMPT CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY; FRESH
+READ-ONLY SUCCESSOR PENDING SEPARATE REVIEW.** This plan authorizes no Alpaca
+credential read, provider request, Robinhood/broker action, production mutation
+or FINAL_HOLDOUT access.
 
-B2-A accepted/certified executable source:
+B2-A-C1 accepted executable source:
+`0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
+`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`, direct parent
+`298bba38cf61d506fec68cb7034fc66a58218078`. Feature source-gate
+`44507842755`, attempt 1, is terminal SUCCESS with source-static, active-tests,
+source-gates and all seven mapped FULL lanes passing. Develop source-gate
+`44616906540`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse, `IDENTITY_STABLE=True`, and no duplicate FULL.
+
+The original B2-A accepted executable predecessor remains
 `6957afa159647ece18af876289d8a20637cfc6eb` /
-`43701fcaef23990a793359d08a8213d43e434780`. Feature source-gate
-`44485930260` and develop source-gate `44489803571` are terminal SUCCESS;
-develop reused the exact feature certification and ran no duplicate seven-lane
-FULL. The canonical feature and documented local integration worktrees were
-verified clean at that executable identity.
+`43701fcaef23990a793359d08a8213d43e434780`; feature source-gate
+`44485930260` and develop source-gate `44489803571` remain preserved historical
+certification evidence.
 
-The previously documented docs-only invocation-source shortcut is no longer
-available for the correction described here because B2-A-C1 changes executable
-source and tests. Any future provider invocation requires a newly published and
-certified exact source, independent ChatGPT source acceptance, integration and
-canonical worktree catch-up, followed by review of a separately named fresh
-successor invocation. It is not a retry of the consumed attempt.
+B2-A-C1 changed executable source/tests, so the earlier docs-descendant shortcut
+was not used to accept the correction itself. The correction is now
+accepted/integrated. This post-acceptance docs-only closeout does not change its
+executable/test/workflow bytes. A future provider acquisition still requires a
+separately reviewed fresh invocation bound to the exact then-current integrated
+invocation source after docs closeout/catch-up. It is not a retry of the
+consumed attempt.
 
 ## Consumed B2-B attempt
 
@@ -64,11 +72,11 @@ diff/admission and mapped source certification. B2-A must perform zero real
 credential reads and zero real provider calls.
 
 The initial B2-B attempt recorded above is consumed and cannot be resumed or
-retried. B2-A-C1 is a source-only/fake-only corrective checkpoint. Any future
-real read-only acquisition requires its own separately reviewed fresh successor
-invocation after the corrected exact source is published, certified, accepted,
-integrated and reconciled locally. No provider or credential operation is
-authorized by this plan.
+retried. B2-A-C1 was the source-only/fake-only corrective checkpoint and is now
+accepted/integrated. Any future real read-only acquisition requires its own
+separately reviewed fresh successor invocation after this docs-only closeout is
+integrated and the canonical worktrees are reconciled locally. No provider or
+credential operation is authorized by this plan.
 
 ## Provider and dataset contract
 
@@ -292,21 +300,34 @@ tokens, request IDs or secrets.
 
 Use only fake transports, credentials and filesystem seams in B2-A-C1 tests.
 
-## Publication and later real attempt
+## B2-A-C1 publication, integration and later real attempt
 
-B2-A-C1 is a source-only/fake-only checkpoint. It does not perform real
-credential access or contact Alpaca. The correction must complete focused checks, then exact-file staging and one
-atomic commit. Run general `ops.ps1 admit` on that clean candidate and require
-FEATURE plus PROSPECTIVE_DEVELOP PASS before one ordinary feature push. The
-single push-triggered CI run owns the mapped canonical FULL. Do not duplicate
-that FULL locally. Do not add a provider-capable
-checkpoint callback; checkpoint `execute=None` remains unchanged. Preserve any
-terminal CI evidence and do not rerun an unchanged source gate.
+B2-A-C1 completed focused verification, exact-file staging, one atomic feature
+commit and general `ops.ps1 admit` before one ordinary feature push. Feature
+run `44507842755`, attempt 1, supplied the mapped canonical FULL and is terminal
+SUCCESS. Independent ChatGPT exact-source review accepted HEAD
+`0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
+`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`.
 
-ChatGPT owns independent exact-source review and acceptance. Only after that
-acceptance, integration and canonical worktree catch-up may ChatGPT review an
-exact, separately named fresh successor invocation. The real operator must
-print canonical `evidence.json` plus SHA-256 and byte length; ChatGPT reviews
-that exact evidence before any baseline backtest. Baseline analysis uses the
-accepted B1 simulator and performs no provider request. The consumed B2-B
-attempt is never retried.
+The accepted commit was fast-forwarded locally onto develop and the ordinary
+develop push succeeded. Develop run `44616906540`, attempt 1, is terminal
+SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason
+`exact_feature_certification`, `IDENTITY_STABLE=True`, and no duplicate FULL.
+
+The first integration wrapper then raised a PowerShell `NativeCommandError`
+after that successful push because it combined
+`$ErrorActionPreference='Stop'` with redirected native Git stderr. GitHub
+proved both remote refs had already reached the accepted SHA, and a separate
+read-only local proof established the integration checkout was clean at the
+accepted HEAD/tree. No second push or merge was performed. This is
+`ARCH148_B2_A_C1_TRANSITION_NATIVE_STDERR_REGRESSION`; the existing workflow
+rule against stderr-unsafe native-command handling remains authoritative.
+
+This docs-only closeout changes no executable/test/workflow bytes and therefore
+does not rerun mapped FULL. After its own docs-only feature gate, integration
+and canonical worktree catch-up, ChatGPT may review one exact, separately named
+fresh read-only acquisition successor. The real operator must print canonical
+`evidence.json` plus SHA-256 and byte length; ChatGPT reviews that exact
+evidence before any baseline backtest. Baseline analysis uses the accepted B1
+simulator and performs no provider request. The consumed B2-B attempt is never
+retried.

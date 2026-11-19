@@ -448,25 +448,37 @@ evidence. After that review, the accepted pure B1 simulator may run zero-cost
 and conservative-cost baselines against flat and QQQ controls, reporting
 drawdown, whipsaw and turnover. Baseline execution makes no provider request.
 
+### B2-A-C1 acceptance and integration
+
+B2-A-C1 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
+`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`, parent
+`298bba38cf61d506fec68cb7034fc66a58218078`. Feature mapped FULL run
+`44507842755`, attempt 1, is terminal SUCCESS. Develop run `44616906540`,
+attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason
+`exact_feature_certification`, and `IDENTITY_STABLE=True`; no duplicate FULL
+ran. C1 source/certification/integration performed zero credential/provider,
+Robinhood, broker, order, production, baseline or FINAL_HOLDOUT effects.
+
 ### Review boundary
 
-B2-A-C1 changes executable source and tests, so the earlier docs-only
-descendant shortcut does not apply. The correction requires exact-source
-publication, mapped certification and independent ChatGPT source acceptance,
-then integration and canonical worktree catch-up. Only after those steps may
-ChatGPT review a separately named fresh successor invocation. The consumed
-B2-B attempt cannot be resumed or retried. This document and a source/preflight
-PASS grant no credential or provider authority; future successful acquisition
-evidence remains READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW until independently
-accepted. No Robinhood, broker, order, production, Q63 or FINAL_HOLDOUT action is
-part of B2-A-C1.
+The executable correction is complete and independently accepted. This
+docs-only closeout does not change the accepted C1 executable/test/workflow
+bytes. After the closeout is integrated and canonical feature/develop worktrees
+are caught up, ChatGPT may review one separately named fresh read-only
+acquisition successor. The consumed B2-B attempt cannot be resumed or retried.
+A docs/source/preflight PASS grants no credential or provider authority; future
+successful acquisition evidence remains
+READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW until independently accepted. No
+Robinhood, broker, order, production, Q63 or FINAL_HOLDOUT action is authorized
+by B2-A-C1 or its closeout.
 
 ## Subsequent milestones
 
 After accepted/integrated 148-A:
 
 - 148-B1: source-only/fake-only 5-minute QQQ/TQQQ/SQQQ acquisition/custody and no-lookahead backtest contract, reusing existing evidence/holdout authority and selecting only an eligible pre-holdout range; no real provider call;
-- 148-B2: complete the B2-A-C1 source correction, independent exact-source acceptance and integration; then review a separately named fresh read-only acquisition successor. Run the deterministic baseline against flat/QQQ controls only after the future acquisition evidence is independently accepted. Existing daily-only research history is not sufficient evidence for these intraday rules;
+- 148-B2: B2-A-C1 source correction, exact-source acceptance and integration are complete. Next review one separately named fresh read-only acquisition successor; run the deterministic baseline against flat/QQQ controls only after that future acquisition evidence is independently accepted. Existing daily-only research history is not sufficient evidence for these intraday rules;
 - 148-C: desktop/demo integration and GUI status/control path;
 - 148-D: current Robinhood read-only parity/preflight using the new complete
   runtime dependency closure;

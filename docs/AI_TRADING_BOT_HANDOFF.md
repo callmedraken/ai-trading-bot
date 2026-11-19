@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148-B2-B consumed / blocked; B2-A-C1 correction pending exact review
+## Current milestone: Architecture 148-B2-A-C1 accepted/integrated; fresh B2 successor pending review
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -11,52 +11,61 @@ Primary application reference: `siropkin/robinhood-ai-trading-bot@1a778749cfbe92
 
 148-A is accepted/integrated at `df48cdd40bcd18f2bfdc65dda201cfe2b6f199bd` / tree `2e139bdd886ee6ce8f92da57cc11ea38f341114f`, parent `ec0f33b7c15521c1901d749d5a933564360448c7`. Feature mapped FULL `44411012023`, attempt 1, is SUCCESS. Develop `44423510835`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. Real provider calls and broker effects were zero.
 
-### Architecture 148-B2-A accepted/integrated identity
+### Architecture 148-B2-A-C1 accepted/integrated identity
 
-B2-A is accepted and integrated at HEAD `6957afa159647ece18af876289d8a20637cfc6eb` /
-tree `43701fcaef23990a793359d08a8213d43e434780`, direct parent
-`0f188ed75216855bc13077ed959ae92bc7463222`. Feature source-gate run
-`44485930260`, attempt 1, is terminal SUCCESS with active tests and all seven
-canonical FULL lanes green. Develop source-gate run `44489803571`, attempt 1,
-is terminal SUCCESS with exact feature-certification reuse; the exact-develop-
-reuse step passed and active tests, `full-tests`, `certification-tests` and
-`certification-full` were skipped. No duplicate seven-lane FULL ran.
+B2-A-C1 is independently SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
+INTEGRATED at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
+`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`, direct parent
+`298bba38cf61d506fec68cb7034fc66a58218078`. Feature mapped FULL run
+`44507842755`, attempt 1, is terminal SUCCESS with source-static, active-tests,
+source-gates and all seven canonical FULL lanes passing. Develop run
+`44616906540`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification` and
+`IDENTITY_STABLE=True`; active tests and all broad/certification execution were
+skipped on develop, so `DEVELOP_DUPLICATE_FULL=NO`.
 
-The canonical feature worktree is
-`F:\AI\worktrees\ai-trading-bot-live-prototype-current`; the local integration
-checkout is
-`F:\AI\worktrees\ai-trading-bot-p4-integration-e5e800a`. At B2-A integration,
-both were verified clean at the accepted executable source identity. B2-A was
-source-only/fake-only with zero Alpaca credential reads and provider requests.
-The prior docs-only invocation-source shortcut does not apply to B2-A-C1 because
-it changes executable source and tests.
+The canonical feature worktree remains
+`F:\AI\worktrees\ai-trading-bot-live-prototype-current`; the integration
+checkout remains
+`F:\AI\worktrees\ai-trading-bot-p4-integration-e5e800a`. The integration
+checkout was proved clean at the accepted HEAD/tree after the push. C1 itself
+was source-only/fake-only and performed zero Alpaca credential/provider,
+Robinhood, broker, order, production, baseline or FINAL_HOLDOUT effects.
 
-The separately reviewed B2-B attempt
-`fd8aa437-c748-4d5b-a52f-1e58b2ca5953` is CONSUMED / BLOCKED /
+The separately reviewed predecessor B2-B attempt
+`fd8aa437-c748-4d5b-a52f-1e58b2ca5953` remains CONSUMED / BLOCKED /
 PAGE_LIMIT_REACHED / NO RETRY at
 `F:\AI\temp\arch148-b2-fd8aa437-c748-4d5b-a52f-1e58b2ca5953`. It read
 credentials once, made 64 provider attempts and received 64 successful QQQ
 pages; TQQQ and SQQQ were not requested. QQQ raw/regular-slot/off-slot counts
-were 162426 / 78057 / 84369, and unresolved intent was NONE. The classification
-is ARCH148_B2_PROVIDER_STREAM_SCOPE_ASSUMPTION_DEFECT /
-ARCH148_B2_PAGINATION_CEILING_UNDERSIZED; Robinhood, broker, order, production,
-FINAL_HOLDOUT and baseline effects were zero. The attempt is immutable and
-cannot be retried. See [the B2 acquisition plan](validation/arch148-b2-readonly-acquisition-plan.md)
-for full incident facts, invocation/admission rules and corrected source
-contract.
+were 162426 / 78057 / 84369 and unresolved intent was NONE. It remains immutable
+incident evidence and cannot be resumed or retried.
 
-B2-A-C1 is the frozen corrective source contract; its source and tests must pass exact-source
-publication, mapped certification and independent ChatGPT acceptance before
-integration. After integration and canonical worktree catch-up, ChatGPT may
-review a separately named fresh successor invocation. No provider or credential
-action is authorized before that distinct review.
+The accepted C1 operator validates all raw bars before projecting only exact B1
+regular-session slots into the normalized dataset, binds reconciled
+raw/qualified/excluded counts in v2 evidence, enforces 192 pages per symbol /
+576 total attempts, and spaces provider-request starts by at least 0.5 seconds.
+Pacing grants no retry.
+
+The first integration wrapper terminated after the successful push because it
+combined `$ErrorActionPreference='Stop'` with redirected native Git stderr;
+GitHub independently proved both remote refs at the accepted SHA and the
+develop reuse run completed successfully. The subsequent read-only local proof
+confirmed the clean accepted integration identity. Do not repeat that
+stderr-unsafe wrapper pattern.
+
+The next boundary is one separately reviewed fresh read-only B2 acquisition
+successor after this docs-only closeout is integrated and local feature/develop
+worktrees are caught up. No provider/credential, Robinhood/broker, production
+or `FINAL_HOLDOUT` action is authorized by this closeout.
 
 Architecture 148-B1 is accepted/integrated at `68b9526f022458cbcdd4f25ff268e0de7c56e562` / tree `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`. The initial B1 commit `70b0a8de5cb3b2cf4fb826352b6ada3650c57614` remains preserved with green run `44432367772` but was exact-source rejected; corrective C1 closed the reviewed defects. Feature mapped FULL `44438409583`, attempt 1, is SUCCESS. Develop `44465681331`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. The operator integration report records both canonical F: worktrees and both live refs at the exact accepted HEAD/tree and clean; the feature checkout required no catch-up.
 
-B2-B is CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY. B2-A-C1 source
-correction and exact-source acceptance, certification and integration must
-precede review of any fresh successor invocation. No provider/credential,
-Robinhood/broker, production or `FINAL_HOLDOUT` action is authorized here.
+B2-B is CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY. B2-A-C1 is now
+accepted/integrated; the next protected boundary is review of one separately
+named fresh read-only acquisition successor after the docs closeout/catch-up.
+No provider/credential, Robinhood/broker, production or `FINAL_HOLDOUT` action
+is authorized here.
 
 
 ### Architecture 148-B1 accepted intraday identity

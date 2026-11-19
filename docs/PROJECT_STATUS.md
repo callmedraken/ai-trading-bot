@@ -1,30 +1,48 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148-B2-B consumed / blocked; B2-A-C1 correction pending review
+## Current milestone - Architecture 148-B2-A-C1 accepted/integrated; fresh B2 successor pending review
 
-The accepted B2-A predecessor is HEAD `6957afa159647ece18af876289d8a20637cfc6eb`
-/ tree `43701fcaef23990a793359d08a8213d43e434780`, parent
-`0f188ed75216855bc13077ed959ae92bc7463222`. Feature source-gate
-`44485930260` and develop source-gate `44489803571` are terminal SUCCESS;
-develop reused the exact feature certification with no duplicate FULL.
+Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
+INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
+`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`, direct parent
+`298bba38cf61d506fec68cb7034fc66a58218078`. Feature source-gate
+`44507842755`, attempt 1, is terminal SUCCESS with source-static, active-tests,
+source-gates and all seven mapped canonical FULL lanes passing. Develop
+source-gate `44616906540`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`, and
+`IDENTITY_STABLE=True`; active-tests, full-tests, certification-tests and
+certification-full were skipped, so no duplicate FULL ran. The local integration
+checkout was then proved clean at the exact accepted HEAD/tree.
 
 Dashboard: B2-B attempt `fd8aa437-c748-4d5b-a52f-1e58b2ca5953` at
-`F:\AI\temp\arch148-b2-fd8aa437-c748-4d5b-a52f-1e58b2ca5953` is CONSUMED /
-BLOCKED / PAGE_LIMIT_REACHED / NO RETRY. Credential reads: 1; provider
-attempts/pages: 64/64; QQQ raw/regular-slot/off-slot bars: 162426 / 78057 /
-84369; unresolved intent: NONE; Robinhood/broker/order/production/
+`F:\AI\temp\arch148-b2-fd8aa437-c748-4d5b-a52f-1e58b2ca5953` remains
+CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY. Credential reads: 1;
+provider attempts/pages: 64/64; QQQ raw/regular-slot/off-slot bars: 162426 /
+78057 / 84369; unresolved intent: NONE; Robinhood/broker/order/production/
 FINAL_HOLDOUT/baseline effects: 0. The immutable attempt cannot be retried.
-See [the B2 acquisition plan](validation/arch148-b2-readonly-acquisition-plan.md)
-for the incident record and corrected source contract.
 
-The B2-A-C1 contract preserves B1 and specifies raw-to-B1 slot projection,
-v2 per-symbol
-raw/qualified/excluded evidence counts, ceilings of 192 pages per symbol and
-576 total attempts, and 0.5-second minimum pacing between request starts after
-the first. Its source/test change requires a new exact-source checkpoint,
-mapped certification, independent acceptance, integration and catch-up before
-ChatGPT may review any separately named fresh successor invocation. This
-status record grants no provider or credential authority.
+B2-A-C1 preserves B1 and now implements validated raw-to-B1 exact-slot
+projection, v2 per-symbol raw/qualified/excluded evidence counts, ceilings of
+192 pages per symbol and 576 total attempts, and 0.5-second minimum pacing
+between provider-request starts after the first. C1 source work, certification
+and integration performed zero credential/provider, Robinhood, broker, order,
+production, baseline or FINAL_HOLDOUT effects.
+
+`ARCH148_B2_A_C1_TRANSITION_NATIVE_STDERR_REGRESSION` records one integration
+wrapper defect: the local fast-forward and `git push origin develop` both
+succeeded, but the wrapper combined `$ErrorActionPreference='Stop'` with native
+stderr redirection and converted Git's normal remote-status stderr into a
+terminating `NativeCommandError` before the final verification prints. GitHub
+then proved both remote refs at the accepted SHA, develop CI ran normally, and
+a separate read-only local proof established the clean integrated HEAD/tree.
+No duplicate push/merge or source/protected effect occurred. Existing workflow
+rules already prohibit this stderr-unsafe pattern; no workflow-source change is
+needed.
+
+The next boundary is review of one separately named **fresh** read-only B2
+acquisition successor after this docs-only closeout is integrated and canonical
+worktrees are caught up. That future invocation is not a retry of the consumed
+B2-B attempt. This status record grants no credential or provider authority.
 
 Architecture 148 is now the current product direction under [the frozen pivot design](architecture/148-tqqq-sqqq-runtime-pivot.md). The first application version is intraday-only and may hold exactly one of TQQQ, SQQQ or FLAT. QQQ is the primary direction reference. V1 uses completed 5-minute bars, session VWAP, EMA(20), EMA(50) and RSI(14), requires two consecutive same-direction completed bars before an entry, forbids same-cycle flips, and forces the application flat beginning five minutes before the official regular-session close.
 
@@ -42,10 +60,12 @@ Architecture 148-B1 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
 
 The accepted B1 OPEN contract is completed 5-minute QQQ/TQQQ/SQQQ research data over `[2016-01-01, 2024-01-01)` UTC with `adjustment=all`, SIP, USD and price basis `ALPACA_ALL_ADJUSTED_INTRADAY_PRICE_V1`. Architecture 148 owns the separately committed intraday schedule identity `4fe981d0-34ef-57be-a7d1-ffd017460bf5` / SHA-256 `a33be70499cdafbfa21f45a04c854ab834425807b6c0314814b7442749aa2bad`. The simulator preserves completed-bar no-lookahead entry, conservative immediate entry-bar hard-stop handling, shared regime-exit semantics and deterministic fake-only controls. No real provider, credential, Robinhood, broker, production-state or `FINAL_HOLDOUT` effect occurred during B1.
 
-The initial B2-B attempt is CONSUMED / BLOCKED / NO RETRY. B2-A-C1 must be
-independently accepted and integrated before ChatGPT can review a fresh
-successor invocation. Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; Q63
-remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
+The initial B2-B attempt remains CONSUMED / BLOCKED / NO RETRY. B2-A-C1 is
+accepted/integrated at `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
+`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`; only a separately reviewed fresh
+read-only acquisition successor may follow the docs closeout/catch-up boundary.
+Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; Q63 remains NOT RUN and
+`FINAL_HOLDOUT` remains SEALED.
 
 L43-Q1 source/certification is independently ACCEPTED and FAST-FORWARD INTEGRATED at HEAD `05f4c4700f82c3d40c83f474c3cf614573d48091` / tree `70aec1c51e63705a68d6710cc3448ac994227e46`. Feature mapped FULL run `44260469616`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and all seven canonical FULL lanes passing. Develop run `44264566809`, attempt 1, is terminal SUCCESS with exact feature-certification reuse; active/FULL/certification jobs were skipped on develop, so no duplicate FULL ran. Local feature/develop reconciliation later reached the same exact clean HEAD/tree.
 

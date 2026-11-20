@@ -33,6 +33,7 @@ env:
               arch134-fresh-successor-readonly-deployment-admission-diagnostic-r2 `
               arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1 `
               arch148-churn-research `
+              arch-ai-strategy-discovery-foundation `
               arch146-a-historical-research-dataset-enforcement `
               arch134-f1r1-d1s3-successor-release-installation-operator `
               arch133-robinhood-supervised-release-installation-operator `

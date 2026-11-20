@@ -244,6 +244,50 @@ def test_arch148_churn_checkpoint_is_source_only_and_mapped():
     assert runner._arch148_churn_authority_check(repo) == ()
 
 
+def test_ai_strategy_discovery_checkpoint_is_source_only_and_mapped():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME]
+
+    assert (
+        runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME
+        == "arch-ai-strategy-discovery-foundation"
+    )
+    assert (
+        runner.AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH
+        == "feature/research-ai-strategy-discovery-current"
+    )
+    assert spec.remote_branch == runner.AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH
+    assert (
+        spec.authority_check is runner._ai_strategy_discovery_foundation_authority_check
+    )
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert (
+        runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME not in runner.ACTIVE_CI_CHECKPOINTS
+    )
+    assert (
+        runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(
+            runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME
+        )
+        == 1
+    )
+    assert (
+        runner.CI_CERTIFICATION_PROFILES[runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME]
+        == "full"
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, runner.AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH, "push"
+        )
+        == runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME
+    )
+    assert (
+        runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME
+        in current_source_authority.develop_static_checkpoints(repo)
+    )
+    assert runner._ai_strategy_discovery_foundation_authority_check(repo) == ()
+
+
 def test_registry_invariants_accept_additions_and_reject_missing_references():
     specs = runner._checkpoint_specs()
     synthetic_name = "synthetic-future-checkpoint"

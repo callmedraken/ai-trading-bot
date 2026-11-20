@@ -383,6 +383,24 @@ ARCH148_CHURN_RUFF: Final = (
     "tests/experiments/test_arch148_churn_policy.py",
     "tests/experiments/test_arch148_churn_research.py",
 )
+AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: Final = "arch-ai-strategy-discovery-foundation"
+AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH: Final = (
+    "feature/research-ai-strategy-discovery-current"
+)
+AI_STRATEGY_DISCOVERY_FOUNDATION_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/experiments/test_ai_strategy_discovery.py",
+    "tests/experiments/test_ai_strategy_discovery_evidence.py",
+)
+AI_STRATEGY_DISCOVERY_FOUNDATION_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "src/trading_bot/experiments/ai_strategy_discovery.py",
+    "src/trading_bot/experiments/ai_strategy_discovery_evidence.py",
+    "tests/experiments/test_ai_strategy_discovery.py",
+    "tests/experiments/test_ai_strategy_discovery_evidence.py",
+)
 ARCH147_NAME: Final = "arch147-desktop-research-profile"
 ARCH147_BRANCH: Final = "feature/research-desktop-product-pivot-current"
 ARCH147_TESTS: Final = (
@@ -669,6 +687,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
     ARCH148_CHURN_NAME,
+    AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
 )
 
@@ -681,6 +700,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH147_P5B_NAME: "full",
     ARCH147_FILTERED_TREND_NAME: "full",
     ARCH148_CHURN_NAME: "full",
+    AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
     ARCH147_P5A_NAME: "full",
     ARCH147_P4_NAME: "full",
     ARCH147_NAME: "full",
@@ -26690,6 +26710,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH148_CHURN_BRANCH,
     )
+    values[AI_STRATEGY_DISCOVERY_FOUNDATION_NAME] = CheckpointSpec(
+        AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
+        "Source-only AI strategy discovery proposal and evidence foundation",
+        AI_STRATEGY_DISCOVERY_FOUNDATION_TESTS,
+        AI_STRATEGY_DISCOVERY_FOUNDATION_RUFF,
+        _ai_strategy_discovery_foundation_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH,
+    )
     values[ARCH147_NAME] = CheckpointSpec(
         ARCH147_NAME,
         "Current single-user desktop research storage and loader pivot",
@@ -27335,6 +27365,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     translated = predecessor
     for name in (
         ARCH148_CHURN_NAME,
+        AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         ARCH147_PROTOTYPE_NAME,
         ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
@@ -27372,6 +27403,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
         return True
     current_names = (
         ARCH148_CHURN_NAME,
+        AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         ARCH147_PROTOTYPE_NAME,
         ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
@@ -28383,6 +28415,47 @@ def _arch148_churn_authority_check(repo_root: Path) -> tuple[str, ...]:
     for relative in required_paths:
         if not (repo_root / relative).is_file():
             failures.append("148 churn source route is missing " + relative)
+    return tuple(failures)
+
+
+def _ai_strategy_discovery_foundation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Register AI strategy discovery as source-only current research."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(AI_STRATEGY_DISCOVERY_FOUNDATION_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != AI_STRATEGY_DISCOVERY_FOUNDATION_TESTS
+        or spec.ruff_paths != AI_STRATEGY_DISCOVERY_FOUNDATION_RUFF
+        or spec.authority_check is not _ai_strategy_discovery_foundation_authority_check
+        or spec.remote_branch != AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(AI_STRATEGY_DISCOVERY_FOUNDATION_NAME)
+        != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(AI_STRATEGY_DISCOVERY_FOUNDATION_NAME)
+        != 1
+        or AI_STRATEGY_DISCOVERY_FOUNDATION_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(specs, AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH, "push")
+        != AI_STRATEGY_DISCOVERY_FOUNDATION_NAME
+    ):
+        failures.append("AI strategy discovery source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("AI strategy discovery tests are not FULL-owned")
+    required_paths = (
+        "src/trading_bot/experiments/ai_strategy_discovery.py",
+        "src/trading_bot/experiments/ai_strategy_discovery_evidence.py",
+        "tests/experiments/test_ai_strategy_discovery.py",
+        "tests/experiments/test_ai_strategy_discovery_evidence.py",
+    )
+    for relative in required_paths:
+        if not (repo_root / relative).is_file():
+            failures.append("AI strategy discovery source route is missing " + relative)
     return tuple(failures)
 
 

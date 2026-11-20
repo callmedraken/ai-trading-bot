@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148 public-reference completion accepted; offline B2 requalification accepted
+## Current milestone - Architecture 148 churn research proposal (source-only; OPEN evaluation pending)
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -75,14 +75,26 @@ network/provider, Robinhood/broker, order, production-state, FINAL_HOLDOUT or
 baseline effects. The consumed `bb1a...` acquisition remains immutable and NO
 RETRY.
 
-The next operational boundary is to make the main checkout
-`F:\AI\ai-trading-bot` the clean canonical `develop` checkout after this
-docs-only closeout is terminal green, retiring the temporary integration
-worktree only after exact cleanliness/identity proof. Then run the OPEN sparse
-baseline from that canonical checkout. `FINAL_HOLDOUT` remains sealed. Live
-promotion still requires provider-scope proof, whole-share GTC stop-market
-capability, approval-to-order linkage where applicable, and explicit whole-share
-risk/notional authority.
+The current research proposal is
+[Architecture 148 churn research](validation/arch148-churn-research.md). It
+defines four fixed descriptive variants and the two existing cost cases over
+calendar-year OPEN partitions, while preserving the accepted sparse dataset,
+simulator and rejected baseline economics. No churn evaluation result or new
+CI result is claimed here. The source-only `arch148-churn-research` route has
+no preflight or execution dispatch; it does not run the OPEN evaluation.
+After exact local commit and general source admission, the separately
+authorized OPEN comparison is planned before publication so its evidence can be
+reviewed independently; mapped CI is not a prerequisite for that offline run.
+`FINAL_HOLDOUT` remains sealed. Live promotion still requires provider-scope
+proof, whole-share GTC stop-market capability, approval-to-order linkage where
+applicable, and explicit whole-share risk/notional authority.
+
+The accepted sparse OPEN baseline remains unchanged at
+`F:\AI\temp\arch148-open-sparse-baseline-e3e27c29-8a9d-41c5-9ac0-d89a1d4cb5d1\baseline.json`,
+SHA-256 `38cbba9beae664c675670af1ad96e86a56df2a9060c6cb924c1ad51ea4f9b85f`.
+It records 6,233 `ZERO_COST` and 6,235 `CONSERVATIVE_10_BPS` trades, 5,446 and
+5,439 regime exits respectively, and `-99.998648%` conservative return. The
+baseline economics are rejected; these values are not churn results.
 
 Architecture 148 is now the current product direction under [the frozen pivot design](architecture/148-tqqq-sqqq-runtime-pivot.md). The canonical pinned source/runtime/public-reference map is [the 148 parity matrix](validation/arch148-runtime-parity.md); it records local source/tests, external licenses, adopted behavior and intentional exclusions, and grants no provider authority. The first application version is intraday-only and may hold exactly one of TQQQ, SQQQ or FLAT. QQQ is the primary direction reference. V1 uses completed 5-minute bars, session VWAP, EMA(20), EMA(50) and RSI(14), requires two consecutive same-direction completed bars before an entry, forbids same-cycle flips, and forces the application flat beginning five minutes before the official regular-session close.
 
@@ -107,8 +119,9 @@ contract. B2-A-C1 remains accepted/integrated at
 `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
 `e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`. Its immutable raw observations
 are now independently accepted through the sparse offline requalification
-evidence recorded above. No provider retry is authorized. The next research
-boundary is the OPEN sparse baseline after canonical main-checkout migration;
+evidence recorded above. No provider retry is authorized. The churn proposal
+uses that accepted sparse source and baseline as fixed inputs; separately
+reviewed OPEN evidence has not been produced by this source checkpoint.
 `FINAL_HOLDOUT` remains sealed.
 Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; Q63 remains NOT RUN and
 `FINAL_HOLDOUT` remains SEALED.

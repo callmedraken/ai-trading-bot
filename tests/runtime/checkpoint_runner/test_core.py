@@ -223,6 +223,27 @@ def test_current_checkpoint_registry_invariants_allow_growth():
     assert _current_registry_invariant_failures(specs) == ()
 
 
+def test_arch148_churn_checkpoint_is_source_only_and_mapped():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.ARCH148_CHURN_NAME]
+
+    assert runner.ARCH148_CHURN_NAME == "arch148-churn-research"
+    assert runner.ARCH148_CHURN_BRANCH == "feature/research-arch148-churn"
+    assert spec.remote_branch == runner.ARCH148_CHURN_BRANCH
+    assert spec.authority_check is runner._arch148_churn_authority_check
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert runner.ARCH148_CHURN_NAME not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.ARCH148_CHURN_NAME in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(runner.ARCH148_CHURN_NAME) == 1
+    assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH148_CHURN_NAME] == "full"
+    assert (
+        runner.resolve_ci_checkpoint(specs, runner.ARCH148_CHURN_BRANCH, "push")
+        == runner.ARCH148_CHURN_NAME
+    )
+    assert runner._arch148_churn_authority_check(repo) == ()
+
+
 def test_registry_invariants_accept_additions_and_reject_missing_references():
     specs = runner._checkpoint_specs()
     synthetic_name = "synthetic-future-checkpoint"

@@ -6,8 +6,9 @@ ACQUISITION COMPLETE BUT ORIGINAL B1 QUALIFICATION CONSUMED / BLOCKED /
 QUALIFICATION_BAR_COUNT_MISMATCH / NO RETRY; PUBLIC-REFERENCE COMPLETION SOURCE
 AND OFFLINE SPARSE REQUALIFICATION EVIDENCE INDEPENDENTLY ACCEPTED.** This plan
 authorizes no new Alpaca credential read, provider request, Robinhood/broker
-action, production mutation or FINAL_HOLDOUT access. The next research boundary
-is the OPEN sparse baseline after canonical main-checkout migration.
+action, production mutation or FINAL_HOLDOUT access. The current follow-on
+proposal is the source-only [Architecture 148 churn study](arch148-churn-research.md);
+it does not run an OPEN evaluation or create new results.
 
 B2-A-C1 accepted executable source:
 `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
@@ -31,9 +32,12 @@ executable/test/workflow bytes. A future provider acquisition still requires a
 separately reviewed fresh invocation bound to the exact then-current integrated
 invocation source after docs closeout/catch-up. The later `bb1a...` attempt
 recorded below already consumed its own acquisition boundary; it is not a retry
-of the earlier `fd8aa...` attempt. The offline requalification review is accepted; another provider invocation is
-not authorized. The next research boundary is canonical main-checkout migration
-followed by the OPEN sparse baseline.
+of the earlier `fd8aa...` attempt. The offline requalification review is
+accepted; another provider invocation is not authorized. The proposed research
+scope is the fixed churn study in
+[`arch148-churn-research.md`](arch148-churn-research.md). Any OPEN evaluation is
+a separate later evidence step bound to exact committed source and independent
+review; no such result is claimed by this plan.
 
 ## Consumed B2-B attempt
 
@@ -370,5 +374,8 @@ It binds dataset `0308b694-c718-5b1a-a51c-9fcc4516bb81` and custody
 `dbcced6a-b4cc-5d36-a33b-5e6df3d82baa`, reports zero fully missing sessions,
 and records zero new credential/network/provider/Robinhood/broker/order/
 production/FINAL_HOLDOUT/baseline effects. Keep the dense B1 contract unchanged.
-No provider retry or broker effect is authorized by this plan. After canonical
-main-checkout migration, the OPEN sparse baseline is the next research boundary.
+No provider retry or broker effect is authorized by this plan. The accepted
+sparse observations and baseline are inputs to the proposed source-only churn
+comparison in [`arch148-churn-research.md`](arch148-churn-research.md). A
+separate OPEN evaluation remains pending and must not overwrite this plan's
+immutable acquisition or requalification evidence.

@@ -17,27 +17,24 @@ def _historical_workflow_view(workflow: str) -> str:
     from scripts.distributed_full import predecessor_workflow
 
     workflow = predecessor_workflow(workflow)
-    for name in (
-        runner.ARCH147_PROTOTYPE_NAME,
-        runner.ARCH147_P6_NAME,
-        runner.ARCH147_P5B_NAME,
-        runner.ARCH147_FILTERED_TREND_NAME,
-        runner.ARCH147_P5A_NAME,
-        runner.ARCH147_P4_NAME,
-        runner.ARCH147_NAME,
-        runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
-        runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
-    ):
+    historical_names = set(runner.ACTIVE_CI_CHECKPOINTS)
+    current_successors = tuple(
+        name
+        for name in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+        if name not in historical_names
+    )
+    for name in current_successors:
         registration = f"              {name} `\n"
         if workflow.count(registration) != 1:
             raise AssertionError(f"expected one current workflow registration: {name}")
-        workflow = workflow.replace(registration, "", 1)
-
-    current_first = f"              {runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME} `\n"
-    historical_first = f"              {_ARCH132_R3M_FIRST_ACTIVE_CHECKPOINT} `\n"
-    if workflow.count(current_first) != 1:
-        raise AssertionError("expected one R1 successor workflow registration")
-    return workflow.replace(current_first, historical_first, 1)
+        if name == runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME:
+            historical_first = (
+                f"              {_ARCH132_R3M_FIRST_ACTIVE_CHECKPOINT} `\n"
+            )
+            workflow = workflow.replace(registration, historical_first, 1)
+        else:
+            workflow = workflow.replace(registration, "", 1)
+    return workflow
 
 
 def _spec() -> runner.CheckpointSpec:

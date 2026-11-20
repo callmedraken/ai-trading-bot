@@ -8,11 +8,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, localcontext
 from zoneinfo import ZoneInfo
 
 from trading_bot.domain import Bar, OrderSide
+from trading_bot.experiments.arch148_churn_policy import ChurnPolicy
 from trading_bot.experiments.arch148_intraday import (
     _DECIMAL_CONTEXT,
     SQQQ_SYMBOL,
@@ -43,7 +44,6 @@ from trading_bot.live_runtime.strategy import (
     SessionDecision,
     _CompletedBarSignalStream,
     analyze_market,
-    confirmed_regime_exit,
     session_decision,
 )
 
@@ -54,7 +54,7 @@ _NEW_YORK = ZoneInfo("America/New_York")
 @dataclass(frozen=True, slots=True)
 class _PendingExit:
     reason: str
-    is_reversal: bool = False
+    reversal_source: MarketRegime | None = None
 
 
 def _completed_bar(bar: Bar) -> CompletedBar:
@@ -99,6 +99,11 @@ def run_sparse_backtest(
     initial_capital: Decimal = Decimal("10000"),
     analyzer: Callable[..., SignalAnalysis] = analyze_market,
     session_policy: Callable[[datetime], SessionDecision] | None = None,
+    churn_policy: ChurnPolicy = ChurnPolicy.CONTROL,
+    on_equity_mark: Callable[[datetime, Decimal], None] | None = None,
+    on_trade_close: (
+        Callable[[BacktestTrade, Decimal, MarketRegime | None], None] | None
+    ) = None,
 ) -> BacktestResult:
     """Replay a sparse dataset without fabricating execution or valuation bars.
 
@@ -108,7 +113,10 @@ def run_sparse_backtest(
     first later real bar, where the hard stop has priority. The final published
     session slot must flatten any open position or the simulation fails. The
     equity curve emits no mark while a position lacks a real ETF close; it does
-    not carry forward a stale valuation.
+    not carry forward a stale valuation. ``churn_policy`` adds a research-only
+    exit/entry gate; CONTROL preserves the existing strategy behavior. Optional
+    observers receive only emitted equity marks and settled trade facts, without
+    changing the returned result.
     """
 
     if type(dataset) is not SparseIntradayDataset:
@@ -125,6 +133,12 @@ def run_sparse_backtest(
         raise Arch148IntradayError("analyzer must be callable")
     if session_policy is not None and not callable(session_policy):
         raise Arch148IntradayError("session_policy must be callable")
+    if type(churn_policy) is not ChurnPolicy:
+        raise Arch148IntradayError("exact churn policy is required")
+    if on_equity_mark is not None and not callable(on_equity_mark):
+        raise Arch148IntradayError("equity observer must be callable")
+    if on_trade_close is not None and not callable(on_trade_close):
+        raise Arch148IntradayError("trade observer must be callable")
 
     authority = HistoricalIntradaySessionAuthority()
     session_policy = session_policy or (
@@ -149,8 +163,30 @@ def run_sparse_backtest(
     reversal_exits = 0
     forced_flat_count = 0
     hard_stop = HardStopPolicy()
+    active_session_date: date | None = None
+    cooldown_until: datetime | None = None
+
+    def append_equity_mark(at: datetime, value: Decimal) -> None:
+        equity_curve.append(value)
+        if on_equity_mark is not None:
+            on_equity_mark(at, value)
+
+    def observe_closed_trade(
+        trade: BacktestTrade,
+        added_turnover: Decimal,
+        reversal_source: MarketRegime | None,
+    ) -> None:
+        if on_trade_close is not None:
+            on_trade_close(trade, added_turnover, reversal_source)
 
     for as_of in expected_open_slots(dataset.start, dataset.end_exclusive, authority):
+        session_date = as_of.astimezone(_NEW_YORK).date()
+        if session_date != active_session_date:
+            active_session_date = session_date
+            cooldown_until = None
+        elif cooldown_until is not None and as_of >= cooldown_until:
+            cooldown_until = None
+
         while (
             qqq_pointer < len(qqq_bars)
             and qqq_bars[qqq_pointer].timestamp + _BAR_WIDTH <= as_of
@@ -199,6 +235,7 @@ def run_sparse_backtest(
                 cash = _add(cash, proceeds)
                 trades.append(trade)
                 turnover = _add(turnover, added_turnover)
+                observe_closed_trade(trade, added_turnover, None)
                 position = None
                 pending_exit = None
                 acted = True
@@ -219,8 +256,11 @@ def run_sparse_backtest(
             cash = _add(cash, proceeds)
             trades.append(trade)
             turnover = _add(turnover, added_turnover)
-            reversal_exits += int(pending_exit.is_reversal)
+            reversal_exits += int(pending_exit.reversal_source is not None)
             forced_flat_count += int(pending_exit.reason == "FORCED_FLAT")
+            observe_closed_trade(trade, added_turnover, pending_exit.reversal_source)
+            if trade.exit_reason == "REGIME_EXIT" and churn_policy.cooldown_duration:
+                cooldown_until = trade.exit_at + churn_policy.cooldown_duration
             position = None
             pending_exit = None
             acted = True
@@ -228,19 +268,18 @@ def run_sparse_backtest(
 
         if position is not None and pending_exit is None:
             exit_reason: str | None = None
-            is_reversal = False
+            reversal_source: MarketRegime | None = None
             if decision.force_flat:
                 exit_reason = "FORCED_FLAT"
             elif signal is None or signal.quality is not MarketQuality.READY:
                 exit_reason = "SAFETY"
-            elif confirmed_regime_exit(signal, TargetPosition(position.symbol)):
+            elif churn_policy.should_exit_regime(
+                signal, TargetPosition(position.symbol)
+            ):
                 exit_reason = "REGIME_EXIT"
-                is_reversal = signal.entry_confirmation in (
-                    MarketRegime.BULLISH,
-                    MarketRegime.BEARISH,
-                )
+                reversal_source = churn_policy.reversal_source(signal)
             if exit_reason is not None:
-                pending_exit = _PendingExit(exit_reason, is_reversal)
+                pending_exit = _PendingExit(exit_reason, reversal_source)
                 if current_bar is not None:
                     proceeds, trade, added_turnover = _settle(
                         position,
@@ -252,8 +291,14 @@ def run_sparse_backtest(
                     cash = _add(cash, proceeds)
                     trades.append(trade)
                     turnover = _add(turnover, added_turnover)
-                    reversal_exits += int(is_reversal)
+                    reversal_exits += int(reversal_source is not None)
                     forced_flat_count += int(exit_reason == "FORCED_FLAT")
+                    observe_closed_trade(trade, added_turnover, reversal_source)
+                    if (
+                        trade.exit_reason == "REGIME_EXIT"
+                        and churn_policy.cooldown_duration
+                    ):
+                        cooldown_until = trade.exit_at + churn_policy.cooldown_duration
                     position = None
                     pending_exit = None
                     acted = True
@@ -269,6 +314,7 @@ def run_sparse_backtest(
             and not decision.force_flat
             and signal.entry_confirmation
             in (MarketRegime.BULLISH, MarketRegime.BEARISH)
+            and cooldown_until is None
         ):
             target = (
                 TQQQ_SYMBOL
@@ -309,14 +355,16 @@ def run_sparse_backtest(
                         cash = _add(cash, proceeds)
                         trades.append(trade)
                         turnover = _add(turnover, added_turnover)
+                        observe_closed_trade(trade, added_turnover, None)
                         position = None
                         valuation_bar = None
 
         if position is None:
-            equity_curve.append(cash)
+            append_equity_mark(as_of, cash)
         elif valuation_bar is not None:
             with localcontext(_DECIMAL_CONTEXT):
-                equity_curve.append(cash + position.quantity * valuation_bar.close)
+                equity_value = cash + position.quantity * valuation_bar.close
+            append_equity_mark(as_of, equity_value)
 
         session = authority.schedule_for(as_of.astimezone(_NEW_YORK).date())
         if session is not None and as_of == session.closes_at - _BAR_WIDTH:

@@ -507,23 +507,29 @@ attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason
 ran. C1 source/certification/integration performed zero credential/provider,
 Robinhood, broker, order, production, baseline or FINAL_HOLDOUT effects.
 
-### Review boundary
+### Current research boundary
 
-The C1 executable correction and source certification remain independently
-accepted. The later acquisition completed, but its original downstream dense-B1
-qualification failed and remains consumed. The broader public-reference source
-checkpoint and exact sparse offline requalification result are independently
-accepted. The immediate safe boundary is canonical main-checkout migration,
-then the OPEN sparse baseline. A docs/source/preflight PASS grants no credential
-or provider authority. No new provider request, Robinhood, broker, order,
-production, Q63 or FINAL_HOLDOUT action follows from this documentation update.
+The C1 executable correction, public-reference source checkpoint and exact
+sparse offline requalification result remain independently accepted. The
+current follow-on proposal is the source-only
+[Architecture 148 churn study](../validation/arch148-churn-research.md). It
+fixes four descriptive variants, two existing cost cases, calendar-year OPEN
+partitions and required diagnostics before any evaluation. No churn evaluation
+result or new CI result is claimed here; the checkpoint does not run the OPEN
+evaluation. After exact local commit and general source admission, the
+separately authorized OPEN comparison is planned before publication so its
+evidence can be independently reviewed; mapped CI is not a prerequisite for
+that offline run. A docs/source/preflight PASS grants no credential or provider
+authority. No new provider request, Robinhood, broker, order, production, Q63 or
+FINAL_HOLDOUT action follows from this documentation update.
 
 ## Subsequent milestones
 
 After accepted/integrated 148-A:
 
 - 148-B1: source-only/fake-only 5-minute QQQ/TQQQ/SQQQ acquisition/custody and no-lookahead backtest contract, reusing existing evidence/holdout authority and selecting only an eligible pre-holdout range; no real provider call;
-- 148-B2: the earlier `fd8aa...` page-limit incident and later `bb1a...` completed-but-unqualified acquisition remain separate immutable consumed attempts. The original dense B1 qualification is unchanged. Sparse offline requalification source and exact result are independently accepted; after canonical main-checkout migration the OPEN sparse baseline is next, with no provider retry authorized;
+- 148-B2: the earlier `fd8aa...` page-limit incident and later `bb1a...` completed-but-unqualified acquisition remain separate immutable consumed attempts. The original dense B1 qualification is unchanged. Sparse offline requalification source and exact result are independently accepted; no provider retry is authorized;
+- 148 churn research: the source-only proposal in [`arch148-churn-research.md`](../validation/arch148-churn-research.md) defines four fixed descriptive variants and two existing cost cases. Its separate OPEN evaluation remains pending and must be independently reviewed; no winner or promotion rule is defined;
 - 148-C: desktop/demo integration and GUI status/control path;
 - 148-D: current Robinhood read-only parity/preflight using the new complete
   runtime dependency closure;

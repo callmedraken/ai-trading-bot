@@ -361,6 +361,28 @@ ARCH147_FILTERED_TREND_RUFF: Final = (
     "tests/runtime/checkpoint_runner/__init__.py",
     *ARCH147_FILTERED_TREND_TESTS,
 )
+ARCH148_CHURN_NAME: Final = "arch148-churn-research"
+ARCH148_CHURN_BRANCH: Final = "feature/research-arch148-churn"
+ARCH148_CHURN_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/experiments/test_arch148_intraday.py",
+    "tests/experiments/test_arch148_sparse_backtest.py",
+    "tests/experiments/test_arch148_churn_policy.py",
+    "tests/experiments/test_arch148_churn_research.py",
+)
+ARCH148_CHURN_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "src/trading_bot/experiments/arch148_intraday.py",
+    "src/trading_bot/experiments/arch148_sparse_backtest.py",
+    "src/trading_bot/experiments/arch148_churn_policy.py",
+    "src/trading_bot/experiments/arch148_churn_research.py",
+    "tests/experiments/test_arch148_intraday.py",
+    "tests/experiments/test_arch148_sparse_backtest.py",
+    "tests/experiments/test_arch148_churn_policy.py",
+    "tests/experiments/test_arch148_churn_research.py",
+)
 ARCH147_NAME: Final = "arch147-desktop-research-profile"
 ARCH147_BRANCH: Final = "feature/research-desktop-product-pivot-current"
 ARCH147_TESTS: Final = (
@@ -646,6 +668,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+    ARCH148_CHURN_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
 )
 
@@ -657,6 +680,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH147_P6_NAME: "full",
     ARCH147_P5B_NAME: "full",
     ARCH147_FILTERED_TREND_NAME: "full",
+    ARCH148_CHURN_NAME: "full",
     ARCH147_P5A_NAME: "full",
     ARCH147_P4_NAME: "full",
     ARCH147_NAME: "full",
@@ -26656,6 +26680,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH147_FILTERED_TREND_BRANCH,
     )
+    values[ARCH148_CHURN_NAME] = CheckpointSpec(
+        ARCH148_CHURN_NAME,
+        "Source-only Architecture 148 churn study; no evaluation/effect authority",
+        ARCH148_CHURN_TESTS,
+        ARCH148_CHURN_RUFF,
+        _arch148_churn_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH148_CHURN_BRANCH,
+    )
     values[ARCH147_NAME] = CheckpointSpec(
         ARCH147_NAME,
         "Current single-user desktop research storage and loader pivot",
@@ -27300,6 +27334,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         return False
     translated = predecessor
     for name in (
+        ARCH148_CHURN_NAME,
         ARCH147_PROTOTYPE_NAME,
         ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
@@ -27336,6 +27371,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
     if _arch147_current_batch_workflow_is_reviewed(workflow):
         return True
     current_names = (
+        ARCH148_CHURN_NAME,
         ARCH147_PROTOTYPE_NAME,
         ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
@@ -28311,6 +28347,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     return 0 if passed else 1
+
+
+def _arch148_churn_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Register a source-only research route with no evaluation dispatch."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH148_CHURN_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != ARCH148_CHURN_TESTS
+        or spec.ruff_paths != ARCH148_CHURN_RUFF
+        or spec.authority_check is not _arch148_churn_authority_check
+        or spec.remote_branch != ARCH148_CHURN_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH148_CHURN_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH148_CHURN_NAME) != 1
+        or ARCH148_CHURN_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(specs, ARCH148_CHURN_BRANCH, "push")
+        != ARCH148_CHURN_NAME
+    ):
+        failures.append("148 churn source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("148 churn experiment tests are not FULL-owned")
+    required_paths = (
+        "src/trading_bot/experiments/arch148_churn_policy.py",
+        "src/trading_bot/experiments/arch148_churn_research.py",
+        "tests/experiments/test_arch148_churn_policy.py",
+        "tests/experiments/test_arch148_churn_research.py",
+    )
+    for relative in required_paths:
+        if not (repo_root / relative).is_file():
+            failures.append("148 churn source route is missing " + relative)
+    return tuple(failures)
 
 
 def _arch147_filtered_trend_authority_check(

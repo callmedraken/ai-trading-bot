@@ -744,6 +744,7 @@ def test_ci_certification_profile_mapping_is_explicit_and_bounded():
         runner.ARCH147_PROTOTYPE_NAME: "full",
         runner.ARCH147_P5B_NAME: "full",
         runner.ARCH147_FILTERED_TREND_NAME: "full",
+        runner.ARCH148_CHURN_NAME: "full",
         runner.ARCH147_P5A_NAME: "full",
         runner.ARCH147_P4_NAME: "full",
         runner.ARCH147_NAME: "full",

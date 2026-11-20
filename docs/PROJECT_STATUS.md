@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148 churn research accepted/integrated; all four variants economically rejected
+## Current milestone - Architecture 148 late-session intraday-momentum research design frozen; implementation pending
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -101,6 +101,20 @@ across OPEN. No variant was selected. `FINAL_HOLDOUT` remained sealed and all
 recorded credential/network/provider/Robinhood/broker/order/production effects
 were zero. Live promotion still requires a viable strategy plus the existing
 provider-scope, whole-share stop, approval-linkage and risk/notional blockers.
+
+The next OPEN-only research design is now frozen in
+[Architecture 148 late-session intraday momentum research](validation/arch148-intraday-momentum-research.md).
+It is a materially different entry/holding architecture, not another churn
+threshold: QQQ's first-half-hour return from the previous regular-session
+close supplies one direction for the day; the strategy may make at most one
+scheduled TQQQ/SQQQ entry at official close minus 35 minutes and then holds
+until the existing 3% hard stop, a safety exit, or the existing forced-flat
+boundary at close minus 5 minutes. EMA/VWAP/RSI regime flips, cooldowns and
+same-session re-entry are not part of this candidate. The design uses only
+the accepted sparse OPEN dataset, both accepted cost cases and the existing
+2016-2023 reporting partitions; no executable source or result is claimed by
+this docs-only freeze. `FINAL_HOLDOUT` remains sealed and all provider/broker
+boundaries remain unchanged.
 
 The accepted sparse OPEN baseline remains unchanged at
 `F:\AI\temp\arch148-open-sparse-baseline-e3e27c29-8a9d-41c5-9ac0-d89a1d4cb5d1\baseline.json`,

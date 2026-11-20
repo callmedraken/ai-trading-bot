@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148 churn research accepted/integrated; no viable variant selected
+## Current milestone: Architecture 148 late-session intraday-momentum research design frozen; implementation pending
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -134,9 +134,16 @@ The offline requalification source at
 provider retry is authorized. The fixed Architecture 148 churn comparison in
 [`arch148-churn-research.md`](validation/arch148-churn-research.md) is now
 accepted/integrated with the exact evidence recorded above. It rejects all four
-tested variants economically and selects none. The next research boundary is a
-new OPEN-only entry/holding architecture investigation, not another cooldown
-tweak; it must preserve `FINAL_HOLDOUT` and all provider/broker boundaries.
+tested variants economically and selects none. The next research boundary is frozen in
+[`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).
+It tests one OPEN-only late-session intraday-momentum architecture: QQQ's
+first-half-hour return from the previous regular-session close fixes the
+session direction; at most one TQQQ/SQQQ position may enter at official
+close minus 35 minutes and then remains held until the 3% hard stop, a safety
+exit, or forced flat at close minus 5 minutes. There are no EMA/VWAP/RSI
+regime exits, cooldown variants or same-session re-entry. This is a design
+freeze only; executable source and OPEN evidence remain pending. Preserve
+`FINAL_HOLDOUT` and all provider/broker boundaries.
 
 Architecture 148-B1 is accepted/integrated at `68b9526f022458cbcdd4f25ff268e0de7c56e562` / tree `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`. The initial B1 commit `70b0a8de5cb3b2cf4fb826352b6ada3650c57614` remains preserved with green run `44432367772` but was exact-source rejected; corrective C1 closed the reviewed defects. Feature mapped FULL `44438409583`, attempt 1, is SUCCESS. Develop `44465681331`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. The operator integration report records both canonical F: worktrees and both live refs at the exact accepted HEAD/tree and clean; the feature checkout required no catch-up.
 

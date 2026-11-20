@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148 public-reference source checkpoint pending independent acceptance
+## Current milestone - Architecture 148 public-reference completion accepted; offline B2 requalification accepted
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -51,15 +51,38 @@ No duplicate push/merge or source/protected effect occurred. Existing workflow
 rules already prohibit this stderr-unsafe pattern; no workflow-source change is
 needed.
 
-The active Architecture 148 source checkpoint includes the canonical public-
-reference matrix, an offline requalification implementation at
-`src/trading_bot/experiments/arch148_b2_requalify.py`, the sparse simulator in
-`src/trading_bot/experiments/arch148_sparse_backtest.py`, and the current
-runtime/worker extension. It is pending independent acceptance; no exact-source
-commit, CI result, or integration is asserted here. The source checkpoint
-carries no real requalification result. Any separately produced offline output
-must be independently reviewed before a baseline, and no baseline starts
-automatically. No new provider acquisition is authorized here.
+The Architecture 148 public-reference completion wave is independently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`6fb78af8c2e07d906629fd95277343eb6d54fde3` / tree
+`01091cea96aa3aba6e5de8b88b64d8f722f116ba`, direct parent
+`e11840c2ec7054c79183b3e33aee032f427d1a69`. Feature mapped FULL run
+`44673337558`, attempt 1, is terminal SUCCESS; develop run
+`44679168920`, attempt 1, is terminal SUCCESS on the exact accepted SHA.
+
+The offline requalification of immutable `bb1a...` raw acquisition evidence is
+independently ACCEPTED. Evidence:
+`F:\AI\temp\arch148-b2-offline-requalification-b9a8babd-4869-466d-a81f-fae08fe2aae5\evidence.json`,
+65,688 bytes, SHA-256
+`bdad3ab1f387617e2cef35644680e397c94d113f77f48cc242857151b352788d`.
+It binds dataset identity `0308b694-c718-5b1a-a51c-9fcc4516bb81` /
+SHA-256 `0ba8b2437ef27a98fc48855aa8bb8d27ca3cdc0f2888e214305dde760686dbe0`
+and custody identity `dbcced6a-b4cc-5d36-a33b-5e6df3d82baa` /
+SHA-256 `93db9a9163cf445fdfd61abe68559196d240b09c1c9b70cdc0f7f452e3e8708b`.
+Observed regular-session bars are QQQ 156379, TQQQ 156376 and SQQQ 156376;
+missing counts are 17/20/20 with 17 common and 23 union missing slots and zero
+fully missing expected sessions. Requalification performed zero credential,
+network/provider, Robinhood/broker, order, production-state, FINAL_HOLDOUT or
+baseline effects. The consumed `bb1a...` acquisition remains immutable and NO
+RETRY.
+
+The next operational boundary is to make the main checkout
+`F:\AI\ai-trading-bot` the clean canonical `develop` checkout after this
+docs-only closeout is terminal green, retiring the temporary integration
+worktree only after exact cleanliness/identity proof. Then run the OPEN sparse
+baseline from that canonical checkout. `FINAL_HOLDOUT` remains sealed. Live
+promotion still requires provider-scope proof, whole-share GTC stop-market
+capability, approval-to-order linkage where applicable, and explicit whole-share
+risk/notional authority.
 
 Architecture 148 is now the current product direction under [the frozen pivot design](architecture/148-tqqq-sqqq-runtime-pivot.md). The canonical pinned source/runtime/public-reference map is [the 148 parity matrix](validation/arch148-runtime-parity.md); it records local source/tests, external licenses, adopted behavior and intentional exclusions, and grants no provider authority. The first application version is intraday-only and may hold exactly one of TQQQ, SQQQ or FLAT. QQQ is the primary direction reference. V1 uses completed 5-minute bars, session VWAP, EMA(20), EMA(50) and RSI(14), requires two consecutive same-direction completed bars before an entry, forbids same-cycle flips, and forces the application flat beginning five minutes before the official regular-session close.
 
@@ -78,15 +101,15 @@ Architecture 148-B1 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
 The accepted B1 OPEN contract is completed 5-minute QQQ/TQQQ/SQQQ research data over `[2016-01-01, 2024-01-01)` UTC with `adjustment=all`, SIP, USD and price basis `ALPACA_ALL_ADJUSTED_INTRADAY_PRICE_V1`. Architecture 148 owns the separately committed intraday schedule identity `4fe981d0-34ef-57be-a7d1-ffd017460bf5` / SHA-256 `a33be70499cdafbfa21f45a04c854ab834425807b6c0314814b7442749aa2bad`. The simulator preserves completed-bar no-lookahead entry, conservative immediate entry-bar hard-stop handling, shared regime-exit semantics and deterministic fake-only controls. No real provider, credential, Robinhood, broker, production-state or `FINAL_HOLDOUT` effect occurred during B1.
 
 The earlier B2-B attempt remains CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO
-RETRY. The later `bb1a...` acquisition is complete but its original dense B1
-qualification is CONSUMED / BLOCKED / `QUALIFICATION_BAR_COUNT_MISMATCH` / NO
-RETRY. B2-A-C1 remains accepted/integrated at
+RETRY. The later `bb1a...` acquisition remains CONSUMED / BLOCKED /
+`QUALIFICATION_BAR_COUNT_MISMATCH` / NO RETRY under the original dense B1
+contract. B2-A-C1 remains accepted/integrated at
 `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
-`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`. Offline requalification source
-review belongs to the pending Architecture 148 source checkpoint. That source
-checkpoint carries no real requalification result; any separately produced
-offline output must be independently reviewed before a baseline. No baseline
-starts automatically.
+`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`. Its immutable raw observations
+are now independently accepted through the sparse offline requalification
+evidence recorded above. No provider retry is authorized. The next research
+boundary is the OPEN sparse baseline after canonical main-checkout migration;
+`FINAL_HOLDOUT` remains sealed.
 Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; Q63 remains NOT RUN and
 `FINAL_HOLDOUT` remains SEALED.
 

@@ -63,7 +63,7 @@ canonical full-pin source/runtime/public-reference adoption matrix is
 It records the reviewed Lumiwealth, QuantConnect/Lean, Hummingbot, Freqtrade,
 Robinhood, and siropkin references; local source/tests; license handling; and
 behavior explicitly declined. No third-party implementation code is copied
-into the current candidate.
+into the accepted Architecture 148 public-reference completion source.
 
 ## Final application shape
 
@@ -420,14 +420,18 @@ event and is not rewritten.
 
 The missing-slot sets have 17 common timestamps and a 23-timestamp union. The
 original B1 contract remains unchanged at 156396 expected slots per symbol;
-these counts do not constitute an accepted B1 dataset. An offline
-requalification implementation exists at
-`src/trading_bot/experiments/arch148_b2_requalify.py`, with sparse-backtest
-semantics in `src/trading_bot/experiments/arch148_sparse_backtest.py`. The
-current source checkpoint carries no real requalification result; any
-separately produced offline output must be independently reviewed before a
-baseline. No baseline starts automatically; the preserved acquisition is never
-fetched again or retried.
+these counts do not constitute an accepted dense B1 dataset. The sparse
+requalification implementation at
+`src/trading_bot/experiments/arch148_b2_requalify.py` and sparse-backtest
+semantics in `src/trading_bot/experiments/arch148_sparse_backtest.py` are
+accepted in source `6fb78af8c2e07d906629fd95277343eb6d54fde3` / tree
+`01091cea96aa3aba6e5de8b88b64d8f722f116ba`. The exact offline result is
+independently accepted with evidence SHA-256
+`bdad3ab1f387617e2cef35644680e397c94d113f77f48cc242857151b352788d`,
+dataset identity `0308b694-c718-5b1a-a51c-9fcc4516bb81`, and custody identity
+`dbcced6a-b4cc-5d36-a33b-5e6df3d82baa`. It reports zero fully missing
+sessions and zero requalification provider/broker/production/FINAL_HOLDOUT
+effects. The preserved acquisition is never fetched again or retried.
 
 ### Corrected B2-A-C1 source contract
 
@@ -483,13 +487,13 @@ ambiguity, malformed data, repeated token, source drift or either ceiling ends
 the attempt immediately. No wait-and-retry, alternate feed, alternate client
 or credential fallback is allowed.
 
-Before any baseline backtest, ChatGPT must review and accept the exact
-requalification result for the preserved `bb1a...` acquisition. The current
-source checkpoint carries no real requalification result, and no baseline
-starts automatically. After independent review, the accepted pure simulator
-may run zero-cost and conservative-cost baselines against flat and QQQ controls,
-reporting drawdown, whipsaw and turnover. Baseline execution makes no provider
-request.
+The exact requalification result for preserved `bb1a...` has been
+independently accepted. After this closeout is terminal green and the main
+checkout `F:\AI\ai-trading-bot` is established as the exact canonical
+`develop` checkout, the accepted pure sparse simulator may run OPEN zero-cost
+and conservative-cost baselines against flat and QQQ controls, reporting
+drawdown, whipsaw and turnover. Baseline execution makes no provider request
+and does not access FINAL_HOLDOUT.
 
 ### B2-A-C1 acceptance and integration
 
@@ -506,21 +510,20 @@ Robinhood, broker, order, production, baseline or FINAL_HOLDOUT effects.
 ### Review boundary
 
 The C1 executable correction and source certification remain independently
-accepted. The later acquisition completed, but its original downstream
-qualification failed; that attempt is consumed. The immediate safe boundary is
-independent acceptance of the broader source checkpoint, including offline
-requalification. Any separately produced offline output must be independently
-reviewed before a baseline. No baseline starts automatically. A docs/source/preflight
-PASS grants no credential or provider authority. No new provider request,
-Robinhood, broker, order, production, Q63 or FINAL_HOLDOUT action follows from
-this documentation update.
+accepted. The later acquisition completed, but its original downstream dense-B1
+qualification failed and remains consumed. The broader public-reference source
+checkpoint and exact sparse offline requalification result are independently
+accepted. The immediate safe boundary is canonical main-checkout migration,
+then the OPEN sparse baseline. A docs/source/preflight PASS grants no credential
+or provider authority. No new provider request, Robinhood, broker, order,
+production, Q63 or FINAL_HOLDOUT action follows from this documentation update.
 
 ## Subsequent milestones
 
 After accepted/integrated 148-A:
 
 - 148-B1: source-only/fake-only 5-minute QQQ/TQQQ/SQQQ acquisition/custody and no-lookahead backtest contract, reusing existing evidence/holdout authority and selecting only an eligible pre-holdout range; no real provider call;
-- 148-B2: the earlier `fd8aa...` page-limit incident and later `bb1a...` completed-but-unqualified acquisition remain separate immutable consumed attempts. The original dense B1 qualification is unchanged. Independently review the offline requalification source, then review its actual offline result; no baseline starts automatically and no provider retry is authorized;
+- 148-B2: the earlier `fd8aa...` page-limit incident and later `bb1a...` completed-but-unqualified acquisition remain separate immutable consumed attempts. The original dense B1 qualification is unchanged. Sparse offline requalification source and exact result are independently accepted; after canonical main-checkout migration the OPEN sparse baseline is next, with no provider retry authorized;
 - 148-C: desktop/demo integration and GUI status/control path;
 - 148-D: current Robinhood read-only parity/preflight using the new complete
   runtime dependency closure;

@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148 public-reference source checkpoint pending independent acceptance
+## Current milestone: Architecture 148 public-reference completion accepted; offline B2 requalification accepted
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -21,11 +21,28 @@ provider/backtest gaps. Its rule
 requires source inspection and an explicit local rule before implementing a
 provider or backtest semantic gap.
 
-The active Architecture 148 source checkpoint includes this matrix, offline
-B2 requalification, sparse research semantics, and runtime/worker composition.
-It remains pending independent acceptance; this handoff does not assert a new
-exact-source commit, CI result, or integration. The source checkpoint carries
-no real requalification result.
+The Architecture 148 public-reference completion wave is independently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`6fb78af8c2e07d906629fd95277343eb6d54fde3` / tree
+`01091cea96aa3aba6e5de8b88b64d8f722f116ba`, parent
+`e11840c2ec7054c79183b3e33aee032f427d1a69`. Feature mapped FULL
+`44673337558`, attempt 1, and develop `44679168920`, attempt 1, are terminal
+SUCCESS.
+
+The immutable `bb1a...` acquisition was requalified offline under the accepted
+sparse v3 contract and independently accepted. Evidence:
+`F:\AI\temp\arch148-b2-offline-requalification-b9a8babd-4869-466d-a81f-fae08fe2aae5\evidence.json`;
+byte length 65688; SHA-256
+`bdad3ab1f387617e2cef35644680e397c94d113f77f48cc242857151b352788d`.
+Dataset: `0308b694-c718-5b1a-a51c-9fcc4516bb81` /
+`0ba8b2437ef27a98fc48855aa8bb8d27ca3cdc0f2888e214305dde760686dbe0`.
+Custody: `dbcced6a-b4cc-5d36-a33b-5e6df3d82baa` /
+`93db9a9163cf445fdfd61abe68559196d240b09c1c9b70cdc0f7f452e3e8708b`.
+It records 430 exhausted pages, observed counts 156379/156376/156376, missing
+counts 17/20/20, 17 common missing slots, 23 union missing slots, zero fully
+missing sessions, and zero new credential/network/provider/Robinhood/broker/
+order/production/FINAL_HOLDOUT/baseline effects. The original acquisition
+remains CONSUMED / NO RETRY.
 
 Primary application reference: `siropkin/robinhood-ai-trading-bot@1a778749cfbe92c7ab9444b12e3cc73587533ade` (MIT). 148-A used its simple cycle shape as a reference while retaining the repository's stronger deterministic risk, MCP boundary and durable reconciliation contracts; its direct `robin_stocks` credential path, generic write retry, prompt-only risk limits and non-durable order handling were not adopted.
 
@@ -44,13 +61,15 @@ source-gates and all seven canonical FULL lanes passing. Develop run
 `IDENTITY_STABLE=True`; active tests and all broad/certification execution were
 skipped on develop, so `DEVELOP_DUPLICATE_FULL=NO`.
 
-The canonical feature worktree remains
-`F:\AI\worktrees\ai-trading-bot-live-prototype-current`; the integration
-checkout remains
-`F:\AI\worktrees\ai-trading-bot-p4-integration-e5e800a`. The integration
-checkout was proved clean at the accepted HEAD/tree after the push. C1 itself
-was source-only/fake-only and performed zero Alpaca credential/provider,
-Robinhood, broker, order, production, baseline or FINAL_HOLDOUT effects.
+The feature and integration worktrees remain auxiliary local checkouts for this
+closeout only. After this docs-only commit is terminal green, the next operator
+boundary is to prove auxiliary/main checkout identities, remove the clean
+temporary integration worktree, and make `F:\AI\ai-trading-bot` the canonical
+clean `develop` checkout at exact `origin/develop`. Do not switch, reset,
+clean, or remove a worktree on any mismatch. The live-prototype feature worktree
+may remain until the OPEN baseline is accepted, then becomes a cleanup candidate.
+Consumed B2/requalification evidence is retained and is not ordinary temp
+cleanup material.
 
 The separately reviewed predecessor B2-B attempt
 `fd8aa437-c748-4d5b-a52f-1e58b2ca5953` remains CONSUMED / BLOCKED /
@@ -92,23 +111,22 @@ stderr-unsafe wrapper pattern.
 
 The offline requalification source at
 `src/trading_bot/experiments/arch148_b2_requalify.py` and sparse simulator at
-`src/trading_bot/experiments/arch148_sparse_backtest.py` are ready for
-independent source review as part of the broader Architecture 148 checkpoint.
-Any separately produced offline output must be independently reviewed before a
-baseline. No baseline starts automatically and no provider retry is authorized
-here. This handoff grants no new credential/provider, Robinhood/broker,
-production or `FINAL_HOLDOUT` action.
+`src/trading_bot/experiments/arch148_sparse_backtest.py` are accepted in
+`6fb78af8...`. The exact offline output above is independently accepted. No
+provider retry is authorized. After canonical main-checkout migration, the next
+research action is the OPEN sparse baseline only; it grants no Robinhood/broker,
+production, Q63 or `FINAL_HOLDOUT` authority.
 
 Architecture 148-B1 is accepted/integrated at `68b9526f022458cbcdd4f25ff268e0de7c56e562` / tree `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`. The initial B1 commit `70b0a8de5cb3b2cf4fb826352b6ada3650c57614` remains preserved with green run `44432367772` but was exact-source rejected; corrective C1 closed the reviewed defects. Feature mapped FULL `44438409583`, attempt 1, is SUCCESS. Develop `44465681331`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. The operator integration report records both canonical F: worktrees and both live refs at the exact accepted HEAD/tree and clean; the feature checkout required no catch-up.
 
 The earlier B2-B attempt is CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO
-RETRY. The later acquisition is complete but its original dense B1
-qualification is CONSUMED / BLOCKED / `QUALIFICATION_BAR_COUNT_MISMATCH` / NO
-RETRY. B2-A-C1 remains accepted/integrated. The next safe step is independent
-acceptance of the current Architecture 148 source checkpoint; any separately
-produced offline output must be reviewed before a baseline. No baseline starts
-automatically. No new provider or credential read, Robinhood/broker, production
-or `FINAL_HOLDOUT` action is authorized here.
+RETRY. The later acquisition remains CONSUMED / BLOCKED /
+`QUALIFICATION_BAR_COUNT_MISMATCH` / NO RETRY under dense B1, while its
+immutable raw observations are independently accepted through sparse offline
+requalification. B2-A-C1 and the public-reference completion source are
+accepted/integrated. The next safe steps are canonical main-checkout migration
+and then the OPEN sparse baseline. No new provider or credential read,
+Robinhood/broker, production, Q63 or `FINAL_HOLDOUT` action is authorized here.
 
 
 ### Architecture 148-B1 accepted intraday identity
@@ -130,7 +148,7 @@ or `FINAL_HOLDOUT` action is authorized here.
 - schedule SHA-256: `a33be70499cdafbfa21f45a04c854ab834425807b6c0314814b7442749aa2bad`
 - source/provider/credential/broker/production/FINAL_HOLDOUT effects during B1: zero
 - Earlier B2-B attempt `fd8aa...`: CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY.
-- Later attempt `bb1a...`: acquisition complete; original downstream qualification CONSUMED / BLOCKED / `QUALIFICATION_BAR_COUNT_MISMATCH` / NO RETRY. The current source checkpoint carries no real requalification result; any separate offline output must be independently reviewed before baseline.
+- Later attempt `bb1a...`: acquisition complete; original downstream qualification CONSUMED / BLOCKED / `QUALIFICATION_BAR_COUNT_MISMATCH` / NO RETRY. Its immutable raw observations are independently accepted through sparse offline requalification evidence `bdad3ab1f387617e2cef35644680e397c94d113f77f48cc242857151b352788d`; no provider retry is authorized.
 
 The accepted B1 simulator executes signals no earlier than the next bar open, then activates the 3% hard stop immediately for the entry bar. Entry-bar gap-through exits use the bar OPEN; otherwise a LOW breach exits at the stop threshold. The shared `live_runtime.strategy.confirmed_regime_exit` rule is used by both runtime and research paths. Dataset and custody schemas are v2 and bind the Architecture-148 schedule commitment separately from the Architecture-146 session-date authority.
 

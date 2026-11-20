@@ -3,11 +3,11 @@
 Status: **B2-A-C1 SOURCE/CERTIFICATION ACCEPTED / FAST-FORWARD INTEGRATED;
 EARLIER B2-B CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY; LATER
 ACQUISITION COMPLETE BUT ORIGINAL B1 QUALIFICATION CONSUMED / BLOCKED /
-QUALIFICATION_BAR_COUNT_MISMATCH / NO RETRY; OFFLINE REQUALIFICATION SOURCE
-REVIEW IS PART OF THE BROADER ARCHITECTURE 148 PUBLIC-REFERENCE SOURCE
-CHECKPOINT, PENDING INDEPENDENT ACCEPTANCE.** This plan authorizes no new Alpaca
-credential read, provider request, Robinhood/broker action, production
-mutation, baseline or FINAL_HOLDOUT access.
+QUALIFICATION_BAR_COUNT_MISMATCH / NO RETRY; PUBLIC-REFERENCE COMPLETION SOURCE
+AND OFFLINE SPARSE REQUALIFICATION EVIDENCE INDEPENDENTLY ACCEPTED.** This plan
+authorizes no new Alpaca credential read, provider request, Robinhood/broker
+action, production mutation or FINAL_HOLDOUT access. The next research boundary
+is the OPEN sparse baseline after canonical main-checkout migration.
 
 B2-A-C1 accepted executable source:
 `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
@@ -31,8 +31,9 @@ executable/test/workflow bytes. A future provider acquisition still requires a
 separately reviewed fresh invocation bound to the exact then-current integrated
 invocation source after docs closeout/catch-up. The later `bb1a...` attempt
 recorded below already consumed its own acquisition boundary; it is not a retry
-of the earlier `fd8aa...` attempt. The immediate next review is offline
-requalification, not another provider invocation.
+of the earlier `fd8aa...` attempt. The offline requalification review is accepted; another provider invocation is
+not authorized. The next research boundary is canonical main-checkout migration
+followed by the OPEN sparse baseline.
 
 ## Consumed B2-B attempt
 
@@ -356,12 +357,18 @@ accepted HEAD/tree. No second push or merge was performed. This is
 rule against stderr-unsafe native-command handling remains authoritative.
 
 The later acquisition's raw provider facts are preserved, but its original
-dense B1 qualification failed. The offline requalification source is
-`src/trading_bot/experiments/arch148_b2_requalify.py`; its sparse replay source
-is `src/trading_bot/experiments/arch148_sparse_backtest.py`. They are ready for
-independent source review as part of the broader Architecture 148 checkpoint.
-The source checkpoint carries no real requalification result. Any separately
-produced offline output must be independently reviewed before a baseline. No
-baseline starts automatically; keep the dense B1 contract unchanged. No
-provider retry, Robinhood/broker effect or FINAL_HOLDOUT access is authorized
-by this plan.
+dense B1 qualification failed. The offline requalification source at
+`src/trading_bot/experiments/arch148_b2_requalify.py` and sparse replay source
+at `src/trading_bot/experiments/arch148_sparse_backtest.py` are accepted in
+`6fb78af8c2e07d906629fd95277343eb6d54fde3` / tree
+`01091cea96aa3aba6e5de8b88b64d8f722f116ba`. The exact offline result is
+independently accepted at
+`F:\AI\temp\arch148-b2-offline-requalification-b9a8babd-4869-466d-a81f-fae08fe2aae5\evidence.json`,
+65,688 bytes, SHA-256
+`bdad3ab1f387617e2cef35644680e397c94d113f77f48cc242857151b352788d`.
+It binds dataset `0308b694-c718-5b1a-a51c-9fcc4516bb81` and custody
+`dbcced6a-b4cc-5d36-a33b-5e6df3d82baa`, reports zero fully missing sessions,
+and records zero new credential/network/provider/Robinhood/broker/order/
+production/FINAL_HOLDOUT/baseline effects. Keep the dense B1 contract unchanged.
+No provider retry or broker effect is authorized by this plan. After canonical
+main-checkout migration, the OPEN sparse baseline is the next research boundary.

@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148-B2-A-C1 accepted/integrated; fresh B2 successor pending review
+## Current milestone - Architecture 148 public-reference source checkpoint pending independent acceptance
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -21,6 +21,18 @@ provider attempts/pages: 64/64; QQQ raw/regular-slot/off-slot bars: 162426 /
 78057 / 84369; unresolved intent: NONE; Robinhood/broker/order/production/
 FINAL_HOLDOUT/baseline effects: 0. The immutable attempt cannot be retried.
 
+Later attempt `bb1a784b-98d1-41fd-8d95-aa9fa463d5c9` at
+`F:\AI\temp\arch148-b2-bb1a784b-98d1-41fd-8d95-aa9fa463d5c9` completed
+acquisition with 1 credential read, 430/430 pages, 0 unresolved pagination
+intents, and null end cursors for all three symbols. The preserved data failed
+the original dense B1 downstream qualification:
+QQQ 148 pages / 349805 raw / 156379 observed / 17 missing;
+TQQQ 141 / 331112 / 156376 / 20 missing;
+SQQQ 141 / 328679 / 156376 / 20 missing. The missing-slot sets share 17
+timestamps and have a 23-timestamp union. This attempt is CONSUMED / BLOCKED /
+`QUALIFICATION_BAR_COUNT_MISMATCH` / NO RETRY. It remains separate from the
+older fd8aa page-limit incident.
+
 B2-A-C1 preserves B1 and now implements validated raw-to-B1 exact-slot
 projection, v2 per-symbol raw/qualified/excluded evidence counts, ceilings of
 192 pages per symbol and 576 total attempts, and 0.5-second minimum pacing
@@ -39,14 +51,19 @@ No duplicate push/merge or source/protected effect occurred. Existing workflow
 rules already prohibit this stderr-unsafe pattern; no workflow-source change is
 needed.
 
-The next boundary is review of one separately named **fresh** read-only B2
-acquisition successor after this docs-only closeout is integrated and canonical
-worktrees are caught up. That future invocation is not a retry of the consumed
-B2-B attempt. This status record grants no credential or provider authority.
+The active Architecture 148 source checkpoint includes the canonical public-
+reference matrix, an offline requalification implementation at
+`src/trading_bot/experiments/arch148_b2_requalify.py`, the sparse simulator in
+`src/trading_bot/experiments/arch148_sparse_backtest.py`, and the current
+runtime/worker extension. It is pending independent acceptance; no exact-source
+commit, CI result, or integration is asserted here. The source checkpoint
+carries no real requalification result. Any separately produced offline output
+must be independently reviewed before a baseline, and no baseline starts
+automatically. No new provider acquisition is authorized here.
 
-Architecture 148 is now the current product direction under [the frozen pivot design](architecture/148-tqqq-sqqq-runtime-pivot.md). The first application version is intraday-only and may hold exactly one of TQQQ, SQQQ or FLAT. QQQ is the primary direction reference. V1 uses completed 5-minute bars, session VWAP, EMA(20), EMA(50) and RSI(14), requires two consecutive same-direction completed bars before an entry, forbids same-cycle flips, and forces the application flat beginning five minutes before the official regular-session close.
+Architecture 148 is now the current product direction under [the frozen pivot design](architecture/148-tqqq-sqqq-runtime-pivot.md). The canonical pinned source/runtime/public-reference map is [the 148 parity matrix](validation/arch148-runtime-parity.md); it records local source/tests, external licenses, adopted behavior and intentional exclusions, and grants no provider authority. The first application version is intraday-only and may hold exactly one of TQQQ, SQQQ or FLAT. QQQ is the primary direction reference. V1 uses completed 5-minute bars, session VWAP, EMA(20), EMA(50) and RSI(14), requires two consecutive same-direction completed bars before an entry, forbids same-cycle flips, and forces the application flat beginning five minutes before the official regular-session close.
 
-The hard stop-loss invariant is source-owned at 3.00% below the reconciled average entry fill and may never be widened. A broker-resident full-position stop-market order is the preferred live protection; software logic independently treats a stop breach as mandatory EXIT. Live promotion is blocked when exact full-position stop protection cannot be proven. Robinhood's stop execution price is not guaranteed, so this is an exit/protection invariant rather than a guaranteed maximum loss.
+The hard stop-loss invariant is source-owned at 3.00% below the reconciled average entry fill and may never be widened. A broker-resident full-position stop-market order is the preferred live protection; software logic independently treats a stop breach as mandatory EXIT. Live promotion is blocked when exact full-position stop protection cannot be proven. Whole-share entry sizing uses a fresh price, cash, unleveraged buying power and existing risk controls while retaining the <=$10 acquisition ceiling. A quantity-denominated market order has no capped fill price and does not guarantee a <=$10 fill. Robinhood's stop execution price is also not guaranteed, so the stop is an exit/protection invariant rather than a guaranteed maximum loss.
 
 Architecture 148 adopts the simple application-loop shape reviewed in `siropkin/robinhood-ai-trading-bot@1a778749cfbe92c7ab9444b12e3cc73587533ade` while retaining this repository's stronger MCP OAuth/session, deterministic risk, durable intent, `ref_id`, UNKNOWN/no-retry reconciliation, source/state continuity, XNYS calendar, research/backtest, GUI and certification components. Direct Robinhood username/password login, `robin_stocks`, generic write retry and prompt-only risk constraints are explicitly not adopted.
 
@@ -60,10 +77,16 @@ Architecture 148-B1 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
 
 The accepted B1 OPEN contract is completed 5-minute QQQ/TQQQ/SQQQ research data over `[2016-01-01, 2024-01-01)` UTC with `adjustment=all`, SIP, USD and price basis `ALPACA_ALL_ADJUSTED_INTRADAY_PRICE_V1`. Architecture 148 owns the separately committed intraday schedule identity `4fe981d0-34ef-57be-a7d1-ffd017460bf5` / SHA-256 `a33be70499cdafbfa21f45a04c854ab834425807b6c0314814b7442749aa2bad`. The simulator preserves completed-bar no-lookahead entry, conservative immediate entry-bar hard-stop handling, shared regime-exit semantics and deterministic fake-only controls. No real provider, credential, Robinhood, broker, production-state or `FINAL_HOLDOUT` effect occurred during B1.
 
-The initial B2-B attempt remains CONSUMED / BLOCKED / NO RETRY. B2-A-C1 is
-accepted/integrated at `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
-`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`; only a separately reviewed fresh
-read-only acquisition successor may follow the docs closeout/catch-up boundary.
+The earlier B2-B attempt remains CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO
+RETRY. The later `bb1a...` acquisition is complete but its original dense B1
+qualification is CONSUMED / BLOCKED / `QUALIFICATION_BAR_COUNT_MISMATCH` / NO
+RETRY. B2-A-C1 remains accepted/integrated at
+`0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
+`e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`. Offline requalification source
+review belongs to the pending Architecture 148 source checkpoint. That source
+checkpoint carries no real requalification result; any separately produced
+offline output must be independently reviewed before a baseline. No baseline
+starts automatically.
 Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; Q63 remains NOT RUN and
 `FINAL_HOLDOUT` remains SEALED.
 

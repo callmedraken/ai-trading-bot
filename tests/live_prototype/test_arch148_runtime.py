@@ -34,6 +34,7 @@ from trading_bot.live_runtime.models import (
     BrokerReviewFacts,
     BrokerSnapshot,
     CompletedBar,
+    ExecutionProfile,
     IntentKind,
     IntentLifecycle,
     MarketQuality,
@@ -519,7 +520,7 @@ def test_in_progress_bars_are_ignored_and_missing_completed_slot_blocks() -> Non
     assert analyze_market(no_current_bars).quality is MarketQuality.GAP
 
 
-def test_history_closing_tail_and_current_vwap_open_are_required() -> None:
+def test_sparse_history_and_current_vwap_open_are_handled_separately() -> None:
     market = _market()
     prior = [
         bar
@@ -536,7 +537,9 @@ def test_history_closing_tail_and_current_vwap_open_are_required() -> None:
         market,
         completed_bars=tuple(prior[:-1] + current),
     )
-    assert analyze_market(missing_tail).quality is MarketQuality.GAP
+    recovered = analyze_market(missing_tail)
+    assert recovered.quality is MarketQuality.READY
+    assert recovered.latest is not None
 
     missing_open = replace(
         market,
@@ -966,7 +969,8 @@ def test_first_entry_then_stop_recovery_and_filled_stop_flatten() -> None:
     )
     ready = _run(service, state, ready_broker, _market())
     assert ready.status.protective_stop_ready
-    assert ready.status.live_ready
+    assert not ready.status.live_ready
+    assert ready.status.execution_profile is ExecutionProfile.FRACTIONAL_RESEARCH_PAPER
     assert ready.effect_proposal is None
 
     state = store.state

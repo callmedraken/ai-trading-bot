@@ -13,11 +13,14 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from trading_bot.domain import OrderSide, Position, Symbol
 from trading_bot.domain._validation import normalize_utc, require_decimal
+
+if TYPE_CHECKING:
+    from .order_tracker import OrderWriteReservation, TrackedOrder
 
 QQQ = Symbol("QQQ")
 TQQQ = Symbol("TQQQ")
@@ -242,6 +245,11 @@ class TargetPosition(StrEnum):
         if self is TargetPosition.SQQQ:
             return SQQQ
         return None
+
+
+class ExecutionProfile(StrEnum):
+    FRACTIONAL_RESEARCH_PAPER = "FRACTIONAL_RESEARCH_PAPER"
+    PROTECTED_WHOLE_SHARE = "PROTECTED_WHOLE_SHARE"
 
 
 class IntentKind(StrEnum):
@@ -801,6 +809,10 @@ class RuntimeState:
     intents: tuple[LogicalOrderIntent, ...]
     positions: Mapping[Symbol, OwnedPositionRecord]
     approval_receipts: tuple[ApprovalRequiredReceipt, ...]
+    proposal_reviews: tuple[BrokerReviewFacts, ...] = ()
+    tracked_orders: tuple[TrackedOrder, ...] = ()
+    write_reservations: tuple[OrderWriteReservation, ...] = ()
+    pending_exit: PendingExit | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.owner_id, UUID):
@@ -823,6 +835,10 @@ class RuntimeState:
             isinstance(item, ApprovalRequiredReceipt) for item in self.approval_receipts
         ):
             raise TypeError("approval_receipts must be a tuple of receipts")
+        if not isinstance(self.proposal_reviews, tuple) or not all(
+            isinstance(item, BrokerReviewFacts) for item in self.proposal_reviews
+        ):
+            raise TypeError("proposal_reviews must be a tuple of BrokerReviewFacts")
         if not isinstance(self.positions, Mapping):
             raise TypeError("positions must be a mapping")
         intent_ids = [intent.intent_id for intent in self.intents]
@@ -853,6 +869,10 @@ class RuntimeState:
             raise ValueError("runtime state contains duplicate approval IDs")
         if len(receipt_intents) != len(set(receipt_intents)):
             raise ValueError("runtime state contains duplicate approval receipts")
+        if len({review.ref_id for review in self.proposal_reviews}) != len(
+            self.proposal_reviews
+        ):
+            raise ValueError("runtime state contains duplicate proposal reviews")
         if any(sequence >= self.next_sequence for sequence in sequences):
             raise ValueError("next_sequence must exceed every persisted sequence")
         for intent in self.intents:
@@ -873,7 +893,13 @@ class RuntimeState:
             intent = intent_by_id.get(receipt.intent_id)
             if (
                 intent is None
-                or intent.lifecycle is not IntentLifecycle.APPROVAL_REQUIRED
+                or intent.lifecycle
+                not in (
+                    IntentLifecycle.APPROVAL_REQUIRED,
+                    IntentLifecycle.MAY_HAVE_OCCURRED,
+                    IntentLifecycle.UNKNOWN,
+                    IntentLifecycle.RECONCILED,
+                )
                 or receipt.ref_id != intent.ref_id
                 or receipt.terms_digest != intent.terms_digest
                 or receipt.source_identity != self.source_identity
@@ -883,6 +909,261 @@ class RuntimeState:
             ):
                 raise ValueError(
                     "approval receipt has no exact persisted intent binding"
+                )
+        for review in self.proposal_reviews:
+            matches = tuple(
+                intent
+                for intent in self.intents
+                if intent.ref_id == review.ref_id
+                and intent.terms_digest == review.terms_digest
+            )
+            if (
+                len(matches) != 1
+                or review.source_identity != self.source_identity
+                or review.account_fingerprint != self.account_fingerprint
+                or review.session_fingerprint != self.session_fingerprint
+                or review.state_revision >= self.revision
+            ):
+                raise ValueError(
+                    "proposal review has no exact persisted intent binding"
+                )
+        # These imports are local to keep order_tracker's model imports acyclic.
+        from .order_tracker import (
+            OrderWriteAction,
+            OrderWriteReservation,
+            OrderWriteStatus,
+            TrackedOrder,
+        )
+
+        if not isinstance(self.tracked_orders, tuple) or not all(
+            isinstance(item, TrackedOrder) for item in self.tracked_orders
+        ):
+            raise TypeError("tracked_orders must be a tuple of TrackedOrder values")
+        if not isinstance(self.write_reservations, tuple) or not all(
+            isinstance(item, OrderWriteReservation) for item in self.write_reservations
+        ):
+            raise TypeError(
+                "write_reservations must be a tuple of OrderWriteReservation values"
+            )
+        tracked_intents = [item.intent_id for item in self.tracked_orders]
+        if len(tracked_intents) != len(set(tracked_intents)):
+            raise ValueError("runtime state contains duplicate tracked intents")
+        operations = [item.operation_id for item in self.write_reservations]
+        if len(operations) != len(set(operations)):
+            raise ValueError("runtime state contains duplicate operation IDs")
+        tracked_by_id = {item.intent_id: item for item in self.tracked_orders}
+        place_intent_ids: list[UUID] = []
+        cancel_order_ids: list[str] = []
+        if any(item.intent_id not in intent_by_id for item in self.tracked_orders):
+            raise ValueError("tracked order has no persisted logical intent")
+        for tracked in self.tracked_orders:
+            intent = intent_by_id[tracked.intent_id]
+            if tracked.ref_id != intent.ref_id:
+                raise ValueError("tracked order ref_id differs from logical intent")
+            fact = tracked.last_fact
+            if fact is not None and (
+                fact.account_fingerprint != self.account_fingerprint
+                or fact.source_identity not in (None, self.source_identity)
+                or fact.intent_id not in (None, intent.intent_id)
+                or fact.ref_id not in (None, intent.ref_id)
+                or fact.kind is not intent.kind
+                or fact.symbol != intent.symbol
+                or fact.side is not intent.side
+                or fact.requested_quantity != intent.quantity
+                or fact.stop_price != intent.stop_price
+            ):
+                raise ValueError("tracked order fact differs from exact logical intent")
+        for reservation in self.write_reservations:
+            intent = intent_by_id.get(reservation.intent_id)
+            if (
+                intent is None
+                or reservation.ref_id != intent.ref_id
+                or reservation.terms_digest != intent.terms_digest
+                or reservation.owner_id != self.owner_id
+                or reservation.source_identity != self.source_identity
+                or reservation.account_fingerprint != self.account_fingerprint
+                or reservation.session_fingerprint != self.session_fingerprint
+                or reservation.reserved_revision > self.revision
+            ):
+                raise ValueError("write reservation has no exact state binding")
+            if reservation.action is OrderWriteAction.PLACE:
+                place_intent_ids.append(reservation.intent_id)
+                tracked = tracked_by_id.get(intent.intent_id)
+                if (
+                    tracked is None
+                    or intent.lifecycle
+                    not in (
+                        IntentLifecycle.MAY_HAVE_OCCURRED,
+                        IntentLifecycle.UNKNOWN,
+                        IntentLifecycle.RECONCILED,
+                    )
+                    or reservation.review is None
+                    or reservation.review.status.value != "ACCEPTED"
+                    or reservation.review.warnings
+                    or reservation.review.approval_required
+                ):
+                    raise ValueError("placement reservation has no MAY intent/tracker")
+            else:
+                cancel_order_ids.append(reservation.target_provider_order_id)
+                target = next(
+                    (
+                        item
+                        for item in self.tracked_orders
+                        if item.provider_order_id
+                        == reservation.target_provider_order_id
+                    ),
+                    None,
+                )
+                intent = intent_by_id[reservation.intent_id]
+                if (
+                    target is None
+                    or target.intent_id != intent.intent_id
+                    or intent.kind is not IntentKind.PROTECTIVE_STOP
+                ):
+                    raise ValueError("cancel reservation has no exact protective stop")
+        if len(place_intent_ids) != len(set(place_intent_ids)):
+            raise ValueError("logical intent has multiple placement reservations")
+        if len(cancel_order_ids) != len(set(cancel_order_ids)):
+            raise ValueError("provider order has multiple cancel reservations")
+        if self.pending_exit is not None:
+            pending = self.pending_exit
+            if not isinstance(pending, PendingExit):
+                raise TypeError("pending_exit must be PendingExit or None")
+            stop_intent = intent_by_id.get(pending.stop_intent_id)
+            stop_track = tracked_by_id.get(pending.stop_intent_id)
+            cancel_reservation = next(
+                (
+                    item
+                    for item in self.write_reservations
+                    if item.action is OrderWriteAction.CANCEL
+                    and item.intent_id == pending.stop_intent_id
+                    and item.target_provider_order_id == pending.stop_provider_order_id
+                ),
+                None,
+            )
+            position = self.positions.get(pending.symbol)
+            pending_exit_intent = (
+                None
+                if pending.exit_intent_id is None
+                else intent_by_id.get(pending.exit_intent_id)
+            )
+            if (
+                stop_intent is None
+                or stop_intent.kind is not IntentKind.PROTECTIVE_STOP
+                or stop_intent.symbol != pending.symbol
+                or stop_track is None
+                or stop_track.provider_order_id != pending.stop_provider_order_id
+                or cancel_reservation is None
+                or position is None
+                or position.stop_intent_id not in (None, pending.stop_intent_id)
+                or (
+                    position.stop_intent_id is None
+                    and (
+                        stop_track.last_fact is None
+                        or stop_track.last_fact.state
+                        not in (OrderState.CANCELED, OrderState.REJECTED)
+                    )
+                )
+                or (
+                    position.stop_intent_id == pending.stop_intent_id
+                    and stop_track.last_fact is not None
+                    and stop_track.last_fact.state is OrderState.FILLED
+                )
+                or (
+                    pending.exit_intent_id is not None
+                    and (
+                        pending_exit_intent is None
+                        or pending_exit_intent.kind is not IntentKind.EXIT
+                        or pending_exit_intent.symbol != pending.symbol
+                        or pending_exit_intent.side is not OrderSide.SELL
+                        or pending_exit_intent.quantity != position.quantity
+                        or pending_exit_intent.lifecycle
+                        not in (
+                            IntentLifecycle.PROPOSED,
+                            IntentLifecycle.APPROVAL_REQUIRED,
+                            IntentLifecycle.MAY_HAVE_OCCURRED,
+                            IntentLifecycle.UNKNOWN,
+                            IntentLifecycle.REJECTED,
+                        )
+                    )
+                )
+                or (
+                    pending.exit_intent_id is None
+                    and any(
+                        item.kind is IntentKind.EXIT
+                        and item.lifecycle
+                        in (
+                            IntentLifecycle.PROPOSED,
+                            IntentLifecycle.APPROVAL_REQUIRED,
+                            IntentLifecycle.MAY_HAVE_OCCURRED,
+                            IntentLifecycle.UNKNOWN,
+                        )
+                        for item in self.intents
+                    )
+                )
+            ):
+                raise ValueError("pending exit has no exact canceled stop linkage")
+            if (
+                pending_exit_intent is not None
+                and pending_exit_intent.lifecycle is IntentLifecycle.REJECTED
+            ):
+                exit_track = tracked_by_id.get(pending.exit_intent_id)
+                exit_reservation = next(
+                    (
+                        item
+                        for item in self.write_reservations
+                        if item.action is OrderWriteAction.PLACE
+                        and item.intent_id == pending.exit_intent_id
+                    ),
+                    None,
+                )
+                exit_fact = None if exit_track is None else exit_track.last_fact
+                if (
+                    exit_track is None
+                    or exit_track.provider_order_id is None
+                    or exit_fact is None
+                    or exit_fact.provider_order_id != exit_track.provider_order_id
+                    or exit_fact.state is not OrderState.REJECTED
+                    or exit_fact.requested_quantity != pending_exit_intent.quantity
+                    or exit_fact.filled_quantity != 0
+                    or exit_fact.remaining_quantity != pending_exit_intent.quantity
+                    or exit_reservation is None
+                    or exit_reservation.status is not OrderWriteStatus.TERMINAL
+                ):
+                    raise ValueError(
+                        "rejected pending exit has no exact terminal fact binding"
+                    )
+        identifier_claims: dict[str, tuple[str, UUID]] = {}
+
+        def claim(value: str, kind: str, intent_id: UUID) -> None:
+            previous = identifier_claims.get(value)
+            current = (kind, intent_id)
+            if previous is not None and previous != current:
+                raise ValueError(
+                    "logical, ref, approval, provider and operation IDs "
+                    "must be distinct"
+                )
+            identifier_claims[value] = current
+
+        for intent in self.intents:
+            claim(str(intent.intent_id), "logical", intent.intent_id)
+            claim(intent.ref_id, "ref", intent.intent_id)
+        for receipt in self.approval_receipts:
+            claim(receipt.approval_id, "approval", receipt.intent_id)
+        for tracked in self.tracked_orders:
+            if tracked.approval_id is not None:
+                claim(tracked.approval_id, "approval", tracked.intent_id)
+            if tracked.provider_order_id is not None:
+                claim(tracked.provider_order_id, "provider", tracked.intent_id)
+        for reservation in self.write_reservations:
+            claim(str(reservation.operation_id), "operation", reservation.intent_id)
+            if reservation.approval_id is not None:
+                claim(reservation.approval_id, "approval", reservation.intent_id)
+            if reservation.target_provider_order_id is not None:
+                claim(
+                    reservation.target_provider_order_id,
+                    "provider",
+                    reservation.intent_id,
                 )
         copied_positions: dict[Symbol, OwnedPositionRecord] = {}
         for symbol, record in self.positions.items():
@@ -954,6 +1235,7 @@ class AdmissionBlocker(StrEnum):
     STOP_BREACH = "STOP_BREACH"
     SAFETY_FAILURE = "SAFETY_FAILURE"
     REGIME_EXIT = "REGIME_EXIT"
+    WHOLE_SHARE_STOP_AUTHORITY_REQUIRED = "WHOLE_SHARE_STOP_AUTHORITY_REQUIRED"
     PERSISTENCE_UNAVAILABLE = "PERSISTENCE_UNAVAILABLE"
 
 
@@ -985,6 +1267,7 @@ class CycleStatus:
     protective_stop_ready: bool
     live_ready: bool
     state: str
+    execution_profile: ExecutionProfile = ExecutionProfile.FRACTIONAL_RESEARCH_PAPER
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "as_of", normalize_utc(self.as_of, "as_of"))
@@ -1007,6 +1290,107 @@ class CycleStatus:
                 raise TypeError(f"{name} must be a bool")
         if not isinstance(self.state, str) or not self.state:
             raise ValueError("state must be nonblank")
+        if not isinstance(self.execution_profile, ExecutionProfile):
+            raise TypeError("execution_profile must be an ExecutionProfile")
+        if self.live_ready and (
+            self.execution_profile is not ExecutionProfile.PROTECTED_WHOLE_SHARE
+            or self.actual_position in (None, TargetPosition.FLAT)
+            or not self.protective_stop_ready
+        ):
+            raise ValueError(
+                "live_ready requires a protected whole-share holding "
+                "with exact stop coverage"
+            )
+
+
+_MANDATORY_EXIT_REASONS = frozenset(
+    {
+        AdmissionBlocker.FORCED_FLAT,
+        AdmissionBlocker.STOP_BREACH,
+        AdmissionBlocker.SAFETY_FAILURE,
+        AdmissionBlocker.REGIME_EXIT,
+    }
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectiveStopCancelCandidate:
+    """Pure exact-stop cancellation decision; this object has no write authority."""
+
+    intent_id: UUID
+    ref_id: str
+    provider_order_id: str
+    terms_digest: str
+    fact: BrokerOrderFact
+    held_price: PriceObservation
+    expected_state_revision: int
+    exit_reasons: tuple[AdmissionBlocker, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.intent_id, UUID):
+            raise TypeError("intent_id must be UUID")
+        for name in ("ref_id", "provider_order_id", "terms_digest"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"{name} must be nonblank")
+        if not isinstance(self.fact, BrokerOrderFact):
+            raise TypeError("fact must be BrokerOrderFact")
+        if not isinstance(self.held_price, PriceObservation):
+            raise TypeError("held_price must be PriceObservation")
+        if self.held_price.symbol != self.fact.symbol:
+            raise ValueError("held price symbol differs from protective stop")
+        if self.fact.provider_order_id != self.provider_order_id:
+            raise ValueError("candidate provider ID differs from its fact")
+        if (
+            not isinstance(self.expected_state_revision, int)
+            or isinstance(self.expected_state_revision, bool)
+            or self.expected_state_revision < 0
+        ):
+            raise ValueError("expected_state_revision must be nonnegative")
+        if (
+            not isinstance(self.exit_reasons, tuple)
+            or not self.exit_reasons
+            or not all(
+                reason in _MANDATORY_EXIT_REASONS for reason in self.exit_reasons
+            )
+            or len(set(self.exit_reasons)) != len(self.exit_reasons)
+        ):
+            raise ValueError("exit_reasons must be distinct mandatory exit reasons")
+
+
+@dataclass(frozen=True, slots=True)
+class PendingExit:
+    """Durable mandatory exit retained across an exact stop cancellation."""
+
+    stop_intent_id: UUID
+    stop_provider_order_id: str
+    symbol: Symbol
+    exit_reasons: tuple[AdmissionBlocker, ...]
+    exit_intent_id: UUID | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.stop_intent_id, UUID):
+            raise TypeError("stop_intent_id must be UUID")
+        if self.exit_intent_id is not None and not isinstance(
+            self.exit_intent_id, UUID
+        ):
+            raise TypeError("exit_intent_id must be UUID or None")
+        if (
+            not isinstance(self.stop_provider_order_id, str)
+            or not self.stop_provider_order_id
+        ):
+            raise ValueError("stop_provider_order_id must be nonblank")
+        if self.symbol not in TRADED_SYMBOLS:
+            raise ValueError("pending exit symbol must be TQQQ or SQQQ")
+        if (
+            not isinstance(self.exit_reasons, tuple)
+            or not self.exit_reasons
+            or not all(
+                reason in _MANDATORY_EXIT_REASONS for reason in self.exit_reasons
+            )
+            or len(set(self.exit_reasons)) != len(self.exit_reasons)
+        ):
+            raise ValueError("exit_reasons must be distinct mandatory exit reasons")
 
 
 @dataclass(frozen=True, slots=True)
@@ -1015,6 +1399,13 @@ class CycleResult:
     status: CycleStatus
     intent: LogicalOrderIntent | None
     effect_proposal: EffectProposal | None
+    cancel_candidate: ProtectiveStopCancelCandidate | None = None
+
+    def __post_init__(self) -> None:
+        if self.cancel_candidate is not None and not isinstance(
+            self.cancel_candidate, ProtectiveStopCancelCandidate
+        ):
+            raise TypeError("cancel_candidate must be ProtectiveStopCancelCandidate")
 
 
 class BrokerSnapshotProvider(Protocol):

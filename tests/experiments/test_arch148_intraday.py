@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 import trading_bot.experiments.arch148_intraday as subject
+import trading_bot.experiments.arch148_sparse_backtest as sparse_backtest
 from trading_bot.domain import Bar, Symbol
 from trading_bot.live_runtime.models import (
     MarketQuality,
@@ -454,6 +455,126 @@ def test_deterministic_dataset_and_custody_serialization() -> None:
         dataset.to_json()
         == subject.IntradayDataset.from_json(dataset.to_json()).to_json()
     )
+
+
+def _sparse_dataset(day: date = date(2023, 11, 22)):
+    slots = subject.session_slots(day)
+    missing_by_symbol = {
+        "QQQ": {slots[1]},
+        "TQQQ": {slots[1]},
+        "SQQQ": {slots[1], slots[2]},
+    }
+    datasets = tuple(
+        subject.IntradaySymbolDataset(
+            symbol,
+            tuple(
+                bar
+                for bar in _bars_for(symbol, day)
+                if bar.timestamp not in missing_by_symbol[symbol]
+            ),
+        )
+        for symbol in subject.INTRADAY_SYMBOLS
+    )
+    start = datetime.combine(day, datetime.min.time(), UTC)
+    return subject.SparseIntradayDataset(start, start + timedelta(days=1), datasets)
+
+
+def test_v3_sparse_dataset_binds_real_observations_and_gap_evidence() -> None:
+    dataset = _sparse_dataset()
+    assert dataset.to_dict()["schema"] == "arch148-intraday-dataset/v3"
+    assert tuple(item.scheduled_slot_count for item in dataset.sparse_evidence) == (
+        78,
+        78,
+        78,
+    )
+    assert tuple(
+        item.observed_regular_session_count for item in dataset.sparse_evidence
+    ) == (77, 77, 76)
+    assert tuple(item.missing_count for item in dataset.sparse_evidence) == (1, 1, 2)
+    assert dataset.common_missing_slot_count == 1
+    assert dataset.union_missing_slot_count == 2
+    assert tuple(
+        item.complete_missing_session_count for item in dataset.sparse_evidence
+    ) == (
+        0,
+        0,
+        0,
+    )
+    assert all(
+        item.first_observed_timestamp == subject.session_slots(date(2023, 11, 22))[0]
+        and item.last_observed_timestamp
+        == subject.session_slots(date(2023, 11, 22))[-1]
+        for item in dataset.sparse_evidence
+    )
+    restored = subject.SparseIntradayDataset.from_json(dataset.to_json())
+    assert restored.identity == dataset.identity
+    assert restored.to_json() == dataset.to_json()
+    assert restored.bars_by_symbol["QQQ"] == dataset.bars_by_symbol["QQQ"]
+    changed = subject.SparseIntradayDataset(
+        dataset.start,
+        dataset.end_exclusive,
+        (
+            subject.IntradaySymbolDataset("QQQ", dataset.bars_by_symbol["QQQ"][:-1]),
+            dataset.datasets[1],
+            dataset.datasets[2],
+        ),
+    )
+    assert changed.identity != dataset.identity
+
+
+def test_v3_sparse_dataset_rejects_a_fully_missing_expected_session() -> None:
+    first_day = date(2023, 11, 22)
+    second_day = date(2023, 11, 24)
+    qqq = _bars_for("QQQ", first_day)
+    two_day_bars = {
+        symbol: _bars_for(symbol, first_day) + _bars_for(symbol, second_day)
+        for symbol in subject.INTRADAY_SYMBOLS
+    }
+    two_day_bars["QQQ"] = qqq
+    with pytest.raises(subject.SparseIntradayCoverageError) as caught:
+        subject.SparseIntradayDataset(
+            datetime(2023, 11, 22, tzinfo=UTC),
+            datetime(2023, 11, 25, tzinfo=UTC),
+            tuple(
+                subject.IntradaySymbolDataset(symbol, two_day_bars[symbol])
+                for symbol in subject.INTRADAY_SYMBOLS
+            ),
+        )
+    assert caught.value.symbol == "QQQ"
+    assert caught.value.missing_session_count == 1
+    assert len(caught.value.missing_session_sha256) == 64
+
+
+def test_v3_sparse_custody_roundtrip_binds_page_and_normalized_bytes() -> None:
+    dataset = _sparse_dataset()
+    pages = tuple(
+        subject.IntradayPageEvidence(symbol, (str(index) * 64,), (123,))
+        for index, symbol in enumerate(subject.INTRADAY_SYMBOLS, start=1)
+    )
+    evidence = subject.build_sparse_intraday_custody_evidence(dataset, pages)
+    subject.verify_sparse_intraday_custody_evidence(dataset, evidence)
+    restored = subject.SparseIntradayCustodyEvidence.from_json(evidence.to_json())
+    assert restored.evidence_id == evidence.evidence_id
+    assert restored.to_dict()["schema"] == "arch148-intraday-custody-evidence/v3"
+    assert restored.to_json() == evidence.to_json()
+
+
+def test_run_backtest_dispatches_sparse_v3_through_the_sparse_entrypoint(
+    monkeypatch,
+) -> None:
+    dataset = _sparse_dataset()
+    marker = object()
+    observed = {}
+
+    def fake_sparse_backtest(value, **kwargs):
+        observed["dataset"] = value
+        observed["kwargs"] = kwargs
+        return marker
+
+    monkeypatch.setattr(sparse_backtest, "run_sparse_backtest", fake_sparse_backtest)
+    assert subject.run_backtest(dataset) is marker
+    assert observed["dataset"] is dataset
+    assert observed["kwargs"]["cost_model"] is subject.ZERO_COST
 
 
 def test_schedule_commitment_changes_with_early_close_semantics() -> None:

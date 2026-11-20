@@ -1,10 +1,13 @@
 # Architecture 148-B2 — Read-only Intraday Acquisition Plan
 
 Status: **B2-A-C1 SOURCE/CERTIFICATION ACCEPTED / FAST-FORWARD INTEGRATED;
-B2-B ATTEMPT CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY; FRESH
-READ-ONLY SUCCESSOR PENDING SEPARATE REVIEW.** This plan authorizes no Alpaca
-credential read, provider request, Robinhood/broker action, production mutation
-or FINAL_HOLDOUT access.
+EARLIER B2-B CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO RETRY; LATER
+ACQUISITION COMPLETE BUT ORIGINAL B1 QUALIFICATION CONSUMED / BLOCKED /
+QUALIFICATION_BAR_COUNT_MISMATCH / NO RETRY; OFFLINE REQUALIFICATION SOURCE
+REVIEW IS PART OF THE BROADER ARCHITECTURE 148 PUBLIC-REFERENCE SOURCE
+CHECKPOINT, PENDING INDEPENDENT ACCEPTANCE.** This plan authorizes no new Alpaca
+credential read, provider request, Robinhood/broker action, production
+mutation, baseline or FINAL_HOLDOUT access.
 
 B2-A-C1 accepted executable source:
 `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
@@ -26,8 +29,10 @@ was not used to accept the correction itself. The correction is now
 accepted/integrated. This post-acceptance docs-only closeout does not change its
 executable/test/workflow bytes. A future provider acquisition still requires a
 separately reviewed fresh invocation bound to the exact then-current integrated
-invocation source after docs closeout/catch-up. It is not a retry of the
-consumed attempt.
+invocation source after docs closeout/catch-up. The later `bb1a...` attempt
+recorded below already consumed its own acquisition boundary; it is not a retry
+of the earlier `fd8aa...` attempt. The immediate next review is offline
+requalification, not another provider invocation.
 
 ## Consumed B2-B attempt
 
@@ -50,6 +55,28 @@ production, FINAL_HOLDOUT and baseline effects were all zero. This retained
 evidence is immutable and must not be resumed, replayed or treated as retry
 authority.
 
+## Later completed acquisition with qualification mismatch
+
+Attempt: `bb1a784b-98d1-41fd-8d95-aa9fa463d5c9`
+Retained directory:
+`F:\AI\temp\arch148-b2-bb1a784b-98d1-41fd-8d95-aa9fa463d5c9`
+Outcome: acquisition complete; original downstream qualification CONSUMED /
+BLOCKED / `QUALIFICATION_BAR_COUNT_MISMATCH` / NO RETRY.
+Credential reads: 1. Pages: 430 of 430. Unresolved pagination intents: 0.
+End cursor: null for QQQ, TQQQ and SQQQ. Automatic retry: FORBIDDEN.
+
+| Symbol | Pages | Raw bars | Observed B1 slots | Missing expected slots |
+|---|---:|---:|---:|---:|
+| QQQ | 148 | 349805 | 156379 | 17 |
+| TQQQ | 141 | 331112 | 156376 | 20 |
+| SQQQ | 141 | 328679 | 156376 | 20 |
+
+The missing-slot sets share 17 timestamps and have a 23-timestamp union. The
+accepted dense B1 contract expects 156396 slots for each symbol; the preserved
+acquisition therefore does not qualify as the original B1 dataset. Keep this
+attempt separate from the older `fd8aa...` PAGE_LIMIT_REACHED incident above;
+neither consumed attempt can be resumed or retried.
+
 ## Frozen predecessor
 
 Design base:
@@ -71,12 +98,14 @@ the operator/evidence boundary described below and run fake/focused tests, Ruff,
 diff/admission and mapped source certification. B2-A must perform zero real
 credential reads and zero real provider calls.
 
-The initial B2-B attempt recorded above is consumed and cannot be resumed or
-retried. B2-A-C1 was the source-only/fake-only corrective checkpoint and is now
-accepted/integrated. Any future real read-only acquisition requires its own
-separately reviewed fresh successor invocation after this docs-only closeout is
-integrated and the canonical worktrees are reconciled locally. No provider or
-credential operation is authorized by this plan.
+Both B2 attempts recorded above are consumed and cannot be resumed or retried.
+B2-A-C1 was the source-only/fake-only corrective checkpoint and is now
+accepted/integrated. A new provider acquisition is not authorized by this plan;
+any later attempt requires its own separately reviewed invocation after this
+docs update is integrated and the canonical worktrees are reconciled locally.
+The latest preserved acquisition is complete but failed the original dense B1
+qualification, so the immediate review boundary is offline requalification,
+not another provider request.
 
 ## Provider and dataset contract
 
@@ -254,7 +283,10 @@ bodies remain separate create-once files under the attempt directory.
 
 SUCCESS is exactly
 `READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW`. It grants no dataset acceptance,
-strategy result, profitability claim or live authority.
+strategy result, profitability claim or live authority. This status means the
+acquisition evidence is complete; it does not override a downstream B1
+qualification failure. The later `bb1a...` attempt is consumed and blocked by
+`QUALIFICATION_BAR_COUNT_MISMATCH` as recorded above.
 
 ## B2-A implementation surface
 
@@ -323,11 +355,13 @@ accepted HEAD/tree. No second push or merge was performed. This is
 `ARCH148_B2_A_C1_TRANSITION_NATIVE_STDERR_REGRESSION`; the existing workflow
 rule against stderr-unsafe native-command handling remains authoritative.
 
-This docs-only closeout changes no executable/test/workflow bytes and therefore
-does not rerun mapped FULL. After its own docs-only feature gate, integration
-and canonical worktree catch-up, ChatGPT may review one exact, separately named
-fresh read-only acquisition successor. The real operator must print canonical
-`evidence.json` plus SHA-256 and byte length; ChatGPT reviews that exact
-evidence before any baseline backtest. Baseline analysis uses the accepted B1
-simulator and performs no provider request. The consumed B2-B attempt is never
-retried.
+The later acquisition's raw provider facts are preserved, but its original
+dense B1 qualification failed. The offline requalification source is
+`src/trading_bot/experiments/arch148_b2_requalify.py`; its sparse replay source
+is `src/trading_bot/experiments/arch148_sparse_backtest.py`. They are ready for
+independent source review as part of the broader Architecture 148 checkpoint.
+The source checkpoint carries no real requalification result. Any separately
+produced offline output must be independently reviewed before a baseline. No
+baseline starts automatically; keep the dense B1 contract unchanged. No
+provider retry, Robinhood/broker effect or FINAL_HOLDOUT access is authorized
+by this plan.

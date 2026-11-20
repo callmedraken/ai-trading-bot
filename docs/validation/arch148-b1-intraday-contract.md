@@ -13,7 +13,11 @@ credential access, broker action, B2 or holdout access.
 - Feed: `sip`.
 - Currency / price basis: `USD` /
   `ALPACA_ALL_ADJUSTED_INTRADAY_PRICE_V1`.
-- `FINAL_HOLDOUT` begins at 2024-01-01 and remains sealed. B2 is not authorized.
+- `FINAL_HOLDOUT` begins at 2024-01-01 and remains sealed. This B1 contract
+  grants no provider authority; each B2 acquisition requires its own separately
+  reviewed boundary. The later B2 acquisition and its qualification mismatch
+  are recorded in the [B2 plan](arch148-b2-readonly-acquisition-plan.md); they
+  do not change this frozen dense B1 contract.
 
 The accepted Architecture-146 authority is
 `nyse-published-regular-sessions-2016-2026-v1`, digest

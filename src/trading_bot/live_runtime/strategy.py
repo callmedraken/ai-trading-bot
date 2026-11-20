@@ -148,14 +148,12 @@ def analyze_market(
     EMA20/50 seed with a simple average of their first full period. RSI14 seeds
     with the first 14 close changes, then uses Wilder smoothing. Session VWAP
     uses typical price `(high + low + close) / 3` weighted by volume and resets
-    at every published regular-session open. Flat RSI is 50; equal comparisons
-    are NEUTRAL. A source-marked interpolated bar is never used.
+    at every published regular-session open. Indicator state advances over real
+    observations only; current-session gaps fail closed.
     """
 
     if not isinstance(market, MarketSnapshot):
         raise TypeError("market must be MarketSnapshot")
-    authority = authority or NYSEPublishedRegularSessionAuthority()
-    as_of = market.as_of
     if not market.completed_bars:
         return _unavailable(MarketQuality.NO_CURRENT_SESSION_DATA, "NO_COMPLETED_BARS")
 
@@ -165,137 +163,259 @@ def analyze_market(
     if ordered != market.completed_bars:
         return _unavailable(MarketQuality.INVALID, "BARS_NOT_CHRONOLOGICAL")
 
-    schedules: dict[date, ReviewPaperSessionSchedule] = {}
-    grouped: dict[date, list[CompletedBar]] = {}
+    stream = _CompletedBarSignalStream(
+        authority or NYSEPublishedRegularSessionAuthority()
+    )
     for bar in ordered:
+        stream.append(bar)
+    return stream.analyze(market.as_of)
+
+
+class _CompletedBarSignalStream:
+    """Incremental equivalent of ``analyze_market`` for ordered real bars."""
+
+    def __init__(self, authority: NYSEPublishedRegularSessionAuthority) -> None:
+        self._authority = authority
+        self._last_bar: CompletedBar | None = None
+        self._last_session_date: date | None = None
+        self._session_schedule: ReviewPaperSessionSchedule | None = None
+        self._session_first_timestamp: datetime | None = None
+        self._session_gap = False
+        self._session_weighted_total = Decimal("0")
+        self._session_volume_total = 0
+        self._session_latest_point: SignalPoint | None = None
+        self._session_previous_point: SignalPoint | None = None
+        self._history_gap = False
+        self._invalid: tuple[MarketQuality, str] | None = None
+        self._count = 0
+        self._last_close: Decimal | None = None
+        self._ema20_seed = Decimal("0")
+        self._ema50_seed = Decimal("0")
+        self._ema20: Decimal | None = None
+        self._ema50: Decimal | None = None
+        self._rsi_gain_seed = Decimal("0")
+        self._rsi_loss_seed = Decimal("0")
+        self._rsi_average_gain: Decimal | None = None
+        self._rsi_average_loss: Decimal | None = None
+        self._rsi: Decimal | None = None
+
+    def append(self, bar: CompletedBar) -> None:
+        """Consume one new, real completed observation in chronological order."""
+
+        if self._invalid is not None:
+            return
+        if not isinstance(bar, CompletedBar):
+            self._invalid = (MarketQuality.INVALID, "BAR_TYPE_INVALID")
+            return
+        previous = self._last_bar
+        if previous is not None and bar.timestamp <= previous.timestamp:
+            if bar.timestamp == previous.timestamp:
+                self._invalid = (MarketQuality.GAP, "DUPLICATE_BAR_TIMESTAMP")
+            else:
+                self._invalid = (MarketQuality.INVALID, "BARS_NOT_CHRONOLOGICAL")
+            return
         if bar.interpolated:
-            return _unavailable(MarketQuality.INTERPOLATED, "INTERPOLATED_BAR")
-        if bar.ends_at > as_of:
-            return _unavailable(MarketQuality.INVALID, "UNCOMPLETED_BAR_IN_INPUT")
+            self._invalid = (MarketQuality.INTERPOLATED, "INTERPOLATED_BAR")
+            return
+
         session_date = bar.timestamp.astimezone(_NEW_YORK).date()
         try:
-            schedule = authority.schedule_for(session_date)
+            schedule = self._authority.schedule_for(session_date)
         except UnsupportedNYSEPublishedSessionYearError:
-            return _unavailable(MarketQuality.INVALID, "UNSUPPORTED_SESSION_YEAR")
+            self._invalid = (MarketQuality.INVALID, "UNSUPPORTED_SESSION_YEAR")
+            return
         if schedule is None:
-            return _unavailable(MarketQuality.INVALID, "BAR_OUTSIDE_PUBLISHED_SESSION")
+            self._invalid = (MarketQuality.INVALID, "BAR_OUTSIDE_PUBLISHED_SESSION")
+            return
         if not (schedule.opens_at <= bar.timestamp < schedule.closes_at):
-            return _unavailable(MarketQuality.INVALID, "BAR_OUTSIDE_REGULAR_HOURS")
+            self._invalid = (MarketQuality.INVALID, "BAR_OUTSIDE_REGULAR_HOURS")
+            return
         if bar.ends_at > schedule.closes_at:
-            return _unavailable(MarketQuality.INVALID, "BAR_CROSSES_SESSION_CLOSE")
-        offset = bar.timestamp - schedule.opens_at
-        if offset % _BAR_WIDTH:
-            return _unavailable(MarketQuality.GAP, "BAR_NOT_ALIGNED_TO_FIVE_MINUTES")
-        schedules[session_date] = schedule
-        grouped.setdefault(session_date, []).append(bar)
+            self._invalid = (MarketQuality.INVALID, "BAR_CROSSES_SESSION_CLOSE")
+            return
+        if (bar.timestamp - schedule.opens_at) % _BAR_WIDTH:
+            self._invalid = (MarketQuality.GAP, "BAR_NOT_ALIGNED_TO_FIVE_MINUTES")
+            return
 
-    # A missing entire published session between observed sessions is data loss.
-    observed_days = sorted(grouped)
-    for previous_day, current_day in zip(
-        observed_days, observed_days[1:], strict=False
-    ):
-        cursor = previous_day + timedelta(days=1)
-        while cursor < current_day:
-            try:
-                intermediate = authority.schedule_for(cursor)
-            except UnsupportedNYSEPublishedSessionYearError:
-                return _unavailable(MarketQuality.INVALID, "UNSUPPORTED_SESSION_YEAR")
-            if intermediate is not None and cursor not in grouped:
-                return _unavailable(MarketQuality.GAP, "MISSING_PUBLISHED_SESSION")
-            cursor += timedelta(days=1)
-    current_session_date = as_of.astimezone(_NEW_YORK).date()
-    for day, bars in grouped.items():
-        schedule = schedules[day]
-        if day != current_session_date:
-            if day != observed_days[0] and bars[0].timestamp != schedule.opens_at:
-                return _unavailable(MarketQuality.GAP, "OBSERVED_SESSION_START_MISSING")
-            if bars[-1].ends_at != schedule.closes_at:
-                return _unavailable(MarketQuality.GAP, "OBSERVED_SESSION_CLOSE_MISSING")
-        for left, right in zip(bars, bars[1:], strict=False):
-            if right.timestamp - left.timestamp != _BAR_WIDTH:
-                return _unavailable(MarketQuality.GAP, "NONCONTIGUOUS_SESSION_BARS")
+        if self._last_session_date != session_date:
+            if self._last_session_date is not None:
+                cursor = self._last_session_date + timedelta(days=1)
+                while cursor < session_date:
+                    try:
+                        intermediate = self._authority.schedule_for(cursor)
+                    except UnsupportedNYSEPublishedSessionYearError:
+                        self._invalid = (
+                            MarketQuality.INVALID,
+                            "UNSUPPORTED_SESSION_YEAR",
+                        )
+                        return
+                    if intermediate is not None:
+                        self._history_gap = True
+                    cursor += timedelta(days=1)
+            self._last_session_date = session_date
+            self._session_schedule = schedule
+            self._session_first_timestamp = bar.timestamp
+            self._session_gap = False
+            self._session_weighted_total = Decimal("0")
+            self._session_volume_total = 0
+            self._session_latest_point = None
+            self._session_previous_point = None
+        elif previous is not None and bar.timestamp - previous.timestamp != _BAR_WIDTH:
+            self._session_gap = True
 
-    current_bars = grouped.get(current_session_date, [])
-    if not current_bars:
-        try:
-            current_schedule = authority.schedule_for(current_session_date)
-        except UnsupportedNYSEPublishedSessionYearError:
-            return _unavailable(MarketQuality.INVALID, "UNSUPPORTED_SESSION_YEAR")
-        if current_schedule is not None:
-            latest_expected_end = _latest_completed_end(as_of, current_schedule)
-            if latest_expected_end > current_schedule.opens_at:
-                return _unavailable(MarketQuality.GAP, "MISSING_LATEST_COMPLETED_BAR")
-        return _unavailable(
-            MarketQuality.NO_CURRENT_SESSION_DATA, "NO_CURRENT_SESSION_BARS"
-        )
-    current_schedule = schedules[current_session_date]
-    if current_bars[0].timestamp != current_schedule.opens_at:
-        return _unavailable(MarketQuality.GAP, "SESSION_VWAP_START_MISSING")
-    if current_bars[-1].ends_at != _latest_completed_end(as_of, current_schedule):
-        return _unavailable(MarketQuality.GAP, "MISSING_LATEST_COMPLETED_BAR")
-    if as_of - current_bars[-1].ends_at > _MAX_BAR_AGE:
-        return _unavailable(MarketQuality.STALE, "LATEST_COMPLETED_BAR_STALE")
+        with localcontext(_calculation_context(_PRECISION)):
+            typical_price = (bar.high + bar.low + bar.close) / Decimal("3")
+            self._session_weighted_total += typical_price * bar.volume
+            self._session_volume_total += bar.volume
+            vwap = (
+                self._session_weighted_total / Decimal(self._session_volume_total)
+                if self._session_volume_total > 0
+                else None
+            )
+            ema20, ema50, rsi = self._append_indicators(bar.close)
 
-    with localcontext(_calculation_context(_PRECISION)):
-        closes = [bar.close for bar in ordered]
-        ema20 = _ema(closes, 20)
-        ema50 = _ema(closes, 50)
-        rsi14 = _rsi_wilder(closes, 14)
-        vwaps = _session_vwaps(ordered)
-        points: list[SignalPoint | None] = []
-        for index, bar in enumerate(ordered):
-            vwap = vwaps[index]
-            fast = ema20[index]
-            slow = ema50[index]
-            rsi = rsi14[index]
-            if vwap is None or fast is None or slow is None or rsi is None:
-                points.append(None)
-                continue
-            if bar.close > vwap and fast > slow and rsi >= Decimal("55"):
+        if (
+            vwap is not None
+            and ema20 is not None
+            and ema50 is not None
+            and rsi is not None
+        ):
+            if bar.close > vwap and ema20 > ema50 and rsi >= Decimal("55"):
                 candidate = MarketRegime.BULLISH
-            elif bar.close < vwap and fast < slow and rsi <= Decimal("45"):
+            elif bar.close < vwap and ema20 < ema50 and rsi <= Decimal("45"):
                 candidate = MarketRegime.BEARISH
             else:
                 candidate = MarketRegime.NEUTRAL
-            points.append(
-                SignalPoint(
-                    bar_end=bar.ends_at,
-                    close=bar.close,
-                    session_vwap=vwap,
-                    ema20=fast,
-                    ema50=slow,
-                    rsi14=rsi,
-                    candidate=candidate,
-                )
+            self._session_previous_point = self._session_latest_point
+            self._session_latest_point = SignalPoint(
+                bar.ends_at,
+                bar.close,
+                vwap,
+                ema20,
+                ema50,
+                rsi,
+                candidate,
             )
 
-    index_by_timestamp = {bar.timestamp: i for i, bar in enumerate(ordered)}
-    current_points = [
-        point
-        for bar in current_bars
-        if (point := points[index_by_timestamp[bar.timestamp]]) is not None
-    ]
-    if not current_points:
-        return _unavailable(MarketQuality.INSUFFICIENT_WARMUP, "INDICATOR_WARMUP")
-    latest = current_points[-1]
-    previous = current_points[-2] if len(current_points) >= 2 else None
-    if previous is not None and latest.bar_end - previous.bar_end != _BAR_WIDTH:
-        return _unavailable(MarketQuality.GAP, "CONFIRMATION_BARS_NOT_ADJACENT")
-    confirmation = None
-    if (
-        previous is not None
-        and latest.candidate is previous.candidate
-        and latest.candidate in (MarketRegime.BULLISH, MarketRegime.BEARISH)
-    ):
-        confirmation = latest.candidate
-    return SignalAnalysis(
-        MarketQuality.READY,
-        latest.candidate,
-        confirmation,
-        latest,
-        previous,
-        "COMPLETED_BAR_CLASSIFICATION",
-    )
+        self._last_bar = bar
+
+    def analyze(self, as_of: datetime) -> SignalAnalysis:
+        """Return the same latest-signal result as the batch analyzer."""
+
+        if self._invalid is not None:
+            return _unavailable(*self._invalid)
+        if self._last_bar is None:
+            return _unavailable(
+                MarketQuality.NO_CURRENT_SESSION_DATA, "NO_COMPLETED_BARS"
+            )
+        if not isinstance(as_of, datetime) or as_of.tzinfo is None:
+            return _unavailable(MarketQuality.INVALID, "AS_OF_INVALID")
+        if self._last_bar.ends_at > as_of:
+            return _unavailable(MarketQuality.INVALID, "UNCOMPLETED_BAR_IN_INPUT")
+
+        current_session_date = as_of.astimezone(_NEW_YORK).date()
+        if self._history_gap:
+            return _unavailable(MarketQuality.GAP, "MISSING_PUBLISHED_SESSION")
+        has_current = self._last_session_date == current_session_date
+        if not has_current:
+            try:
+                current_schedule = self._authority.schedule_for(current_session_date)
+            except UnsupportedNYSEPublishedSessionYearError:
+                return _unavailable(MarketQuality.INVALID, "UNSUPPORTED_SESSION_YEAR")
+            if current_schedule is not None:
+                latest_expected_end = _latest_completed_end(as_of, current_schedule)
+                if latest_expected_end > current_schedule.opens_at:
+                    return _unavailable(
+                        MarketQuality.GAP, "MISSING_LATEST_COMPLETED_BAR"
+                    )
+            return _unavailable(
+                MarketQuality.NO_CURRENT_SESSION_DATA, "NO_CURRENT_SESSION_BARS"
+            )
+
+        schedule = self._session_schedule
+        if schedule is None:
+            return _unavailable(MarketQuality.INVALID, "SESSION_AUTHORITY_UNAVAILABLE")
+        if self._session_first_timestamp != schedule.opens_at:
+            return _unavailable(MarketQuality.GAP, "SESSION_VWAP_START_MISSING")
+        if self._session_gap:
+            return _unavailable(MarketQuality.GAP, "NONCONTIGUOUS_CURRENT_SESSION_BARS")
+        if self._last_bar.ends_at != _latest_completed_end(as_of, schedule):
+            return _unavailable(MarketQuality.GAP, "MISSING_LATEST_COMPLETED_BAR")
+        if as_of - self._last_bar.ends_at > _MAX_BAR_AGE:
+            return _unavailable(MarketQuality.STALE, "LATEST_COMPLETED_BAR_STALE")
+        latest = self._session_latest_point
+        if latest is None:
+            return _unavailable(MarketQuality.INSUFFICIENT_WARMUP, "INDICATOR_WARMUP")
+        previous = self._session_previous_point
+        if previous is not None and latest.bar_end - previous.bar_end != _BAR_WIDTH:
+            return _unavailable(MarketQuality.GAP, "CONFIRMATION_BARS_NOT_ADJACENT")
+        confirmation = None
+        if (
+            previous is not None
+            and latest.candidate is previous.candidate
+            and latest.candidate in (MarketRegime.BULLISH, MarketRegime.BEARISH)
+        ):
+            confirmation = latest.candidate
+        return SignalAnalysis(
+            MarketQuality.READY,
+            latest.candidate,
+            confirmation,
+            latest,
+            previous,
+            "COMPLETED_BAR_CLASSIFICATION",
+        )
+
+    def _append_indicators(
+        self, close: Decimal
+    ) -> tuple[Decimal | None, Decimal | None, Decimal | None]:
+        index = self._count
+        with localcontext(_calculation_context(_PRECISION)):
+            if index < 20:
+                self._ema20_seed += close
+                if index == 19:
+                    self._ema20 = self._ema20_seed / Decimal("20")
+            else:
+                assert self._ema20 is not None
+                multiplier = Decimal("2") / Decimal("21")
+                self._ema20 = (close - self._ema20) * multiplier + self._ema20
+
+            if index < 50:
+                self._ema50_seed += close
+                if index == 49:
+                    self._ema50 = self._ema50_seed / Decimal("50")
+            else:
+                assert self._ema50 is not None
+                multiplier = Decimal("2") / Decimal("51")
+                self._ema50 = (close - self._ema50) * multiplier + self._ema50
+
+            if self._last_close is not None:
+                change = close - self._last_close
+                gain = max(change, Decimal("0"))
+                loss = max(-change, Decimal("0"))
+                if index <= 14:
+                    self._rsi_gain_seed += gain
+                    self._rsi_loss_seed += loss
+                    if index == 14:
+                        self._rsi_average_gain = self._rsi_gain_seed / Decimal("14")
+                        self._rsi_average_loss = self._rsi_loss_seed / Decimal("14")
+                        self._rsi = _rsi_value(
+                            self._rsi_average_gain, self._rsi_average_loss
+                        )
+                else:
+                    assert self._rsi_average_gain is not None
+                    assert self._rsi_average_loss is not None
+                    self._rsi_average_gain = (
+                        self._rsi_average_gain * Decimal("13") + gain
+                    ) / Decimal("14")
+                    self._rsi_average_loss = (
+                        self._rsi_average_loss * Decimal("13") + loss
+                    ) / Decimal("14")
+                    self._rsi = _rsi_value(
+                        self._rsi_average_gain, self._rsi_average_loss
+                    )
+            self._last_close = close
+            self._count += 1
+        return self._ema20, self._ema50, self._rsi
 
 
 def confirmed_regime_exit(signal: SignalAnalysis, held: TargetPosition) -> bool:
@@ -317,40 +437,6 @@ def confirmed_regime_exit(signal: SignalAnalysis, held: TargetPosition) -> bool:
     )
 
 
-def _ema(values: list[Decimal], period: int) -> list[Decimal | None]:
-    result: list[Decimal | None] = [None] * len(values)
-    if len(values) < period:
-        return result
-    with localcontext(_calculation_context(_PRECISION)):
-        average = sum(values[:period], Decimal("0")) / Decimal(period)
-        result[period - 1] = average
-        multiplier = Decimal("2") / Decimal(period + 1)
-        for index in range(period, len(values)):
-            average = (values[index] - average) * multiplier + average
-            result[index] = average
-    return result
-
-
-def _rsi_wilder(values: list[Decimal], period: int) -> list[Decimal | None]:
-    result: list[Decimal | None] = [None] * len(values)
-    if len(values) <= period:
-        return result
-    with localcontext(_calculation_context(_PRECISION)):
-        changes = [values[index] - values[index - 1] for index in range(1, len(values))]
-        gains = [max(change, Decimal("0")) for change in changes]
-        losses = [max(-change, Decimal("0")) for change in changes]
-        average_gain = sum(gains[:period], Decimal("0")) / Decimal(period)
-        average_loss = sum(losses[:period], Decimal("0")) / Decimal(period)
-        result[period] = _rsi_value(average_gain, average_loss)
-        for index in range(period + 1, len(values)):
-            gain = gains[index - 1]
-            loss = losses[index - 1]
-            average_gain = (average_gain * Decimal(period - 1) + gain) / Decimal(period)
-            average_loss = (average_loss * Decimal(period - 1) + loss) / Decimal(period)
-            result[index] = _rsi_value(average_gain, average_loss)
-    return result
-
-
 def _rsi_value(average_gain: Decimal, average_loss: Decimal) -> Decimal:
     if average_gain == 0 and average_loss == 0:
         return Decimal("50")
@@ -361,26 +447,6 @@ def _rsi_value(average_gain: Decimal, average_loss: Decimal) -> Decimal:
     return Decimal("100") - (
         Decimal("100") / (Decimal("1") + average_gain / average_loss)
     )
-
-
-def _session_vwaps(bars: tuple[CompletedBar, ...]) -> list[Decimal | None]:
-    result: list[Decimal | None] = [None] * len(bars)
-    with localcontext(_calculation_context(_PRECISION)):
-        current_date: date | None = None
-        weighted_total = Decimal("0")
-        volume_total = 0
-        for index, bar in enumerate(bars):
-            session_date = bar.timestamp.astimezone(_NEW_YORK).date()
-            if session_date != current_date:
-                current_date = session_date
-                weighted_total = Decimal("0")
-                volume_total = 0
-            typical_price = (bar.high + bar.low + bar.close) / Decimal("3")
-            weighted_total += typical_price * bar.volume
-            volume_total += bar.volume
-            if volume_total > 0:
-                result[index] = weighted_total / Decimal(volume_total)
-    return result
 
 
 def _unavailable(quality: MarketQuality, reason: str) -> SignalAnalysis:

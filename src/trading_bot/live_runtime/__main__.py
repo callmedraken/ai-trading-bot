@@ -1,4 +1,4 @@
-"""Effect-free help surface for the source-only runtime skeleton."""
+"""Effect-free help for the explicitly injected Architecture 148 desktop service."""
 
 from __future__ import annotations
 
@@ -10,12 +10,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m trading_bot.live_runtime",
         description=(
-            "Architecture 148-A runtime contracts only. No provider or broker "
-            "composition is available in this source-only milestone."
+            "No provider, broker, credential, worker, or desktop connection is "
+            "created by this module. Compose an Arch148RuntimeService with an "
+            "explicit context-owned bindings factory and cross-instance owner "
+            "lease, then call service.create_window() from desktop startup. "
+            "Order writes remain denied unless an explicit effect authority is "
+            "injected."
+        ),
+        epilog=(
+            "This module intentionally has no default connection or effect path. "
+            "Import trading_bot.live_runtime.service.Arch148RuntimeService for "
+            "explicit application composition; the service exposes create_window()."
         ),
     )
     parser.parse_args(argv)
-    parser.error("runtime composition is deferred; this command has no effect path")
+    parser.error("runtime service requires explicit injected application composition")
     return 2
 
 

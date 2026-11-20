@@ -55,10 +55,17 @@ from trading_bot.review_paper.session_admission import ReviewPaperSessionSchedul
 
 ARCH148_INTRADAY_DATASET_SCHEMA = "arch148-intraday-dataset/v2"
 ARCH148_INTRADAY_EVIDENCE_SCHEMA = "arch148-intraday-custody-evidence/v2"
+ARCH148_SPARSE_INTRADAY_DATASET_SCHEMA = "arch148-intraday-dataset/v3"
+ARCH148_SPARSE_INTRADAY_EVIDENCE_SCHEMA = "arch148-intraday-custody-evidence/v3"
 ARCH148_INTRADAY_SCHEDULE_SCHEMA = "arch148-intraday-session-schedule/v1"
 ARCH148_INTRADAY_SCHEDULE_VERSION = "arch148-intraday-session-schedule-identity/v1"
 ARCH148_INTRADAY_IDENTITY_VERSION = "arch148-intraday-dataset-identity/v2"
 ARCH148_INTRADAY_EVIDENCE_IDENTITY_VERSION = "arch148-intraday-custody-identity/v2"
+ARCH148_SPARSE_INTRADAY_IDENTITY_VERSION = "arch148-intraday-dataset-identity/v3"
+ARCH148_SPARSE_INTRADAY_EVIDENCE_IDENTITY_VERSION = (
+    "arch148-intraday-custody-identity/v3"
+)
+ARCH148_SPARSE_INTRADAY_GAP_EVIDENCE_VERSION = "arch148-intraday-gap-evidence/v1"
 ARCH148_INTRADAY_IDENTITY_NAMESPACE = UUID("f0f7f3e1-4ad7-5b71-9e5b-2eb8e6a13d0c")
 ARCH148_INTRADAY_EVIDENCE_NAMESPACE = UUID("a33e2ad9-6c1e-5b02-88c0-2dc7c4e5e2c2")
 ARCH148_INTRADAY_SCHEDULE_NAMESPACE = UUID("56a3f326-6fd1-5f5c-921d-30c169db5181")
@@ -173,6 +180,23 @@ class IntradaySessionCoverageError(Arch148IntradayError):
         super().__init__(
             f"{symbol} session slot coverage mismatch: "
             f"missing={len(missing)}, unexpected={len(unexpected)}"
+        )
+
+
+class SparseIntradayCoverageError(Arch148IntradayError):
+    """Sparse observations fail qualification when an expected session is empty."""
+
+    def __init__(
+        self,
+        symbol: str,
+        missing_session_count: int,
+        missing_session_sha256: str,
+    ) -> None:
+        self.symbol = symbol
+        self.missing_session_count = missing_session_count
+        self.missing_session_sha256 = missing_session_sha256
+        super().__init__(
+            f"{symbol} has {missing_session_count} fully missing expected session(s)"
         )
 
 
@@ -987,6 +1011,377 @@ class IntradayDataset:
         return result
 
 
+def _slot_digest(slots: tuple[datetime, ...]) -> str:
+    return sha256(
+        _json_bytes(
+            [
+                ARCH148_SPARSE_INTRADAY_GAP_EVIDENCE_VERSION,
+                [_timestamp_text(item) for item in slots],
+            ]
+        )
+    ).hexdigest()
+
+
+def _session_digest(sessions: tuple[date, ...]) -> str:
+    return sha256(
+        _json_bytes(
+            [
+                ARCH148_SPARSE_INTRADAY_GAP_EVIDENCE_VERSION,
+                [item.isoformat() for item in sessions],
+            ]
+        )
+    ).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class SparseIntradaySymbolEvidence:
+    """Deterministic coverage proof for one sparse provider observation stream."""
+
+    symbol: str
+    scheduled_slot_count: int
+    observed_regular_session_count: int
+    missing_count: int
+    missing_slot_sha256: str
+    observed_normalized_bar_sha256: str
+    first_observed_timestamp: datetime
+    last_observed_timestamp: datetime
+    complete_missing_session_count: int
+    complete_missing_session_sha256: str
+
+    def __post_init__(self) -> None:
+        if self.symbol not in INTRADAY_SYMBOLS:
+            raise Arch148IntradayError("sparse evidence symbol is invalid")
+        if (
+            type(self.scheduled_slot_count) is not int
+            or self.scheduled_slot_count <= 0
+            or type(self.observed_regular_session_count) is not int
+            or self.observed_regular_session_count <= 0
+            or self.observed_regular_session_count > self.scheduled_slot_count
+            or type(self.missing_count) is not int
+            or self.missing_count
+            != self.scheduled_slot_count - self.observed_regular_session_count
+            or type(self.complete_missing_session_count) is not int
+            or self.complete_missing_session_count != 0
+        ):
+            raise Arch148IntradayError("sparse evidence counts are invalid")
+        _digest(self.missing_slot_sha256)
+        _digest(self.observed_normalized_bar_sha256)
+        _digest(self.complete_missing_session_sha256)
+        first = normalize_utc(self.first_observed_timestamp, "first_observed_timestamp")
+        last = normalize_utc(self.last_observed_timestamp, "last_observed_timestamp")
+        if first > last:
+            raise Arch148IntradayError("sparse evidence timestamp bounds are invalid")
+        object.__setattr__(self, "first_observed_timestamp", first)
+        object.__setattr__(self, "last_observed_timestamp", last)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "symbol": self.symbol,
+            "scheduled_slot_count": self.scheduled_slot_count,
+            "observed_regular_session_count": self.observed_regular_session_count,
+            "missing_count": self.missing_count,
+            "missing_slot_sha256": self.missing_slot_sha256,
+            "observed_normalized_bar_sha256": self.observed_normalized_bar_sha256,
+            "first_observed_timestamp": _timestamp_text(self.first_observed_timestamp),
+            "last_observed_timestamp": _timestamp_text(self.last_observed_timestamp),
+            "complete_missing_session_count": self.complete_missing_session_count,
+            "complete_missing_session_sha256": self.complete_missing_session_sha256,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SparseIntradayDataset:
+    """Version-three OPEN dataset that preserves sparse provider observations.
+
+    The frozen v2 dataset remains a full-slot compatibility contract.  This
+    additive v3 dataset treats the schedule as the allowed timestamp universe;
+    each supplied bar remains an actual provider observation.
+    """
+
+    start: datetime
+    end_exclusive: datetime
+    datasets: tuple[IntradaySymbolDataset, ...]
+    request_descriptor_json: str = field(default_factory=_request_descriptor_json)
+    calendar_identity: str = AUTHORITY_IDENTITY
+    calendar_digest: str = AUTHORITY_DIGEST
+    price_basis: str = PRICE_BASIS
+    schedule_identity: str = ARCH148_INTRADAY_SCHEDULE_IDENTITY
+    schedule_digest: str = ARCH148_INTRADAY_SCHEDULE_DIGEST
+    identity: str = field(init=False)
+    sparse_evidence: tuple[SparseIntradaySymbolEvidence, ...] = field(init=False)
+    common_missing_slot_count: int = field(init=False)
+    common_missing_slot_sha256: str = field(init=False)
+    union_missing_slot_count: int = field(init=False)
+    union_missing_slot_sha256: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        start = normalize_utc(self.start, "start")
+        end = normalize_utc(self.end_exclusive, "end_exclusive")
+        if start >= end or start < OPEN_START or end > OPEN_END_EXCLUSIVE:
+            raise Arch148IntradayError("sparse dataset range must stay inside OPEN")
+        if any(
+            value.hour or value.minute or value.second or value.microsecond
+            for value in (start, end)
+        ):
+            raise Arch148IntradayError(
+                "sparse dataset range must use UTC midnight boundaries"
+            )
+        object.__setattr__(self, "start", start)
+        object.__setattr__(self, "end_exclusive", end)
+        if (
+            type(self.datasets) is not tuple
+            or any(type(item) is not IntradaySymbolDataset for item in self.datasets)
+            or tuple(item.symbol for item in self.datasets) != INTRADAY_SYMBOLS
+        ):
+            raise Arch148IntradayError(
+                "sparse dataset must contain QQQ, TQQQ, SQQQ in order"
+            )
+        if (
+            self.price_basis != PRICE_BASIS
+            or self.calendar_identity != AUTHORITY_IDENTITY
+            or self.calendar_digest != AUTHORITY_DIGEST
+            or self.schedule_identity != ARCH148_INTRADAY_SCHEDULE_IDENTITY
+            or self.schedule_digest != ARCH148_INTRADAY_SCHEDULE_DIGEST
+        ):
+            raise Arch148IntradayError("sparse dataset provenance is frozen")
+        try:
+            descriptor = json.loads(self.request_descriptor_json)
+        except (TypeError, ValueError):
+            raise Arch148IntradayError(
+                "sparse request descriptor must be canonical JSON"
+            ) from None
+        if (
+            type(descriptor) is not dict
+            or _json_bytes(descriptor).decode() != self.request_descriptor_json
+            or descriptor != json.loads(_request_descriptor_json())
+        ):
+            raise Arch148IntradayError(
+                "sparse request descriptor is not the frozen OPEN contract"
+            )
+
+        expected = expected_open_slots(start, end)
+        expected_set = set(expected)
+        slots_by_date: dict[date, tuple[datetime, ...]] = {}
+        # The committed XNYS regular session opens at 13:30/14:30 UTC and
+        # closes between 17:00 and 21:00 UTC, so no OPEN session crosses UTC
+        # midnight; UTC slot dates are the authoritative published session date.
+        for slot in expected:
+            slots_by_date.setdefault(slot.date(), ())
+            slots_by_date[slot.date()] += (slot,)
+
+        missing_by_symbol: dict[str, set[datetime]] = {}
+        normalized_by_symbol: dict[str, bytes] = {}
+        evidence: list[SparseIntradaySymbolEvidence] = []
+        for item in self.datasets:
+            actual = tuple(bar.timestamp for bar in item.bars)
+            unexpected = tuple(slot for slot in actual if slot not in expected_set)
+            if unexpected:
+                raise IntradaySessionCoverageError(item.symbol, (), unexpected)
+            actual_set = set(actual)
+            missing = tuple(slot for slot in expected if slot not in actual_set)
+            missing_by_symbol[item.symbol] = set(missing)
+            complete_missing = tuple(
+                session_date
+                for session_date, session_slots_for_date in slots_by_date.items()
+                if not any(slot in actual_set for slot in session_slots_for_date)
+            )
+            if complete_missing:
+                raise SparseIntradayCoverageError(
+                    item.symbol,
+                    len(complete_missing),
+                    _session_digest(complete_missing),
+                )
+            normalized = item.normalized_bytes
+            normalized_by_symbol[item.symbol] = normalized
+            evidence.append(
+                SparseIntradaySymbolEvidence(
+                    item.symbol,
+                    len(expected),
+                    len(actual),
+                    len(missing),
+                    _slot_digest(missing),
+                    sha256(normalized).hexdigest(),
+                    actual[0],
+                    actual[-1],
+                    len(complete_missing),
+                    _session_digest(complete_missing),
+                )
+            )
+
+        common_missing = tuple(
+            slot
+            for slot in expected
+            if all(slot in missing_by_symbol[symbol] for symbol in INTRADAY_SYMBOLS)
+        )
+        union_missing = tuple(
+            slot
+            for slot in expected
+            if any(slot in missing_by_symbol[symbol] for symbol in INTRADAY_SYMBOLS)
+        )
+        sparse_evidence = tuple(evidence)
+        object.__setattr__(self, "sparse_evidence", sparse_evidence)
+        object.__setattr__(self, "common_missing_slot_count", len(common_missing))
+        object.__setattr__(
+            self, "common_missing_slot_sha256", _slot_digest(common_missing)
+        )
+        object.__setattr__(self, "union_missing_slot_count", len(union_missing))
+        object.__setattr__(
+            self, "union_missing_slot_sha256", _slot_digest(union_missing)
+        )
+
+        identity_material = [
+            ARCH148_SPARSE_INTRADAY_IDENTITY_VERSION,
+            _range_text(start),
+            _range_text(end),
+            self.price_basis,
+            self.calendar_identity,
+            self.calendar_digest,
+            self.schedule_identity,
+            self.schedule_digest,
+            sha256(self.request_descriptor_json.encode()).hexdigest(),
+            [item.to_dict() for item in sparse_evidence],
+            len(common_missing),
+            _slot_digest(common_missing),
+            len(union_missing),
+            _slot_digest(union_missing),
+            [
+                [
+                    item.symbol,
+                    sha256(normalized_by_symbol[item.symbol]).hexdigest(),
+                    len(normalized_by_symbol[item.symbol]),
+                    len(item.bars),
+                ]
+                for item in self.datasets
+            ],
+        ]
+        object.__setattr__(
+            self,
+            "identity",
+            str(
+                uuid5(
+                    ARCH148_INTRADAY_IDENTITY_NAMESPACE,
+                    canonical_json_bytes(identity_material).decode(),
+                )
+            ),
+        )
+
+    @property
+    def symbols(self) -> tuple[str, ...]:
+        return INTRADAY_SYMBOLS
+
+    @property
+    def bars_by_symbol(self) -> Mapping[str, tuple[Bar, ...]]:
+        return MappingProxyType({item.symbol: item.bars for item in self.datasets})
+
+    @property
+    def sparse_evidence_by_symbol(self) -> Mapping[str, SparseIntradaySymbolEvidence]:
+        return MappingProxyType({item.symbol: item for item in self.sparse_evidence})
+
+    @property
+    def request_digest(self) -> str:
+        return sha256(self.request_descriptor_json.encode()).hexdigest()
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": ARCH148_SPARSE_INTRADAY_DATASET_SCHEMA,
+            "identity": self.identity,
+            "start": _range_text(self.start),
+            "end_exclusive": _range_text(self.end_exclusive),
+            "price_basis": self.price_basis,
+            "calendar_identity": self.calendar_identity,
+            "calendar_digest": self.calendar_digest,
+            "schedule_identity": self.schedule_identity,
+            "schedule_digest": self.schedule_digest,
+            "request_descriptor": json.loads(self.request_descriptor_json),
+            "datasets": [
+                {
+                    "symbol": item.symbol,
+                    "bars": [_bar_to_dict(bar) for bar in item.bars],
+                }
+                for item in self.datasets
+            ],
+            "sparse_evidence": [item.to_dict() for item in self.sparse_evidence],
+            "common_missing_slot_count": self.common_missing_slot_count,
+            "common_missing_slot_sha256": self.common_missing_slot_sha256,
+            "union_missing_slot_count": self.union_missing_slot_count,
+            "union_missing_slot_sha256": self.union_missing_slot_sha256,
+        }
+
+    def to_json(self) -> str:
+        return _json_bytes(self.to_dict()).decode("utf-8")
+
+    @classmethod
+    def from_json(cls, value: str | bytes) -> SparseIntradayDataset:
+        body = value.encode() if type(value) is str else value
+        if type(body) is not bytes:
+            raise Arch148IntradayError("sparse dataset JSON must be text or bytes")
+        try:
+            raw = json.loads(
+                body.decode("utf-8"),
+                object_pairs_hook=_object_pairs,
+                parse_constant=_reject_constant,
+            )
+        except Arch148IntradayError:
+            raise
+        except (ValueError, TypeError, UnicodeError, RecursionError):
+            raise Arch148IntradayError("malformed sparse dataset JSON") from None
+        if type(raw) is not dict or _json_bytes(raw) != body:
+            raise Arch148IntradayError("canonical sparse dataset JSON required")
+        expected_fields = {
+            "schema",
+            "identity",
+            "start",
+            "end_exclusive",
+            "price_basis",
+            "calendar_identity",
+            "calendar_digest",
+            "schedule_identity",
+            "schedule_digest",
+            "request_descriptor",
+            "datasets",
+            "sparse_evidence",
+            "common_missing_slot_count",
+            "common_missing_slot_sha256",
+            "union_missing_slot_count",
+            "union_missing_slot_sha256",
+        }
+        if (
+            set(raw) != expected_fields
+            or raw["schema"] != ARCH148_SPARSE_INTRADAY_DATASET_SCHEMA
+            or type(raw["datasets"]) is not list
+        ):
+            raise Arch148IntradayError("sparse dataset fields do not match schema")
+        datasets: list[IntradaySymbolDataset] = []
+        for item in raw["datasets"]:
+            if (
+                type(item) is not dict
+                or set(item) != {"symbol", "bars"}
+                or type(item["bars"]) is not list
+            ):
+                raise Arch148IntradayError(
+                    "sparse symbol dataset fields do not match schema"
+                )
+            datasets.append(
+                IntradaySymbolDataset(
+                    item["symbol"], tuple(_bar_from_dict(bar) for bar in item["bars"])
+                )
+            )
+        result = cls(
+            _parse_timestamp(raw["start"]),
+            _parse_timestamp(raw["end_exclusive"]),
+            tuple(datasets),
+            _json_bytes(raw["request_descriptor"]).decode(),
+            raw["calendar_identity"],
+            raw["calendar_digest"],
+            raw["price_basis"],
+            raw["schedule_identity"],
+            raw["schedule_digest"],
+        )
+        if raw["identity"] != result.identity or result.to_json() != body.decode():
+            raise Arch148IntradayError("sparse dataset identity or bytes mismatch")
+        return result
+
+
 @dataclass(frozen=True, slots=True)
 class IntradayPageEvidence:
     symbol: str
@@ -1212,9 +1607,233 @@ class IntradayCustodyEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class SparseIntradayCustodyEvidence:
+    """Version-three raw-page and normalized-byte custody for sparse data."""
+
+    dataset_identity: str
+    request_descriptor_json: str
+    request_digest: str
+    pages: tuple[IntradayPageEvidence, ...]
+    normalized: tuple[IntradayNormalizedEvidence, ...]
+    calendar_identity: str = AUTHORITY_IDENTITY
+    calendar_digest: str = AUTHORITY_DIGEST
+    price_basis: str = PRICE_BASIS
+    schedule_identity: str = ARCH148_INTRADAY_SCHEDULE_IDENTITY
+    schedule_digest: str = ARCH148_INTRADAY_SCHEDULE_DIGEST
+    schema: str = field(default=ARCH148_SPARSE_INTRADAY_EVIDENCE_SCHEMA, init=False)
+    evidence_id: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if type(self.dataset_identity) is not str or not self.dataset_identity:
+            raise Arch148IntradayError("sparse custody dataset identity is required")
+        _digest(self.request_digest)
+        if (
+            self.request_descriptor_json != _request_descriptor_json()
+            or sha256(self.request_descriptor_json.encode()).hexdigest()
+            != self.request_digest
+        ):
+            raise Arch148IntradayError("sparse custody request digest mismatch")
+        if (
+            type(self.pages) is not tuple
+            or type(self.normalized) is not tuple
+            or any(type(item) is not IntradayPageEvidence for item in self.pages)
+            or any(
+                type(item) is not IntradayNormalizedEvidence for item in self.normalized
+            )
+            or tuple(item.symbol for item in self.pages) != INTRADAY_SYMBOLS
+            or tuple(item.symbol for item in self.normalized) != INTRADAY_SYMBOLS
+        ):
+            raise Arch148IntradayError("sparse custody symbols are incomplete")
+        if (
+            self.calendar_identity,
+            self.calendar_digest,
+            self.price_basis,
+            self.schedule_identity,
+            self.schedule_digest,
+        ) != (
+            AUTHORITY_IDENTITY,
+            AUTHORITY_DIGEST,
+            PRICE_BASIS,
+            ARCH148_INTRADAY_SCHEDULE_IDENTITY,
+            ARCH148_INTRADAY_SCHEDULE_DIGEST,
+        ):
+            raise Arch148IntradayError("sparse custody provenance is frozen")
+        material = {
+            "schema": ARCH148_SPARSE_INTRADAY_EVIDENCE_SCHEMA,
+            "dataset_identity": self.dataset_identity,
+            "request_descriptor": json.loads(self.request_descriptor_json),
+            "request_digest": self.request_digest,
+            "pages": [
+                {
+                    "symbol": item.symbol,
+                    "sha256": list(item.raw_page_sha256),
+                    "sizes": list(item.raw_page_byte_size),
+                }
+                for item in self.pages
+            ],
+            "normalized": [
+                {
+                    "symbol": item.symbol,
+                    "sha256": item.normalized_sha256,
+                    "size": item.normalized_byte_size,
+                    "count": item.normalized_bar_count,
+                }
+                for item in self.normalized
+            ],
+            "calendar_identity": self.calendar_identity,
+            "calendar_digest": self.calendar_digest,
+            "price_basis": self.price_basis,
+            "schedule_identity": self.schedule_identity,
+            "schedule_digest": self.schedule_digest,
+        }
+        object.__setattr__(
+            self,
+            "evidence_id",
+            str(
+                uuid5(
+                    ARCH148_INTRADAY_EVIDENCE_NAMESPACE,
+                    canonical_json_bytes(
+                        [ARCH148_SPARSE_INTRADAY_EVIDENCE_IDENTITY_VERSION, material]
+                    ).decode(),
+                )
+            ),
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": self.schema,
+            "evidence_id": self.evidence_id,
+            "dataset_identity": self.dataset_identity,
+            "request_descriptor": json.loads(self.request_descriptor_json),
+            "request_digest": self.request_digest,
+            "pages": [
+                {
+                    "symbol": item.symbol,
+                    "raw_page_sha256": list(item.raw_page_sha256),
+                    "raw_page_byte_size": list(item.raw_page_byte_size),
+                }
+                for item in self.pages
+            ],
+            "normalized": [
+                {
+                    "symbol": item.symbol,
+                    "normalized_sha256": item.normalized_sha256,
+                    "normalized_byte_size": item.normalized_byte_size,
+                    "normalized_bar_count": item.normalized_bar_count,
+                }
+                for item in self.normalized
+            ],
+            "calendar_identity": self.calendar_identity,
+            "calendar_digest": self.calendar_digest,
+            "price_basis": self.price_basis,
+            "schedule_identity": self.schedule_identity,
+            "schedule_digest": self.schedule_digest,
+        }
+
+    def to_json(self) -> str:
+        return _json_bytes(self.to_dict()).decode("utf-8")
+
+    @classmethod
+    def from_json(cls, value: str | bytes) -> SparseIntradayCustodyEvidence:
+        body = value.encode() if type(value) is str else value
+        if type(body) is not bytes:
+            raise Arch148IntradayError("sparse custody JSON must be text or bytes")
+        try:
+            raw = json.loads(
+                body.decode("utf-8"),
+                object_pairs_hook=_object_pairs,
+                parse_constant=_reject_constant,
+            )
+        except Arch148IntradayError:
+            raise
+        except (ValueError, TypeError, UnicodeError, RecursionError):
+            raise Arch148IntradayError("malformed sparse custody JSON") from None
+        fields = {
+            "schema",
+            "evidence_id",
+            "dataset_identity",
+            "request_descriptor",
+            "request_digest",
+            "pages",
+            "normalized",
+            "calendar_identity",
+            "calendar_digest",
+            "price_basis",
+            "schedule_identity",
+            "schedule_digest",
+        }
+        if (
+            type(raw) is not dict
+            or set(raw) != fields
+            or raw["schema"] != ARCH148_SPARSE_INTRADAY_EVIDENCE_SCHEMA
+            or _json_bytes(raw) != body
+            or type(raw["pages"]) is not list
+            or type(raw["normalized"]) is not list
+        ):
+            raise Arch148IntradayError("sparse custody fields/bytes are invalid")
+        pages = tuple(
+            IntradayPageEvidence(
+                item["symbol"],
+                tuple(item["raw_page_sha256"]),
+                tuple(item["raw_page_byte_size"]),
+            )
+            for item in raw["pages"]
+            if type(item) is dict
+            and set(item) == {"symbol", "raw_page_sha256", "raw_page_byte_size"}
+            and type(item["raw_page_sha256"]) is list
+            and type(item["raw_page_byte_size"]) is list
+        )
+        if len(pages) != len(raw["pages"]):
+            raise Arch148IntradayError("sparse custody page fields are invalid")
+        normalized = tuple(
+            IntradayNormalizedEvidence(
+                item["symbol"],
+                item["normalized_sha256"],
+                item["normalized_byte_size"],
+                item["normalized_bar_count"],
+            )
+            for item in raw["normalized"]
+            if type(item) is dict
+            and set(item)
+            == {
+                "symbol",
+                "normalized_sha256",
+                "normalized_byte_size",
+                "normalized_bar_count",
+            }
+        )
+        if len(normalized) != len(raw["normalized"]):
+            raise Arch148IntradayError("sparse custody normalized fields are invalid")
+        result = cls(
+            raw["dataset_identity"],
+            _json_bytes(raw["request_descriptor"]).decode(),
+            raw["request_digest"],
+            pages,
+            normalized,
+            raw["calendar_identity"],
+            raw["calendar_digest"],
+            raw["price_basis"],
+            raw["schedule_identity"],
+            raw["schedule_digest"],
+        )
+        if (
+            raw["evidence_id"] != result.evidence_id
+            or result.to_json() != body.decode()
+        ):
+            raise Arch148IntradayError("sparse custody identity mismatch")
+        return result
+
+
+@dataclass(frozen=True, slots=True)
 class IntradayAcquisitionResult:
     dataset: IntradayDataset
     custody: IntradayCustodyEvidence
+
+
+@dataclass(frozen=True, slots=True)
+class SparseIntradayAcquisitionResult:
+    dataset: SparseIntradayDataset
+    custody: SparseIntradayCustodyEvidence
 
 
 def build_intraday_custody_evidence(
@@ -1249,6 +1868,58 @@ def build_intraday_custody_evidence(
         pages,
         normalized,
     )
+
+
+def build_sparse_intraday_custody_evidence(
+    dataset: SparseIntradayDataset,
+    pages: tuple[IntradayPageEvidence, ...],
+) -> SparseIntradayCustodyEvidence:
+    if (
+        type(dataset) is not SparseIntradayDataset
+        or type(pages) is not tuple
+        or tuple(item.symbol for item in pages) != INTRADAY_SYMBOLS
+        or any(type(item) is not IntradayPageEvidence for item in pages)
+    ):
+        raise Arch148IntradayError("sparse page evidence is incomplete or reordered")
+    normalized = tuple(
+        IntradayNormalizedEvidence(
+            item.symbol,
+            sha256(item.normalized_bytes).hexdigest(),
+            len(item.normalized_bytes),
+            len(item.bars),
+        )
+        for item in dataset.datasets
+    )
+    return SparseIntradayCustodyEvidence(
+        dataset.identity,
+        dataset.request_descriptor_json,
+        dataset.request_digest,
+        pages,
+        normalized,
+    )
+
+
+def verify_sparse_intraday_custody_evidence(
+    dataset: SparseIntradayDataset, custody: SparseIntradayCustodyEvidence
+) -> None:
+    if (
+        type(dataset) is not SparseIntradayDataset
+        or type(custody) is not SparseIntradayCustodyEvidence
+        or custody.dataset_identity != dataset.identity
+        or custody.request_digest != dataset.request_digest
+        or custody.schedule_identity != dataset.schedule_identity
+        or custody.schedule_digest != dataset.schedule_digest
+    ):
+        raise Arch148IntradayError("sparse custody evidence is not bound to dataset")
+    for item, evidence in zip(dataset.datasets, custody.normalized, strict=True):
+        actual = item.normalized_bytes
+        if (sha256(actual).hexdigest(), len(actual), len(item.bars)) != (
+            evidence.normalized_sha256,
+            evidence.normalized_byte_size,
+            evidence.normalized_bar_count,
+        ):
+            raise Arch148IntradayError("sparse normalized custody mismatch")
+    SparseIntradayCustodyEvidence.from_json(custody.to_json())
 
 
 def verify_intraday_custody_evidence(
@@ -1425,7 +2096,7 @@ def _settle_backtest_exit(
 
 
 def run_backtest(
-    dataset: IntradayDataset,
+    dataset: IntradayDataset | SparseIntradayDataset,
     *,
     cost_model: BacktestCostModel = ZERO_COST,
     initial_capital: Decimal = Decimal("10000"),
@@ -1439,6 +2110,18 @@ def run_backtest(
     during the entry bar; other exits use the next bar open.
     """
 
+    if type(dataset) is SparseIntradayDataset:
+        from trading_bot.experiments.arch148_sparse_backtest import (
+            run_sparse_backtest,
+        )
+
+        return run_sparse_backtest(
+            dataset,
+            cost_model=cost_model,
+            initial_capital=initial_capital,
+            analyzer=analyzer,
+            session_policy=session_policy,
+        )
     if (
         type(dataset) is not IntradayDataset
         or type(cost_model) is not BacktestCostModel
@@ -1651,6 +2334,8 @@ __all__ = [
     "ARCH148_INTRADAY_SCHEDULE_IDENTITY",
     "ARCH148_INTRADAY_SCHEDULE_SCHEMA",
     "ARCH148_INTRADAY_SCHEDULE_VERSION",
+    "ARCH148_SPARSE_INTRADAY_DATASET_SCHEMA",
+    "ARCH148_SPARSE_INTRADAY_EVIDENCE_SCHEMA",
     "AlpacaIntradayPageTransport",
     "BacktestCostModel",
     "BacktestResult",
@@ -1675,12 +2360,18 @@ __all__ = [
     "OPEN_START",
     "PRICE_BASIS",
     "SCHEDULE_TIMEZONE",
+    "SparseIntradayCoverageError",
+    "SparseIntradayCustodyEvidence",
+    "SparseIntradayDataset",
+    "SparseIntradaySymbolEvidence",
+    "SparseIntradayAcquisitionResult",
     "TIMEFRAME",
     "ZERO_COST",
     "acquire_intraday_dataset",
     "arch148_intraday_schedule_commitment",
     "build_alpaca_intraday_request",
     "build_intraday_custody_evidence",
+    "build_sparse_intraday_custody_evidence",
     "collect_intraday_pages",
     "expected_open_slots",
     "frozen_intraday_request_descriptor",
@@ -1692,4 +2383,5 @@ __all__ = [
     "EARLY_CLOSE",
     "validate_intraday_session_coverage",
     "verify_intraday_custody_evidence",
+    "verify_sparse_intraday_custody_evidence",
 ]

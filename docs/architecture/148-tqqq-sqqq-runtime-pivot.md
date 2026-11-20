@@ -57,7 +57,13 @@ must retain the applicable copyright/license notice.
 Other existing public-reference evidence remains relevant, including
 `EUGMsub/RobinhoodAgenticTrader`, `kevin1chun/robinhood-for-agents` and
 `abiemann/RobinhoodEquityTradingAgent`. Architecture 148 requires an explicit
-parity matrix before source publication rather than a prose-only survey.
+parity matrix before source publication rather than a prose-only survey. The
+canonical full-pin source/runtime/public-reference adoption matrix is
+[`docs/validation/arch148-runtime-parity.md`](../validation/arch148-runtime-parity.md).
+It records the reviewed Lumiwealth, QuantConnect/Lean, Hummingbot, Freqtrade,
+Robinhood, and siropkin references; local source/tests; license handling; and
+behavior explicitly declined. No third-party implementation code is copied
+into the current candidate.
 
 ## Final application shape
 
@@ -190,6 +196,12 @@ does not guarantee execution price: when triggered it becomes a market order
 and may fill below the stop, particularly in volatile conditions. The hard stop
 is therefore an exit trigger/protection invariant, not a guaranteed maximum
 loss.
+
+Whole-share entry sizing uses a fresh price with cash, unleveraged buying power
+and existing risk controls, while retaining the <=$10 acquisition ceiling. A
+quantity-denominated market order has no capped fill price and does not
+guarantee a <=$10 fill. Live use remains blocked pending reviewed exact
+whole-share risk authority and provider capability.
 
 Reference:
 - https://robinhood.com/us/en/support/articles/trading-with-your-agent/
@@ -389,6 +401,34 @@ The attempt is immutable evidence, not retry authority; automatic retry is
 forbidden. Robinhood, broker, order, production, FINAL_HOLDOUT and baseline
 effects were all zero.
 
+### Later completed acquisition with failed original qualification
+
+Attempt `bb1a784b-98d1-41fd-8d95-aa9fa463d5c9`, retained under
+`F:\AI\temp\arch148-b2-bb1a784b-98d1-41fd-8d95-aa9fa463d5c9`, completed its
+provider acquisition: one credential read, 430 of 430 pages, zero unresolved
+pagination intents, and a null end cursor for each symbol. It is CONSUMED /
+BLOCKED / `QUALIFICATION_BAR_COUNT_MISMATCH` / NO RETRY because its preserved
+data does not satisfy the original dense B1 downstream qualification contract.
+The older `fd8aa...` page-limit incident above remains a separate immutable
+event and is not rewritten.
+
+| Symbol | Pages | Raw bars | Observed B1 slots | Missing expected slots |
+|---|---:|---:|---:|---:|
+| QQQ | 148 | 349805 | 156379 | 17 |
+| TQQQ | 141 | 331112 | 156376 | 20 |
+| SQQQ | 141 | 328679 | 156376 | 20 |
+
+The missing-slot sets have 17 common timestamps and a 23-timestamp union. The
+original B1 contract remains unchanged at 156396 expected slots per symbol;
+these counts do not constitute an accepted B1 dataset. An offline
+requalification implementation exists at
+`src/trading_bot/experiments/arch148_b2_requalify.py`, with sparse-backtest
+semantics in `src/trading_bot/experiments/arch148_sparse_backtest.py`. The
+current source checkpoint carries no real requalification result; any
+separately produced offline output must be independently reviewed before a
+baseline. No baseline starts automatically; the preserved acquisition is never
+fetched again or retried.
+
 ### Corrected B2-A-C1 source contract
 
 Provider documentation was rechecked on 2026-11-18. For
@@ -443,10 +483,13 @@ ambiguity, malformed data, repeated token, source drift or either ceiling ends
 the attempt immediately. No wait-and-retry, alternate feed, alternate client
 or credential fallback is allowed.
 
-Before any baseline backtest, ChatGPT must review and accept the exact acquisition
-evidence. After that review, the accepted pure B1 simulator may run zero-cost
-and conservative-cost baselines against flat and QQQ controls, reporting
-drawdown, whipsaw and turnover. Baseline execution makes no provider request.
+Before any baseline backtest, ChatGPT must review and accept the exact
+requalification result for the preserved `bb1a...` acquisition. The current
+source checkpoint carries no real requalification result, and no baseline
+starts automatically. After independent review, the accepted pure simulator
+may run zero-cost and conservative-cost baselines against flat and QQQ controls,
+reporting drawdown, whipsaw and turnover. Baseline execution makes no provider
+request.
 
 ### B2-A-C1 acceptance and integration
 
@@ -462,23 +505,22 @@ Robinhood, broker, order, production, baseline or FINAL_HOLDOUT effects.
 
 ### Review boundary
 
-The executable correction is complete and independently accepted. This
-docs-only closeout does not change the accepted C1 executable/test/workflow
-bytes. After the closeout is integrated and canonical feature/develop worktrees
-are caught up, ChatGPT may review one separately named fresh read-only
-acquisition successor. The consumed B2-B attempt cannot be resumed or retried.
-A docs/source/preflight PASS grants no credential or provider authority; future
-successful acquisition evidence remains
-READY_FOR_INDEPENDENT_B2_EVIDENCE_REVIEW until independently accepted. No
-Robinhood, broker, order, production, Q63 or FINAL_HOLDOUT action is authorized
-by B2-A-C1 or its closeout.
+The C1 executable correction and source certification remain independently
+accepted. The later acquisition completed, but its original downstream
+qualification failed; that attempt is consumed. The immediate safe boundary is
+independent acceptance of the broader source checkpoint, including offline
+requalification. Any separately produced offline output must be independently
+reviewed before a baseline. No baseline starts automatically. A docs/source/preflight
+PASS grants no credential or provider authority. No new provider request,
+Robinhood, broker, order, production, Q63 or FINAL_HOLDOUT action follows from
+this documentation update.
 
 ## Subsequent milestones
 
 After accepted/integrated 148-A:
 
 - 148-B1: source-only/fake-only 5-minute QQQ/TQQQ/SQQQ acquisition/custody and no-lookahead backtest contract, reusing existing evidence/holdout authority and selecting only an eligible pre-holdout range; no real provider call;
-- 148-B2: B2-A-C1 source correction, exact-source acceptance and integration are complete. Next review one separately named fresh read-only acquisition successor; run the deterministic baseline against flat/QQQ controls only after that future acquisition evidence is independently accepted. Existing daily-only research history is not sufficient evidence for these intraday rules;
+- 148-B2: the earlier `fd8aa...` page-limit incident and later `bb1a...` completed-but-unqualified acquisition remain separate immutable consumed attempts. The original dense B1 qualification is unchanged. Independently review the offline requalification source, then review its actual offline result; no baseline starts automatically and no provider retry is authorized;
 - 148-C: desktop/demo integration and GUI status/control path;
 - 148-D: current Robinhood read-only parity/preflight using the new complete
   runtime dependency closure;

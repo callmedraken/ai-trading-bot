@@ -34,10 +34,13 @@ from .models import (
     AdmissionBlocker,
     ApprovalRequestStatus,
     ApprovalRequiredReceipt,
+    BrokerOrderFact,
+    BrokerReviewFacts,
     BrokerSnapshot,
     CycleResult,
     CycleStatus,
     EffectProposal,
+    ExecutionProfile,
     IntentKind,
     IntentLifecycle,
     LogicalOrderIntent,
@@ -46,13 +49,24 @@ from .models import (
     MarketSnapshot,
     OrderState,
     OwnedPositionRecord,
+    PendingExit,
     PriceObservation,
+    ProtectiveStopCancelCandidate,
     ProviderApprovalFact,
     RuntimeState,
     RuntimeStateStore,
     SourceIdentity,
     TargetPosition,
     decimal_sum_equals,
+)
+from .order_tracker import (
+    OrderTrackerError,
+    OrderWriteAction,
+    OrderWriteReservation,
+    OrderWriteStatus,
+    TrackedOrder,
+    _fact_progresses,
+    apply_broker_order_facts,
 )
 from .strategy import (
     HardStopPolicy,
@@ -77,6 +91,7 @@ class CycleRequest:
     expected_state_revision: int
     market: MarketSnapshot
     broker: BrokerSnapshot
+    execution_profile: ExecutionProfile = ExecutionProfile.FRACTIONAL_RESEARCH_PAPER
 
     def __post_init__(self) -> None:
         if not isinstance(self.as_of, datetime) or self.as_of.tzinfo is None:
@@ -100,6 +115,41 @@ class CycleRequest:
             raise TypeError("market must be MarketSnapshot")
         if not isinstance(self.broker, BrokerSnapshot):
             raise TypeError("broker must be BrokerSnapshot")
+        if not isinstance(self.execution_profile, ExecutionProfile):
+            raise TypeError("execution_profile must be an ExecutionProfile")
+
+
+@dataclass(frozen=True, slots=True)
+class ReconciliationRequest:
+    """Bound broker facts for lifecycle reconciliation without market planning."""
+
+    as_of: datetime
+    owner_id: UUID
+    source_identity: SourceIdentity
+    session_fingerprint: str
+    expected_state_revision: int
+    broker: BrokerSnapshot
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.as_of, datetime) or self.as_of.tzinfo is None:
+            raise ValueError("as_of must be timezone-aware")
+        if not isinstance(self.owner_id, UUID):
+            raise TypeError("owner_id must be UUID")
+        if not isinstance(self.source_identity, SourceIdentity):
+            raise TypeError("source_identity must be SourceIdentity")
+        if (
+            not isinstance(self.session_fingerprint, str)
+            or not self.session_fingerprint
+        ):
+            raise ValueError("session_fingerprint must be nonblank")
+        if (
+            not isinstance(self.expected_state_revision, int)
+            or isinstance(self.expected_state_revision, bool)
+            or self.expected_state_revision < 0
+        ):
+            raise ValueError("expected_state_revision must be nonnegative")
+        if not isinstance(self.broker, BrokerSnapshot):
+            raise TypeError("broker must be BrokerSnapshot")
 
 
 class ReconciliationStatus(StrEnum):
@@ -120,6 +170,28 @@ class ReconciliationResult:
     status: ReconciliationStatus
     next_state: RuntimeState | None = None
     settled_exit: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ReconciliationOutcome:
+    """Exact reconciliation result; it contains no strategy or effect proposal."""
+
+    state: RuntimeState | None
+    blockers: tuple[AdmissionBlocker, ...]
+    settled_exit: bool
+    state_advanced: bool
+
+    def __post_init__(self) -> None:
+        if self.state is not None and not isinstance(self.state, RuntimeState):
+            raise TypeError("state must be RuntimeState or None")
+        if not isinstance(self.blockers, tuple) or not all(
+            isinstance(item, AdmissionBlocker) for item in self.blockers
+        ):
+            raise TypeError("blockers must be a tuple of AdmissionBlocker values")
+        if not isinstance(self.settled_exit, bool) or not isinstance(
+            self.state_advanced, bool
+        ):
+            raise TypeError("settlement and state_advanced must be bool")
 
 
 class CycleState(StrEnum):
@@ -153,6 +225,12 @@ class CycleApplicationService:
             session_authority or NYSEPublishedRegularSessionAuthority()
         )
         self._hard_stop = hard_stop or HardStopPolicy()
+
+    @property
+    def state_store(self) -> RuntimeStateStore:
+        """Return the injected CAS owner so composition can verify identity."""
+
+        return self._state_store
 
     def run_cycle(self, request: CycleRequest) -> CycleResult:
         """Return a sanitized status and optional proposal, with zero effects."""
@@ -245,6 +323,25 @@ class CycleApplicationService:
                 request.broker, state, owned_record, threshold, as_of
             )
             protective_stop_ready = coverage
+            if request.execution_profile is ExecutionProfile.PROTECTED_WHOLE_SHARE:
+                if owned_record.quantity != owned_record.quantity.to_integral_value(
+                    rounding=ROUND_DOWN
+                ):
+                    blockers.append(
+                        AdmissionBlocker.WHOLE_SHARE_STOP_AUTHORITY_REQUIRED
+                    )
+                facts = request.broker.tradability.get(symbol)
+                if (
+                    facts is None
+                    or facts.stop_market_supported is not True
+                    or facts.exact_stop_price_supported is not True
+                ):
+                    blockers.append(AdmissionBlocker.STOP_INCOMPATIBLE)
+                elif coverage and not _whole_share_stop_link_ready(
+                    request.broker, state, owned_record, as_of
+                ):
+                    blockers.append(AdmissionBlocker.STOP_CONFLICT)
+                blockers = _unique(blockers)
             if coverage_blocker is not None:
                 blockers.append(coverage_blocker)
                 blockers = _unique(blockers)
@@ -267,6 +364,12 @@ class CycleApplicationService:
                 mandatory_exit_reasons.append(AdmissionBlocker.REGIME_EXIT)
             if session.force_flat:
                 mandatory_exit_reasons.append(AdmissionBlocker.FORCED_FLAT)
+            if (
+                state is not None
+                and state.pending_exit is not None
+                and state.pending_exit.symbol == symbol
+            ):
+                mandatory_exit_reasons.extend(state.pending_exit.exit_reasons)
             mandatory_exit_reasons = _priority_exit_reasons(mandatory_exit_reasons)
             if mandatory_exit_reasons:
                 desired = TargetPosition.FLAT
@@ -299,7 +402,22 @@ class CycleApplicationService:
         proposal: EffectProposal | None = None
         selected_intent: LogicalOrderIntent | None = None
         risk_decision: RiskDecision | None = None
+        cancel_candidate: ProtectiveStopCancelCandidate | None = None
         if action is not None and state is not None:
+            if (
+                action is IntentKind.EXIT
+                and owned_record is not None
+                and mandatory_exit_reasons
+            ):
+                cancel_candidate = _protective_stop_cancel_candidate(
+                    state,
+                    request.broker,
+                    owned_record,
+                    mandatory_exit_reasons,
+                    held_price=held_price,
+                    as_of=as_of,
+                    session=session,
+                )
             action_blockers = _action_blockers(
                 action,
                 blockers,
@@ -330,7 +448,9 @@ class CycleApplicationService:
                     elif gate is not None:
                         action_blockers.append(gate)
                     else:
-                        persisted = self._persist_intent(state, selected_intent)
+                        persisted = self._persist_intent(
+                            state, selected_intent, request.broker.review
+                        )
                         if persisted:
                             proposal = EffectProposal(
                                 selected_intent,
@@ -355,9 +475,11 @@ class CycleApplicationService:
         else:
             cycle_state = CycleState.READY
         live_ready = (
-            actual is not None
+            request.execution_profile is ExecutionProfile.PROTECTED_WHOLE_SHARE
+            and actual is not None
             and actual is not TargetPosition.FLAT
             and protective_stop_ready
+            and _whole_share_stop_link_ready(request.broker, state, owned_record, as_of)
             and not blockers
             and not mandatory_exit_reasons
         )
@@ -373,8 +495,85 @@ class CycleApplicationService:
             protective_stop_ready=protective_stop_ready,
             live_ready=live_ready,
             state=cycle_state.value,
+            execution_profile=request.execution_profile,
         )
-        return CycleResult(signal, status, selected_intent, proposal)
+        return CycleResult(signal, status, selected_intent, proposal, cancel_candidate)
+
+    def reconcile_only(self, request: ReconciliationRequest) -> ReconciliationOutcome:
+        """Advance only exact durable facts; never analyze or propose a write."""
+
+        if not isinstance(request, ReconciliationRequest):
+            raise TypeError("request must be ReconciliationRequest")
+        as_of = request.as_of.astimezone(UTC)
+        blockers: list[AdmissionBlocker] = []
+        try:
+            state = self._state_store.load(request.owner_id, request.source_identity)
+        except Exception:
+            state = None
+            blockers.append(AdmissionBlocker.STATE_UNAVAILABLE)
+        if state is None or not isinstance(state, RuntimeState):
+            return ReconciliationOutcome(
+                None, (AdmissionBlocker.STATE_UNAVAILABLE,), False, False
+            )
+        if (
+            state.owner_id != request.owner_id
+            or state.source_identity != request.source_identity
+        ):
+            blockers.append(AdmissionBlocker.STATE_IDENTITY_MISMATCH)
+        elif state.revision != request.expected_state_revision:
+            blockers.append(AdmissionBlocker.STATE_CONFLICT)
+        elif state.session_fingerprint != request.session_fingerprint:
+            blockers.append(AdmissionBlocker.SESSION_IDENTITY_MISMATCH)
+        elif not _state_well_formed(state):
+            blockers.append(AdmissionBlocker.STATE_IDENTITY_MISMATCH)
+        broker = request.broker
+        if broker.source_identity != request.source_identity:
+            blockers.append(AdmissionBlocker.SOURCE_IDENTITY_MISMATCH)
+        if broker.session_fingerprint != request.session_fingerprint:
+            blockers.append(AdmissionBlocker.SESSION_IDENTITY_MISMATCH)
+        if broker.state_revision != request.expected_state_revision:
+            blockers.append(AdmissionBlocker.STATE_CONFLICT)
+        if broker.account.fingerprint != state.account_fingerprint:
+            blockers.append(AdmissionBlocker.ACCOUNT_IDENTITY_MISMATCH)
+        blockers.extend(_reconciliation_snapshot_blockers(broker, as_of))
+        blockers = _unique(blockers)
+        if blockers:
+            return ReconciliationOutcome(state, tuple(blockers), False, False)
+
+        state, reconcile_blockers, settled_exit, state_advanced = (
+            self._reconcile_pending(request, state, as_of)
+        )
+        blockers.extend(reconcile_blockers)
+        if state is None:
+            return ReconciliationOutcome(
+                None, tuple(_unique(blockers)), settled_exit, state_advanced
+            )
+        try:
+            observed = apply_broker_order_facts(state, broker.orders, as_of=as_of)
+        except OrderTrackerError:
+            blockers.append(AdmissionBlocker.UNKNOWN_INTENT)
+            return ReconciliationOutcome(
+                state, tuple(_unique(blockers)), settled_exit, state_advanced
+            )
+        if (
+            observed.tracked_orders != state.tracked_orders
+            or observed.write_reservations != state.write_reservations
+        ):
+            next_state = replace(observed, revision=state.revision + 1)
+            try:
+                persisted = self._state_store.compare_and_swap(
+                    state.revision, next_state
+                )
+            except Exception:
+                persisted = False
+            if persisted:
+                state = next_state
+                state_advanced = True
+            else:
+                blockers.append(AdmissionBlocker.STATE_CONFLICT)
+        return ReconciliationOutcome(
+            state, tuple(_unique(blockers)), settled_exit, state_advanced
+        )
 
     def _make_intent(
         self,
@@ -405,37 +604,59 @@ class CycleApplicationService:
                 return None, None, [AdmissionBlocker.BUYING_POWER_UNSAFE]
             with localcontext(_fixed_context()):
                 desired_quantity = cash_limit / price.price
-                proposal_id = uuid5(
-                    _RISK_NAMESPACE,
-                    "\n".join(
-                        (
-                            "arch148-risk-proposal/v1",
-                            request.owner_id.hex,
-                            request.source_identity.head,
-                            request.source_identity.tree,
-                            str(state.next_sequence),
-                            target_symbol.value,
-                            canonical_decimal(desired_quantity),
-                        )
-                    ),
+                if request.execution_profile is ExecutionProfile.PROTECTED_WHOLE_SHARE:
+                    desired_quantity = desired_quantity.to_integral_value(
+                        rounding=ROUND_DOWN
+                    )
+            if (
+                request.execution_profile is ExecutionProfile.PROTECTED_WHOLE_SHARE
+                and desired_quantity <= 0
+            ):
+                return (
+                    None,
+                    None,
+                    [AdmissionBlocker.WHOLE_SHARE_STOP_AUTHORITY_REQUIRED],
                 )
-                trade_proposal = TradeProposal(
-                    proposal_id,
-                    target_symbol,
-                    OrderSide.BUY,
-                    desired_quantity,
-                    as_of,
-                    "ARCH148_CONFIRMED_REGIME",
-                )
-                risk_decision = self._risk_manager.evaluate(
-                    trade_proposal,
-                    _risk_context(
-                        request.broker.account, request.broker.positions, price, as_of
-                    ),
-                )
+            proposal_id = uuid5(
+                _RISK_NAMESPACE,
+                "\n".join(
+                    (
+                        "arch148-risk-proposal/v1",
+                        request.owner_id.hex,
+                        request.source_identity.head,
+                        request.source_identity.tree,
+                        str(state.next_sequence),
+                        target_symbol.value,
+                        canonical_decimal(desired_quantity),
+                    )
+                ),
+            )
+            trade_proposal = TradeProposal(
+                proposal_id,
+                target_symbol,
+                OrderSide.BUY,
+                desired_quantity,
+                as_of,
+                "ARCH148_CONFIRMED_REGIME",
+            )
+            risk_decision = self._risk_manager.evaluate(
+                trade_proposal,
+                _risk_context(
+                    request.broker.account, request.broker.positions, price, as_of
+                ),
+            )
             if risk_decision.outcome is RiskOutcome.REJECTED:
                 return None, risk_decision, [AdmissionBlocker.RISK_REJECTED]
             quantity = risk_decision.approved_quantity
+            if (
+                request.execution_profile is ExecutionProfile.PROTECTED_WHOLE_SHARE
+                and quantity != quantity.to_integral_value(rounding=ROUND_DOWN)
+            ):
+                return (
+                    None,
+                    risk_decision,
+                    [AdmissionBlocker.WHOLE_SHARE_STOP_AUTHORITY_REQUIRED],
+                )
             with localcontext(_fixed_context()):
                 notional = quantity * price.price
             if notional > Decimal("10") or notional > cash_limit:
@@ -541,15 +762,64 @@ class CycleApplicationService:
         self,
         state: RuntimeState,
         intent: LogicalOrderIntent,
+        review: BrokerReviewFacts | None,
     ) -> bool:
+        if not isinstance(review, BrokerReviewFacts):
+            return False
+        if state.pending_exit is not None and (
+            intent.kind is not IntentKind.EXIT
+            or intent.symbol != state.pending_exit.symbol
+            or state.pending_exit.exit_intent_id not in (None, intent.intent_id)
+            or state.pending_exit.symbol not in state.positions
+            or state.positions[state.pending_exit.symbol].stop_intent_id is not None
+            or not any(
+                tracked.intent_id == state.pending_exit.stop_intent_id
+                and tracked.provider_order_id
+                == state.pending_exit.stop_provider_order_id
+                and tracked.last_fact is not None
+                and tracked.last_fact.state
+                in (OrderState.CANCELED, OrderState.REJECTED)
+                for tracked in state.tracked_orders
+            )
+        ):
+            return False
         existing = next(
             (item for item in state.intents if item.intent_id == intent.intent_id),
             None,
         )
         if existing is not None and existing == intent:
-            return True
+            current_review = next(
+                (
+                    item
+                    for item in state.proposal_reviews
+                    if item.ref_id == intent.ref_id
+                    and item.terms_digest == intent.terms_digest
+                ),
+                None,
+            )
+            if current_review == review:
+                return True
+            next_state = replace(
+                state,
+                revision=state.revision + 1,
+                proposal_reviews=tuple(
+                    item
+                    for item in state.proposal_reviews
+                    if item.ref_id != intent.ref_id
+                )
+                + (review,),
+            )
+            try:
+                return self._state_store.compare_and_swap(state.revision, next_state)
+            except Exception:
+                return False
         if existing is not None:
             return False
+        pending_exit = (
+            None
+            if state.pending_exit is None
+            else replace(state.pending_exit, exit_intent_id=intent.intent_id)
+        )
         retired = tuple(
             replace(item, lifecycle=IntentLifecycle.SUPERSEDED)
             if item.lifecycle is IntentLifecycle.PROPOSED
@@ -561,6 +831,11 @@ class CycleApplicationService:
             revision=state.revision + 1,
             next_sequence=state.next_sequence + 1,
             intents=retired + (intent,),
+            proposal_reviews=tuple(
+                item for item in state.proposal_reviews if item.ref_id != intent.ref_id
+            )
+            + (review,),
+            pending_exit=pending_exit,
         )
         try:
             return self._state_store.compare_and_swap(state.revision, next_state)
@@ -569,7 +844,7 @@ class CycleApplicationService:
 
     def _reconcile_pending(
         self,
-        request: CycleRequest,
+        request: CycleRequest | ReconciliationRequest,
         state: RuntimeState | None,
         as_of: datetime,
     ) -> tuple[RuntimeState | None, list[AdmissionBlocker], bool, bool]:
@@ -710,7 +985,11 @@ def reconcile_order_intent(
         )
     ):
         return ReconciliationResult(ReconciliationStatus.IDENTITY_MISMATCH_BLOCKED)
-    matches = tuple(order for order in broker.orders if order.ref_id == intent.ref_id)
+    matches = tuple(
+        order
+        for order in broker.orders
+        if _order_is_bound_to_intent(state, intent, order)
+    )
     if not matches:
         return ReconciliationResult(ReconciliationStatus.NO_MATCH_BLOCKED)
     if len(matches) != 1:
@@ -734,6 +1013,21 @@ def reconcile_order_intent(
             order.requested_quantity,
         )
         or not _fresh(order.observed_at, as_of, _MAX_FACT_AGE)
+    ):
+        return ReconciliationResult(ReconciliationStatus.FACT_MISMATCH_BLOCKED)
+    tracked_order = next(
+        (item for item in state.tracked_orders if item.intent_id == intent.intent_id),
+        None,
+    )
+    if tracked_order is not None and (
+        tracked_order.provider_order_id not in (None, order.provider_order_id)
+        or (
+            tracked_order.last_fact is not None
+            and not _same_cancel_order_fact(
+                tracked_order.last_fact, order, intent, state
+            )
+            and not _fact_progresses(tracked_order.last_fact, order)
+        )
     ):
         return ReconciliationResult(ReconciliationStatus.FACT_MISMATCH_BLOCKED)
     if order.state is OrderState.PARTIALLY_FILLED:
@@ -805,6 +1099,16 @@ def reconcile_order_intent(
         revision=state.revision + 1,
         intents=intents,
         positions=positions,
+        tracked_orders=_record_reconciled_order_fact(state, intent, order),
+        write_reservations=_terminalize_order_reservations(
+            state, intent, order.provider_order_id
+        ),
+        pending_exit=(
+            None
+            if state.pending_exit is not None
+            and state.pending_exit.exit_intent_id == intent.intent_id
+            else state.pending_exit
+        ),
     )
     return ReconciliationResult(result_status, next_state, settled_exit)
 
@@ -932,6 +1236,33 @@ def _snapshot_blockers(
     return _unique(blockers)
 
 
+def _reconciliation_snapshot_blockers(
+    broker: BrokerSnapshot, as_of: datetime
+) -> list[AdmissionBlocker]:
+    """Validate read facts needed for settlement without market-data gates."""
+
+    blockers: list[AdmissionBlocker] = []
+    if not _fresh(broker.observed_at, as_of, _MAX_FACT_AGE) or not _fresh(
+        broker.account.observed_at, as_of, _MAX_FACT_AGE
+    ):
+        blockers.append(AdmissionBlocker.BROKER_SNAPSHOT_STALE)
+    if any(
+        scope.account_fingerprint != broker.account.fingerprint
+        or not scope.all_agents
+        or not scope.exhausted
+        or scope.symbols not in (None, (TQQQ, SQQQ))
+        or not _fresh(scope.observed_at, as_of, _MAX_FACT_AGE)
+        for scope in (broker.position_scope, broker.order_scope)
+    ):
+        blockers.append(AdmissionBlocker.BROKER_SCOPE_INCOMPLETE)
+    if any(
+        order.account_fingerprint != broker.account.fingerprint
+        for order in broker.orders
+    ):
+        blockers.append(AdmissionBlocker.BROKER_SCOPE_INCOMPLETE)
+    return _unique(blockers)
+
+
 def _market_blockers(quality: MarketQuality) -> list[AdmissionBlocker]:
     mapping = {
         MarketQuality.READY: None,
@@ -952,6 +1283,20 @@ def _state_blockers(state: RuntimeState) -> list[AdmissionBlocker]:
         for intent in state.intents
     ):
         return [AdmissionBlocker.APPROVAL_PENDING]
+    if state.pending_exit is not None and state.pending_exit.exit_intent_id is not None:
+        pending_exit = next(
+            (
+                item
+                for item in state.intents
+                if item.intent_id == state.pending_exit.exit_intent_id
+            ),
+            None,
+        )
+        if (
+            pending_exit is not None
+            and pending_exit.lifecycle is IntentLifecycle.REJECTED
+        ):
+            return [AdmissionBlocker.UNKNOWN_INTENT]
     if any(
         intent.lifecycle in (IntentLifecycle.MAY_HAVE_OCCURRED, IntentLifecycle.UNKNOWN)
         for intent in state.intents
@@ -961,7 +1306,7 @@ def _state_blockers(state: RuntimeState) -> list[AdmissionBlocker]:
 
 
 def _reconcile_approval_request(
-    request: CycleRequest,
+    request: CycleRequest | ReconciliationRequest,
     state: RuntimeState,
     as_of: datetime,
 ) -> tuple[RuntimeState | None, AdmissionBlocker | None]:
@@ -1044,7 +1389,7 @@ def _reconcile_approval_request(
 
 
 def _reconcile_open_protective_stop(
-    request: CycleRequest,
+    request: CycleRequest | ReconciliationRequest,
     state: RuntimeState,
     as_of: datetime,
 ) -> tuple[RuntimeState | None, AdmissionBlocker | None]:
@@ -1106,7 +1451,7 @@ def _reconcile_open_protective_stop(
         for intent in state.intents
         if intent.kind is IntentKind.PROTECTIVE_STOP
         and intent.symbol == symbol
-        and intent.ref_id == order.ref_id
+        and _order_is_bound_to_stop(state, intent, order)
         and intent.lifecycle
         in (
             IntentLifecycle.MAY_HAVE_OCCURRED,
@@ -1137,7 +1482,7 @@ def _reconcile_open_protective_stop(
     if (
         intent.owner_id != state.owner_id
         or intent.source_identity != state.source_identity
-        or intent.ref_id != order.ref_id
+        or order.ref_id not in (None, intent.ref_id)
         or intent.quantity != order.requested_quantity
         or intent.stop_price != threshold
         or order.account_fingerprint != state.account_fingerprint
@@ -1183,8 +1528,96 @@ def _reconcile_open_protective_stop(
     )
 
 
+def _order_is_bound_to_stop(
+    state: RuntimeState,
+    intent: LogicalOrderIntent,
+    order: BrokerOrderFact,
+) -> bool:
+    return intent.kind is IntentKind.PROTECTIVE_STOP and _order_is_bound_to_intent(
+        state, intent, order
+    )
+
+
+def _order_is_bound_to_intent(
+    state: RuntimeState,
+    intent: LogicalOrderIntent,
+    order: BrokerOrderFact,
+) -> bool:
+    tracked = next(
+        (item for item in state.tracked_orders if item.intent_id == intent.intent_id),
+        None,
+    )
+    if (
+        order.source_identity not in (None, state.source_identity)
+        or order.intent_id not in (None, intent.intent_id)
+        or order.ref_id not in (None, intent.ref_id)
+        or (
+            tracked is not None
+            and tracked.provider_order_id is not None
+            and tracked.provider_order_id != order.provider_order_id
+        )
+    ):
+        return False
+    if order.ref_id == intent.ref_id:
+        return True
+    return (
+        order.ref_id is None
+        and tracked is not None
+        and tracked.provider_order_id == order.provider_order_id
+    )
+
+
+def _record_reconciled_order_fact(
+    state: RuntimeState,
+    intent: LogicalOrderIntent,
+    fact: BrokerOrderFact,
+) -> tuple[TrackedOrder, ...]:
+    tracked = next(
+        (item for item in state.tracked_orders if item.intent_id == intent.intent_id),
+        None,
+    )
+    if tracked is None:
+        return state.tracked_orders + (
+            TrackedOrder(
+                intent_id=intent.intent_id,
+                ref_id=intent.ref_id,
+                provider_order_id=fact.provider_order_id,
+                last_fact=fact,
+            ),
+        )
+    updated = replace(
+        tracked,
+        provider_order_id=fact.provider_order_id,
+        last_fact=fact,
+    )
+    return tuple(
+        updated if item.intent_id == intent.intent_id else item
+        for item in state.tracked_orders
+    )
+
+
+def _terminalize_order_reservations(
+    state: RuntimeState,
+    intent: LogicalOrderIntent,
+    provider_order_id: str,
+) -> tuple[OrderWriteReservation, ...]:
+    return tuple(
+        replace(item, status=OrderWriteStatus.TERMINAL)
+        if (
+            item.action is OrderWriteAction.PLACE
+            and item.intent_id == intent.intent_id
+            or item.action is OrderWriteAction.CANCEL
+            and item.intent_id == intent.intent_id
+            and item.target_provider_order_id == provider_order_id
+        )
+        and item.status is not OrderWriteStatus.TERMINAL
+        else item
+        for item in state.write_reservations
+    )
+
+
 def _reconcile_terminal_stopped_order(
-    request: CycleRequest,
+    request: CycleRequest | ReconciliationRequest,
     state: RuntimeState,
     as_of: datetime,
 ) -> tuple[RuntimeState | None, AdmissionBlocker | None]:
@@ -1223,7 +1656,9 @@ def _reconcile_terminal_stopped_order(
     if intent is None or intent.lifecycle is not IntentLifecycle.RECONCILED:
         return None, None
     matches = tuple(
-        order for order in request.broker.orders if order.ref_id == intent.ref_id
+        order
+        for order in request.broker.orders
+        if _order_is_bound_to_stop(state, intent, order)
     )
     if not matches:
         return None, None
@@ -1267,17 +1702,45 @@ def _reconcile_terminal_stopped_order(
         or not _fresh(order.observed_at, as_of, _MAX_FACT_AGE)
     ):
         return None, AdmissionBlocker.STOP_CONFLICT
+    tracks = tuple(
+        item for item in state.tracked_orders if item.intent_id == intent.intent_id
+    )
+    if state.pending_exit is not None and (
+        len(tracks) != 1 or tracks[0].provider_order_id != order.provider_order_id
+    ):
+        return None, AdmissionBlocker.STOP_CONFLICT
+    next_tracks = state.tracked_orders
+    if tracks:
+        tracked = tracks[0]
+        if tracked.provider_order_id != order.provider_order_id or (
+            tracked.last_fact is not None
+            and not _same_cancel_order_fact(tracked.last_fact, order, intent, state)
+            and not _fact_progresses(tracked.last_fact, order)
+        ):
+            return None, AdmissionBlocker.STOP_CONFLICT
+        if tracked.last_fact != order:
+            next_tracks = tuple(
+                replace(item, last_fact=order)
+                if item.intent_id == intent.intent_id
+                else item
+                for item in state.tracked_orders
+            )
+    next_reservations = _terminalize_order_reservations(
+        state, intent, order.provider_order_id
+    )
     return replace(
         state,
         revision=state.revision + 1,
         positions={
             symbol: replace(record, quantity=position.quantity, stop_intent_id=None)
         },
+        tracked_orders=next_tracks,
+        write_reservations=next_reservations,
     ), None
 
 
 def _reconcile_filled_protective_stop(
-    request: CycleRequest,
+    request: CycleRequest | ReconciliationRequest,
     state: RuntimeState,
     as_of: datetime,
 ) -> tuple[RuntimeState | None, AdmissionBlocker | None]:
@@ -1316,7 +1779,9 @@ def _reconcile_filled_protective_stop(
     if intent is None or intent.lifecycle is not IntentLifecycle.RECONCILED:
         return None, None
     matches = tuple(
-        order for order in request.broker.orders if order.ref_id == intent.ref_id
+        order
+        for order in request.broker.orders
+        if _order_is_bound_to_stop(state, intent, order)
     )
     if not matches:
         return None, None
@@ -1353,10 +1818,32 @@ def _reconcile_filled_protective_stop(
         or not _fresh(order.observed_at, as_of, _MAX_FACT_AGE)
     ):
         return None, AdmissionBlocker.STOP_CONFLICT
+    stop_track = next(
+        (item for item in state.tracked_orders if item.intent_id == intent.intent_id),
+        None,
+    )
+    if state.pending_exit is not None and (
+        stop_track is None or stop_track.provider_order_id != order.provider_order_id
+    ):
+        return None, AdmissionBlocker.STOP_CONFLICT
+    updated_intents = tuple(
+        replace(item, lifecycle=IntentLifecycle.SUPERSEDED)
+        if state.pending_exit is not None
+        and item.intent_id == state.pending_exit.exit_intent_id
+        and item.lifecycle is IntentLifecycle.PROPOSED
+        else item
+        for item in state.intents
+    )
     return replace(
         state,
         revision=state.revision + 1,
         positions={},
+        intents=updated_intents,
+        tracked_orders=_record_reconciled_order_fact(state, intent, order),
+        write_reservations=_terminalize_order_reservations(
+            state, intent, order.provider_order_id
+        ),
+        pending_exit=None,
     ), None
 
 
@@ -1371,6 +1858,13 @@ def _state_well_formed(state: RuntimeState) -> bool:
             or not isinstance(state.positions, Mapping)
             or not isinstance(state.intents, tuple)
             or not isinstance(state.approval_receipts, tuple)
+            or not isinstance(state.proposal_reviews, tuple)
+            or not isinstance(state.tracked_orders, tuple)
+            or not isinstance(state.write_reservations, tuple)
+            or (
+                state.pending_exit is not None
+                and not isinstance(state.pending_exit, PendingExit)
+            )
             or not isinstance(state.revision, int)
             or isinstance(state.revision, bool)
             or state.revision < 0
@@ -1404,6 +1898,15 @@ def _state_well_formed(state: RuntimeState) -> bool:
         if any(
             not isinstance(receipt, ApprovalRequiredReceipt)
             for receipt in state.approval_receipts
+        ):
+            return False
+        from .order_tracker import OrderWriteReservation, TrackedOrder
+
+        if any(
+            not isinstance(item, TrackedOrder) for item in state.tracked_orders
+        ) or any(
+            not isinstance(item, OrderWriteReservation)
+            for item in state.write_reservations
         ):
             return False
         if (
@@ -1480,13 +1983,72 @@ def _state_well_formed(state: RuntimeState) -> bool:
             intent = intent_by_id.get(receipt.intent_id)
             if (
                 intent is None
-                or intent.lifecycle is not IntentLifecycle.APPROVAL_REQUIRED
+                or intent.lifecycle
+                not in (
+                    IntentLifecycle.APPROVAL_REQUIRED,
+                    IntentLifecycle.MAY_HAVE_OCCURRED,
+                    IntentLifecycle.UNKNOWN,
+                    IntentLifecycle.RECONCILED,
+                )
                 or receipt.ref_id != intent.ref_id
                 or receipt.terms_digest != intent.terms_digest
                 or receipt.account_fingerprint != state.account_fingerprint
                 or receipt.source_identity != state.source_identity
                 or receipt.session_fingerprint != state.session_fingerprint
                 or receipt.state_revision > state.revision
+            ):
+                return False
+        for review in state.proposal_reviews:
+            matches = tuple(
+                intent
+                for intent in state.intents
+                if intent.ref_id == review.ref_id
+                and intent.terms_digest == review.terms_digest
+            )
+            if (
+                len(matches) != 1
+                or review.source_identity != state.source_identity
+                or review.account_fingerprint != state.account_fingerprint
+                or review.session_fingerprint != state.session_fingerprint
+                or review.state_revision >= state.revision
+            ):
+                return False
+        tracked_by_id = {item.intent_id: item for item in state.tracked_orders}
+        if len(tracked_by_id) != len(state.tracked_orders):
+            return False
+        for tracked in state.tracked_orders:
+            intent = intent_by_id.get(tracked.intent_id)
+            fact = tracked.last_fact
+            if (
+                intent is None
+                or tracked.ref_id != intent.ref_id
+                or (
+                    fact is not None
+                    and (
+                        fact.account_fingerprint != state.account_fingerprint
+                        or fact.source_identity not in (None, state.source_identity)
+                        or fact.intent_id not in (None, intent.intent_id)
+                        or fact.ref_id not in (None, intent.ref_id)
+                        or fact.kind is not intent.kind
+                        or fact.symbol != intent.symbol
+                        or fact.side is not intent.side
+                        or fact.requested_quantity != intent.quantity
+                        or fact.stop_price != intent.stop_price
+                    )
+                )
+            ):
+                return False
+        for reservation in state.write_reservations:
+            intent = intent_by_id.get(reservation.intent_id)
+            if (
+                intent is None
+                or reservation.ref_id != intent.ref_id
+                or reservation.terms_digest != intent.terms_digest
+                or reservation.owner_id != state.owner_id
+                or reservation.source_identity != state.source_identity
+                or reservation.account_fingerprint != state.account_fingerprint
+                or reservation.session_fingerprint != state.session_fingerprint
+                or reservation.reserved_revision > state.revision
             ):
                 return False
         return True
@@ -1656,7 +2218,7 @@ def _stop_coverage(
             and order.source_identity != state.source_identity
         )
         or (order.intent_id is not None and order.intent_id != stop_intent.intent_id)
-        or order.ref_id != stop_intent.ref_id
+        or not _order_is_bound_to_stop(state, stop_intent, order)
         or order.side is not OrderSide.SELL
         or order.kind is not IntentKind.PROTECTIVE_STOP
         or order.stop_price != threshold
@@ -1675,6 +2237,268 @@ def _stop_coverage(
     if order.state is not OrderState.OPEN:
         return False, AdmissionBlocker.STOP_CONFLICT
     return True, None
+
+
+def validate_protective_stop_cancel_candidate(
+    candidate: ProtectiveStopCancelCandidate,
+    state: RuntimeState,
+    broker: BrokerSnapshot,
+    *,
+    as_of: datetime,
+    session_authority: NYSEPublishedRegularSessionAuthority | None = None,
+) -> bool:
+    """Revalidate an exact cancellation decision against refreshed factual rows."""
+
+    if not isinstance(candidate, ProtectiveStopCancelCandidate):
+        return False
+    if not isinstance(state, RuntimeState) or not isinstance(broker, BrokerSnapshot):
+        return False
+    if not isinstance(as_of, datetime) or as_of.tzinfo is None:
+        return False
+    normalized = as_of.astimezone(UTC)
+    session = session_decision(normalized, authority=session_authority)
+    refreshed = _protective_stop_cancel_candidate(
+        state,
+        broker,
+        state.positions.get(candidate.fact.symbol),
+        candidate.exit_reasons,
+        held_price=candidate.held_price,
+        as_of=normalized,
+        session=session,
+    )
+    intent = next(
+        (item for item in state.intents if item.intent_id == candidate.intent_id),
+        None,
+    )
+    return (
+        refreshed is not None
+        and intent is not None
+        and candidate.intent_id == refreshed.intent_id
+        and candidate.ref_id == refreshed.ref_id
+        and candidate.provider_order_id == refreshed.provider_order_id
+        and candidate.terms_digest == refreshed.terms_digest
+        and candidate.held_price == refreshed.held_price
+        and candidate.expected_state_revision == refreshed.expected_state_revision
+        and candidate.exit_reasons == refreshed.exit_reasons
+        and _same_cancel_order_fact(candidate.fact, refreshed.fact, intent, state)
+    )
+
+
+def _protective_stop_cancel_candidate(
+    state: RuntimeState,
+    broker: BrokerSnapshot,
+    record: OwnedPositionRecord | None,
+    exit_reasons: list[AdmissionBlocker] | tuple[AdmissionBlocker, ...],
+    *,
+    held_price: PriceObservation | None,
+    as_of: datetime,
+    session: SessionDecision,
+) -> ProtectiveStopCancelCandidate | None:
+    allowed_reasons = _priority_exit_reasons(list(exit_reasons))
+    if (
+        not allowed_reasons
+        or not isinstance(state, RuntimeState)
+        or record is None
+        or state.pending_exit is not None
+        or not _state_well_formed(state)
+        or held_price is None
+        or held_price.symbol != record.symbol
+        or not _fresh(held_price.observed_at, as_of, _MAX_PRICE_AGE)
+        or not broker.account.active
+        or not broker.account.agentic_allowed
+        or state.account_fingerprint != broker.account.fingerprint
+        or state.source_identity != broker.source_identity
+        or state.session_fingerprint != broker.session_fingerprint
+        or state.revision != broker.state_revision
+        or not _reconciliation_snapshot_blockers(broker, as_of) == []
+        or session.reason
+        not in (
+            SessionReason.ENTRY_OPEN,
+            SessionReason.OPENING_EXCLUSION,
+            SessionReason.CLOSING_EXCLUSION,
+            SessionReason.FORCED_FLAT,
+        )
+        or len(state.positions) != 1
+    ):
+        return None
+    symbol = record.symbol
+    if state.positions.get(symbol) != record or record.stop_intent_id is None:
+        return None
+    intent = next(
+        (item for item in state.intents if item.intent_id == record.stop_intent_id),
+        None,
+    )
+    tracked = next(
+        (
+            item
+            for item in state.tracked_orders
+            if item.intent_id == record.stop_intent_id
+        ),
+        None,
+    )
+    if (
+        intent is None
+        or tracked is None
+        or intent.kind is not IntentKind.PROTECTIVE_STOP
+        or intent.lifecycle is not IntentLifecycle.RECONCILED
+        or intent.symbol != symbol
+        or intent.side is not OrderSide.SELL
+        or intent.stop_price
+        != HardStopPolicy().threshold(record.average_entry_fill, record.hard_stop_price)
+        or tracked.provider_order_id is None
+        or tracked.last_fact is None
+        or any(
+            reservation.action is OrderWriteAction.CANCEL
+            and reservation.target_provider_order_id == tracked.provider_order_id
+            for reservation in state.write_reservations
+        )
+    ):
+        return None
+    position = broker.positions.get(symbol)
+    if (
+        position is None
+        or position.quantity != record.quantity
+        or position.average_cost != record.average_entry_fill
+        or broker.position_owners.get(symbol) != record.entry_intent_id
+        or any(held in broker.positions for held in TRADED_SYMBOLS if held != symbol)
+    ):
+        return None
+    facts = tuple(
+        item
+        for item in broker.orders
+        if item.provider_order_id == tracked.provider_order_id
+    )
+    if len(facts) != 1:
+        return None
+    fact = facts[0]
+    threshold = HardStopPolicy().threshold(
+        record.average_entry_fill, record.hard_stop_price
+    )
+    if (
+        fact.account_fingerprint != state.account_fingerprint
+        or fact.source_identity not in (None, state.source_identity)
+        or fact.intent_id not in (None, intent.intent_id)
+        or fact.ref_id not in (None, intent.ref_id)
+        or fact.kind is not IntentKind.PROTECTIVE_STOP
+        or fact.symbol != symbol
+        or fact.side is not OrderSide.SELL
+        or fact.state not in (OrderState.OPEN, OrderState.PARTIALLY_FILLED)
+        or fact.requested_quantity != intent.quantity
+        or fact.stop_price != threshold
+        or fact.remaining_quantity != position.quantity
+        or not decimal_sum_equals(
+            fact.filled_quantity, fact.remaining_quantity, fact.requested_quantity
+        )
+        or not _fresh(fact.observed_at, as_of, _MAX_FACT_AGE)
+        or not _same_cancel_order_fact(tracked.last_fact, fact, intent, state)
+        or any(
+            order.symbol in TRADED_SYMBOLS
+            and not order.state.terminal
+            and order.provider_order_id != fact.provider_order_id
+            for order in broker.orders
+        )
+    ):
+        return None
+    return ProtectiveStopCancelCandidate(
+        intent_id=intent.intent_id,
+        ref_id=intent.ref_id,
+        provider_order_id=fact.provider_order_id,
+        terms_digest=intent.terms_digest,
+        fact=fact,
+        held_price=held_price,
+        expected_state_revision=state.revision,
+        exit_reasons=tuple(allowed_reasons),
+    )
+
+
+def _whole_share_stop_link_ready(
+    broker: BrokerSnapshot,
+    state: RuntimeState | None,
+    record: OwnedPositionRecord | None,
+    as_of: datetime,
+) -> bool:
+    if (
+        state is None
+        or record is None
+        or record.quantity != record.quantity.to_integral_value(rounding=ROUND_DOWN)
+        or record.stop_intent_id is None
+    ):
+        return False
+    intent = next(
+        (item for item in state.intents if item.intent_id == record.stop_intent_id),
+        None,
+    )
+    tracked = next(
+        (
+            item
+            for item in state.tracked_orders
+            if item.intent_id == record.stop_intent_id
+        ),
+        None,
+    )
+    if (
+        intent is None
+        or tracked is None
+        or tracked.provider_order_id is None
+        or tracked.last_fact is None
+        or intent.kind is not IntentKind.PROTECTIVE_STOP
+        or intent.lifecycle is not IntentLifecycle.RECONCILED
+        or intent.symbol != record.symbol
+        or intent.side is not OrderSide.SELL
+    ):
+        return False
+    facts = tuple(
+        fact
+        for fact in broker.orders
+        if fact.provider_order_id == tracked.provider_order_id
+    )
+    if len(facts) != 1:
+        return False
+    fact = facts[0]
+    return (
+        fact.state is OrderState.OPEN
+        and fact.account_fingerprint == state.account_fingerprint
+        and fact.source_identity in (None, state.source_identity)
+        and fact.intent_id in (None, intent.intent_id)
+        and fact.ref_id in (None, intent.ref_id)
+        and fact.kind is IntentKind.PROTECTIVE_STOP
+        and fact.symbol == record.symbol
+        and fact.side is OrderSide.SELL
+        and fact.requested_quantity == intent.quantity
+        and fact.remaining_quantity == record.quantity
+        and fact.stop_price == intent.stop_price
+        and _same_cancel_order_fact(tracked.last_fact, fact, intent, state)
+        and _fresh(fact.observed_at, as_of, _MAX_FACT_AGE)
+    )
+
+
+def _same_cancel_order_fact(
+    previous: BrokerOrderFact | None,
+    current: BrokerOrderFact,
+    intent: LogicalOrderIntent,
+    state: RuntimeState,
+) -> bool:
+    if previous is None:
+        return False
+    for fact in (previous, current):
+        if (
+            fact.provider_order_id != current.provider_order_id
+            or fact.account_fingerprint != state.account_fingerprint
+            or fact.source_identity not in (None, state.source_identity)
+            or fact.intent_id not in (None, intent.intent_id)
+            or fact.ref_id not in (None, intent.ref_id)
+        ):
+            return False
+    return (
+        replace(
+            previous,
+            observed_at=current.observed_at,
+            source_identity=current.source_identity,
+            intent_id=current.intent_id,
+            ref_id=current.ref_id,
+        )
+        == current
+    )
 
 
 def _action_blockers(

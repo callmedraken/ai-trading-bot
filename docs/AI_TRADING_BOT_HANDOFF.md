@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148 late-session intraday-momentum research design frozen; implementation pending
+## Current milestone: AI Strategy Discovery Campaign v1 design frozen; Generation 0 evidence mining next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -134,7 +134,18 @@ The offline requalification source at
 provider retry is authorized. The fixed Architecture 148 churn comparison in
 [`arch148-churn-research.md`](validation/arch148-churn-research.md) is now
 accepted/integrated with the exact evidence recorded above. It rejects all four
-tested variants economically and selects none. The next research boundary is frozen in
+tested variants economically and selects none. The active research boundary is now frozen in
+[`ai-strategy-discovery-campaign-v1.md`](validation/ai-strategy-discovery-campaign-v1.md).
+Generation 0 mines already accepted research evidence only; it must not run new
+market-data acquisition, provider calls, production operations or `FINAL_HOLDOUT`.
+The AI research role is hypothesis generation, evidence synthesis and failure
+diagnosis. Deterministic repository engines remain the only authority for
+backtests, fills, costs, ranking, walk-forward evidence and candidate lifecycle.
+Every evaluated candidate, including rejected/failed/zero-trade candidates, must
+be retained in the campaign trial ledger. The previously frozen late-session
+momentum candidate remains queued rather than discarded.
+
+The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).
 It tests one OPEN-only late-session intraday-momentum architecture: QQQ's
 first-half-hour return from the previous regular-session close fixes the

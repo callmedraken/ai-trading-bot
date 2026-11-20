@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148 late-session intraday-momentum research design frozen; implementation pending
+## Current milestone - AI Strategy Discovery Campaign v1 design frozen; Generation 0 evidence mining next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -102,7 +102,20 @@ recorded credential/network/provider/Robinhood/broker/order/production effects
 were zero. Live promotion still requires a viable strategy plus the existing
 provider-scope, whole-share stop, approval-linkage and risk/notional blockers.
 
-The next OPEN-only research design is now frozen in
+The active research roadmap has pivoted to the
+[AI Strategy Discovery Campaign v1](validation/ai-strategy-discovery-campaign-v1.md).
+The existing Architecture 148 late-session intraday-momentum design remains a
+frozen queued hypothesis; it is not deleted or reinterpreted, but its executable
+implementation is paused while the broader AI campaign mines accepted evidence
+and searches multiple strategy families. Generation 0 is evidence-only and
+performs no new backtest, provider call, model-driven trade, broker effect or
+`FINAL_HOLDOUT` access. AI may propose and diagnose research hypotheses, while
+repository-owned deterministic engines remain authoritative for data, execution,
+costs, ranking, walk-forward evidence and lifecycle transitions. Every evaluated
+candidate must enter the search ledger, including failures, so later selection
+can account for search breadth instead of reporting only winners.
+
+The previously frozen OPEN-only design remains in
 [Architecture 148 late-session intraday momentum research](validation/arch148-intraday-momentum-research.md).
 It is a materially different entry/holding architecture, not another churn
 threshold: QQQ's first-half-hour return from the previous regular-session

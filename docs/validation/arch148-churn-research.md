@@ -1,25 +1,28 @@
-# Architecture 148 churn research proposal
+# Architecture 148 churn research — accepted OPEN result
 
 ## Status and authority
 
-This document defines a source-only, descriptive OPEN research proposal for
-Architecture 148. It does not report a churn evaluation, validate a strategy,
-select a variant, or grant provider, broker, production, or live-trading
-authority. The four variants and two existing cost cases are fixed before any
-evaluation. Any later OPEN result must be produced as separate, immutable
-evidence from the exact committed source and reviewed independently before it
-can be described as an observed result. `FINAL_HOLDOUT` remains sealed.
+This document records the accepted source-only descriptive OPEN churn study for
+Architecture 148. It does not validate a live strategy, select a variant, or
+grant provider, broker, production, or live-trading authority. The four
+variants and two cost cases were frozen before evaluation; the accepted result
+selects none and leaves `FINAL_HOLDOUT` sealed.
 
-The proposal is on `feature/research-arch148-churn`, based on
-`0e82457d71e584dc526b5e377d7f90867e515879` / tree
-`7981d889617f1a4bcb41b1e314ea04d14c659e0a`. The checkpoint route is
-`arch148-churn-research`; it is source-only, has no preflight or execution
-dispatch, and maps to one GitHub-owned FULL certification run. The route does
-not run the OPEN evaluation.
+Source/certification/evidence are independently accepted and fast-forward
+integrated at `be30617594e197f372438dba19d325fd8737b850` / tree
+`57d5e80bd1933d59faf5da07f0ea293eac34b323`, parent
+`0e82457d71e584dc526b5e377d7f90867e515879`. Feature mapped FULL run
+`44695628477`, attempt 1, and develop run `44698088183`, attempt 1, are
+terminal SUCCESS; develop reused the already-certified source and did not
+duplicate FULL. Accepted research evidence is
+`F:\AI\temp\arch148-churn-research-731f1ee4-53a1-4bdf-8979-5eef493d9f4a\research.json`,
+299,259 bytes, identity `19dcca18-7080-541d-9864-d730c68471e0`, SHA-256
+`5baa7ef9e035f72428c623c798fb9653aa43339027c03e8e417d16c52e08aca8`.
+All nine effect counters are zero, including `final_holdout_accesses=0`.
 
 ## Accepted input and baseline
 
-The proposal uses the already accepted immutable sparse offline requalification
+The study used the already accepted immutable sparse offline requalification
 of B2 acquisition `bb1a784b-98d1-41fd-8d95-aa9fa463d5c9`. Its evidence is
 `F:\AI\temp\arch148-b2-offline-requalification-b9a8babd-4869-466d-a81f-fae08fe2aae5\evidence.json`,
 SHA-256
@@ -29,17 +32,26 @@ dataset `0308b694-c718-5b1a-a51c-9fcc4516bb81`, SHA-256
 custody `dbcced6a-b4cc-5d36-a33b-5e6df3d82baa`, SHA-256
 `93db9a9163cf445fdfd61abe68559196d240b09c1c9b70cdc0f7f452e3e8708b`. The
 original dense B1 qualification remains unchanged and failed; neither that
-failure nor this sparse proposal authorizes another provider acquisition.
+failure nor this sparse study authorizes another provider acquisition.
 
 The accepted OPEN sparse baseline record is
 `F:\AI\temp\arch148-open-sparse-baseline-e3e27c29-8a9d-41c5-9ac0-d89a1d4cb5d1\baseline.json`,
 SHA-256 `38cbba9beae664c675670af1ad96e86a56df2a9060c6cb924c1ad51ea4f9b85f`.
 Its recorded comparison is 6,233 `ZERO_COST` trades and 6,235
 `CONSERVATIVE_10_BPS` trades, with 5,446 and 5,439 regime exits respectively;
-the conservative return is `-99.998648%`. The existing economics are rejected.
-These are baseline facts only, not churn-variant results or live-readiness
-evidence. Preserve the baseline, B2 acquisition, and requalification artifacts
-without overwrite or reinterpretation.
+the conservative return is `-99.998648%`. CONTROL reproduced these accepted
+baseline facts before candidate evaluation.
+
+Observed candidate results show that opposite confirmation reduced
+`CONSERVATIVE_10_BPS` trade count from 6,235 to 3,172, with the 15-minute and
+30-minute cooldown variants reducing it further to 3,067 and 2,970. That churn
+reduction did not rescue economics: full-OPEN conservative returns were
+approximately `-99.5971%`, `-99.5245%` and `-99.4027%` respectively, and
+every variant lost money in every 2016-2023 calendar-year conservative slice.
+The descriptive order was 30-minute cooldown, 15-minute cooldown, opposite
+confirmation, CONTROL; it is not a promotion decision. Preserve the baseline,
+B2 acquisition, requalification and churn evidence without overwrite or
+reinterpretation.
 
 ## Fixed research design
 
@@ -117,7 +129,7 @@ below five minutes unavailable.
 The canonical Architecture 148 source/runtime/public-reference adoption matrix
 is [`arch148-runtime-parity.md`](arch148-runtime-parity.md). It records the
 exact pins, licenses, reviewed functions, local owners/tests, and adopted or
-declined behavior. For this proposal, Lean's fill and missing-bar sources
+declined behavior. For this study, Lean's fill and missing-bar sources
 inform explicit simulator semantics; Freqtrade's cooldown lock is a design
 reference for the distinct regime-only, cross-ETF, session-local rule; and
 Hummingbot does not motivate any offline or live-order behavior change. No
@@ -135,11 +147,10 @@ research modules. The checkpoint route covers `arch148_intraday.py`,
 is mapped to FULL through the current registry and source-gates workflow; it
 does not grant execution authority or automatically run this study.
 
-The next research step is to commit the exact source locally and pass the
-general source admission, then run the separately authorized OPEN comparison
-before publication. It must write fresh external evidence for independent
-review; the mapped GitHub CI result is not a prerequisite to that offline run.
-This source proposal itself does not run the evaluation. Preserve all baseline
-and requalification evidence, keep `FINAL_HOLDOUT` sealed, and stop if the
-input identity, accepted simulator semantics, or required diagnostics do not
-match this contract.
+The accepted source and evidence satisfy this fixed research contract. No
+variant is promoted into live/default strategy behavior. Preserve all baseline,
+requalification and churn evidence and keep `FINAL_HOLDOUT` sealed. The next
+research boundary is an OPEN-only investigation of a materially different
+entry/holding architecture rather than further post-hoc cooldown tuning; any
+such checkpoint must freeze its design and diagnostics before replay and must
+not inherit promotion authority from this rejected study.

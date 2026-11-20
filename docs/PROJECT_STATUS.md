@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 148 churn research proposal (source-only; OPEN evaluation pending)
+## Current milestone - Architecture 148 churn research accepted/integrated; all four variants economically rejected
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -75,19 +75,32 @@ network/provider, Robinhood/broker, order, production-state, FINAL_HOLDOUT or
 baseline effects. The consumed `bb1a...` acquisition remains immutable and NO
 RETRY.
 
-The current research proposal is
-[Architecture 148 churn research](validation/arch148-churn-research.md). It
-defines four fixed descriptive variants and the two existing cost cases over
-calendar-year OPEN partitions, while preserving the accepted sparse dataset,
-simulator and rejected baseline economics. No churn evaluation result or new
-CI result is claimed here. The source-only `arch148-churn-research` route has
-no preflight or execution dispatch; it does not run the OPEN evaluation.
-After exact local commit and general source admission, the separately
-authorized OPEN comparison is planned before publication so its evidence can be
-reviewed independently; mapped CI is not a prerequisite for that offline run.
-`FINAL_HOLDOUT` remains sealed. Live promotion still requires provider-scope
-proof, whole-share GTC stop-market capability, approval-to-order linkage where
-applicable, and explicit whole-share risk/notional authority.
+[Architecture 148 churn research](validation/arch148-churn-research.md) is
+independently SOURCE/CERTIFICATION/EVIDENCE ACCEPTED and FAST-FORWARD
+INTEGRATED at HEAD `be30617594e197f372438dba19d325fd8737b850` / tree
+`57d5e80bd1933d59faf5da07f0ea293eac34b323`, direct parent
+`0e82457d71e584dc526b5e377d7f90867e515879`. Feature mapped FULL run
+`44695628477`, attempt 1, is terminal SUCCESS with source-static,
+active-tests, source-gates and all seven canonical FULL lanes passing. Develop
+run `44698088183`, attempt 1, is terminal SUCCESS on the exact integrated SHA;
+source-static and source-gates passed while active/FULL/certification execution
+was skipped, so no duplicate FULL ran.
+
+Accepted OPEN research evidence is
+`F:\AI\temp\arch148-churn-research-731f1ee4-53a1-4bdf-8979-5eef493d9f4a\research.json`,
+299,259 bytes, identity `19dcca18-7080-541d-9864-d730c68471e0`, SHA-256
+`5baa7ef9e035f72428c623c798fb9653aa43339027c03e8e417d16c52e08aca8`.
+It binds the accepted sparse dataset/custody/requalification/baseline inputs,
+all four frozen variants, both cost models and nine OPEN partitions per run.
+CONTROL reproduced the accepted baseline. Opposite confirmation roughly halved
+trade count, but CONTROL, opposite confirmation, 15-minute cooldown and
+30-minute cooldown are all economically REJECTED: every variant lost money in
+every 2016-2023 calendar-year OPEN slice at `CONSERVATIVE_10_BPS`; the best
+descriptive result, 30-minute cooldown, still returned about `-99.4027%`
+across OPEN. No variant was selected. `FINAL_HOLDOUT` remained sealed and all
+recorded credential/network/provider/Robinhood/broker/order/production effects
+were zero. Live promotion still requires a viable strategy plus the existing
+provider-scope, whole-share stop, approval-linkage and risk/notional blockers.
 
 The accepted sparse OPEN baseline remains unchanged at
 `F:\AI\temp\arch148-open-sparse-baseline-e3e27c29-8a9d-41c5-9ac0-d89a1d4cb5d1\baseline.json`,
@@ -118,11 +131,11 @@ RETRY. The later `bb1a...` acquisition remains CONSUMED / BLOCKED /
 contract. B2-A-C1 remains accepted/integrated at
 `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` /
 `e16fe3aeec6a862c0d7ad7dd35e4171c1d3385e7`. Its immutable raw observations
-are now independently accepted through the sparse offline requalification
-evidence recorded above. No provider retry is authorized. The churn proposal
-uses that accepted sparse source and baseline as fixed inputs; separately
-reviewed OPEN evidence has not been produced by this source checkpoint.
-`FINAL_HOLDOUT` remains sealed.
+are independently accepted through the sparse offline requalification evidence
+recorded above; no provider retry is authorized. The accepted churn study uses
+that sparse source and baseline as fixed inputs and preserves the independently
+accepted OPEN evidence/hash recorded above. All four tested variants remain
+economically rejected and `FINAL_HOLDOUT` remains sealed.
 Q1 remains CONSUMED / BLOCKED / NO AUTOMATIC RETRY; Q63 remains NOT RUN and
 `FINAL_HOLDOUT` remains SEALED.
 

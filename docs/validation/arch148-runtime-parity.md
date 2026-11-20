@@ -15,9 +15,12 @@ safety contracts, public implementation references, and accepted local sources
 to Architecture 148. The fakeable Robinhood adapter, durable order tracker,
 sparse research path and worker/service composition are accepted source. Their
 remaining production blockers are explicit provider/risk facts, not source
-candidate status. The follow-on [churn research proposal](arch148-churn-research.md)
-is source-only and has no evaluation result. Nothing here proves provider
-capability or production readiness.
+candidate status. The follow-on [churn research study](arch148-churn-research.md)
+is independently accepted/integrated at `be30617594e197f372438dba19d325fd8737b850`
+with accepted evidence SHA-256
+`5baa7ef9e035f72428c623c798fb9653aa43339027c03e8e417d16c52e08aca8`.
+It rejects all four tested churn variants economically and selects none.
+Nothing here proves provider capability or production readiness.
 
 The v1 indicator contract is typical-price session VWAP `(high + low + close) / 3`
 weighted by volume, reset at each official session open; EMA20/EMA50 seeded with
@@ -77,8 +80,10 @@ evidence is independently accepted: evidence SHA-256
 dataset identity `0308b694-c718-5b1a-a51c-9fcc4516bb81`, custody identity
 `dbcced6a-b4cc-5d36-a33b-5e6df3d82baa`. It makes zero provider/broker
 effects and grants no production authority. The accepted sparse baseline is
-the fixed comparison input for the source-only [churn proposal](arch148-churn-research.md).
-No churn evaluation result is included or claimed here. Any provider or backtest semantic gap is gated by
+the fixed comparison input for the accepted [churn study](arch148-churn-research.md).
+The independently reviewed churn evidence rejects CONTROL and all three fixed
+churn-reduction candidates under conservative costs and selects no variant.
+Any provider or backtest semantic gap is gated by
 `REFERENCE_FIRST_IMPLEMENTATION_REQUIRED_FOR_PROVIDER_OR_BACKTEST_SEMANTIC_GAPS`:
 identify and pin the relevant source semantics first, document what the source
 does and what the bot adopts or declines, then implement and test an explicit

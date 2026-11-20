@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148 churn research proposal (source-only; OPEN evaluation pending)
+## Current milestone: Architecture 148 churn research accepted/integrated; no viable variant selected
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -61,16 +61,26 @@ source-gates and all seven canonical FULL lanes passing. Develop run
 `IDENTITY_STABLE=True`; active tests and all broad/certification execution were
 skipped on develop, so `DEVELOP_DUPLICATE_FULL=NO`.
 
-The accepted sparse observations and OPEN baseline now support the source-only
-[churn research proposal](validation/arch148-churn-research.md). Its four
-variants, cost cases, calendar-year partitions and required diagnostics are
-fixed before evaluation. This source checkpoint has no preflight or execution
-dispatch and does not run the OPEN evaluation. No churn result or new CI result
-is claimed here. After exact local commit and general source admission, the
-separately authorized OPEN evaluation is planned before publication, writes
-fresh external evidence, and receives independent review; mapped CI is not a
-prerequisite for that offline run. Keep consumed acquisition, requalification
-and baseline artifacts unchanged; `FINAL_HOLDOUT` remains sealed.
+The [Architecture 148 churn study](validation/arch148-churn-research.md) is
+independently SOURCE/CERTIFICATION/EVIDENCE ACCEPTED and FAST-FORWARD
+INTEGRATED at `be30617594e197f372438dba19d325fd8737b850` / tree
+`57d5e80bd1933d59faf5da07f0ea293eac34b323`, parent
+`0e82457d71e584dc526b5e377d7f90867e515879`. Feature mapped FULL
+`44695628477`, attempt 1, passed all seven canonical lanes. Develop
+`44698088183`, attempt 1, is terminal SUCCESS with no duplicate FULL.
+
+Accepted report:
+`F:\AI\temp\arch148-churn-research-731f1ee4-53a1-4bdf-8979-5eef493d9f4a\research.json`;
+299,259 bytes; identity `19dcca18-7080-541d-9864-d730c68471e0`; SHA-256
+`5baa7ef9e035f72428c623c798fb9653aa43339027c03e8e417d16c52e08aca8`.
+It contains the fixed four variants × two cost models with OPEN_FULL plus
+2016-2023 partitions, reproduces CONTROL baseline facts, records zero protected
+effects and zero `FINAL_HOLDOUT` accesses, and selects no variant. Opposite
+confirmation cut trade count substantially, but every variant lost money in
+every calendar year at 10 bps; the descriptive first-place 30-minute cooldown
+still lost about 99.4027% over OPEN. Preserve the acquisition,
+requalification, baseline and churn evidence unchanged; `FINAL_HOLDOUT`
+remains sealed.
 
 The accepted OPEN sparse baseline is preserved at
 `F:\AI\temp\arch148-open-sparse-baseline-e3e27c29-8a9d-41c5-9ac0-d89a1d4cb5d1\baseline.json`,
@@ -121,11 +131,12 @@ The offline requalification source at
 `src/trading_bot/experiments/arch148_b2_requalify.py` and sparse simulator at
 `src/trading_bot/experiments/arch148_sparse_backtest.py` are accepted in
 `6fb78af8...`. The exact offline output above is independently accepted. No
-provider retry is authorized. The proposed next research scope is the fixed
-Architecture 148 churn comparison in
-[`arch148-churn-research.md`](validation/arch148-churn-research.md); no result
-has been generated or accepted. It grants no Robinhood/broker, production, Q63
-or `FINAL_HOLDOUT` authority.
+provider retry is authorized. The fixed Architecture 148 churn comparison in
+[`arch148-churn-research.md`](validation/arch148-churn-research.md) is now
+accepted/integrated with the exact evidence recorded above. It rejects all four
+tested variants economically and selects none. The next research boundary is a
+new OPEN-only entry/holding architecture investigation, not another cooldown
+tweak; it must preserve `FINAL_HOLDOUT` and all provider/broker boundaries.
 
 Architecture 148-B1 is accepted/integrated at `68b9526f022458cbcdd4f25ff268e0de7c56e562` / tree `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`. The initial B1 commit `70b0a8de5cb3b2cf4fb826352b6ada3650c57614` remains preserved with green run `44432367772` but was exact-source rejected; corrective C1 closed the reviewed defects. Feature mapped FULL `44438409583`, attempt 1, is SUCCESS. Develop `44465681331`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. The operator integration report records both canonical F: worktrees and both live refs at the exact accepted HEAD/tree and clean; the feature checkout required no catch-up.
 
@@ -133,13 +144,11 @@ The earlier B2-B attempt is CONSUMED / BLOCKED / PAGE_LIMIT_REACHED / NO
 RETRY. The later acquisition remains CONSUMED / BLOCKED /
 `QUALIFICATION_BAR_COUNT_MISMATCH` / NO RETRY under dense B1, while its
 immutable raw observations are independently accepted through sparse offline
-requalification. B2-A-C1 and the public-reference completion source are
-accepted/integrated. The current follow-on is a source-only churn proposal;
-after exact local commit and general source admission, its separately
-authorized OPEN evaluation is planned before publication, with fresh evidence
-for independent review. Mapped CI is not a prerequisite to the offline run.
-This document claims no evaluation result. No new provider or credential read,
-Robinhood/broker, production, Q63 or `FINAL_HOLDOUT` action is authorized here.
+requalification. B2-A-C1, the public-reference completion source, and the churn
+research checkpoint are accepted/integrated. Churn evidence rejects CONTROL and
+all three fixed churn-reduction candidates at conservative costs; no strategy
+variant is selected. No new provider or credential read, Robinhood/broker,
+production, Q63 or `FINAL_HOLDOUT` action is authorized here.
 
 
 ### Architecture 148-B1 accepted intraday identity

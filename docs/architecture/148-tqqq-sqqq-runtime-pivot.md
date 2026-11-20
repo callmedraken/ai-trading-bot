@@ -511,17 +511,17 @@ Robinhood, broker, order, production, baseline or FINAL_HOLDOUT effects.
 
 The C1 executable correction, public-reference source checkpoint and exact
 sparse offline requalification result remain independently accepted. The
-current follow-on proposal is the source-only
-[Architecture 148 churn study](../validation/arch148-churn-research.md). It
-fixes four descriptive variants, two existing cost cases, calendar-year OPEN
-partitions and required diagnostics before any evaluation. No churn evaluation
-result or new CI result is claimed here; the checkpoint does not run the OPEN
-evaluation. After exact local commit and general source admission, the
-separately authorized OPEN comparison is planned before publication so its
-evidence can be independently reviewed; mapped CI is not a prerequisite for
-that offline run. A docs/source/preflight PASS grants no credential or provider
-authority. No new provider request, Robinhood, broker, order, production, Q63 or
-FINAL_HOLDOUT action follows from this documentation update.
+[Architecture 148 churn study](../validation/arch148-churn-research.md) is now
+SOURCE/CERTIFICATION/EVIDENCE ACCEPTED and FAST-FORWARD INTEGRATED at
+`be30617594e197f372438dba19d325fd8737b850` / tree
+`57d5e80bd1933d59faf5da07f0ea293eac34b323`. Feature FULL
+`44695628477`, attempt 1, passed; develop `44698088183`, attempt 1, passed
+without duplicate FULL. Evidence identity
+`19dcca18-7080-541d-9864-d730c68471e0` / SHA-256
+`5baa7ef9e035f72428c623c798fb9653aa43339027c03e8e417d16c52e08aca8`
+binds all fixed variants, both costs and OPEN partitions. All four variants are
+economically rejected at 10 bps and no winner is selected. A docs/source PASS
+grants no credential or provider authority; `FINAL_HOLDOUT` remains sealed.
 
 ## Subsequent milestones
 
@@ -529,7 +529,7 @@ After accepted/integrated 148-A:
 
 - 148-B1: source-only/fake-only 5-minute QQQ/TQQQ/SQQQ acquisition/custody and no-lookahead backtest contract, reusing existing evidence/holdout authority and selecting only an eligible pre-holdout range; no real provider call;
 - 148-B2: the earlier `fd8aa...` page-limit incident and later `bb1a...` completed-but-unqualified acquisition remain separate immutable consumed attempts. The original dense B1 qualification is unchanged. Sparse offline requalification source and exact result are independently accepted; no provider retry is authorized;
-- 148 churn research: the source-only proposal in [`arch148-churn-research.md`](../validation/arch148-churn-research.md) defines four fixed descriptive variants and two existing cost cases. Its separate OPEN evaluation remains pending and must be independently reviewed; no winner or promotion rule is defined;
+- 148 churn research: [`arch148-churn-research.md`](../validation/arch148-churn-research.md) is accepted/integrated with independently reviewed OPEN evidence. CONTROL and all three fixed churn-reduction variants are economically rejected at `CONSERVATIVE_10_BPS`; no winner is selected and `FINAL_HOLDOUT` remains sealed;
 - 148-C: desktop/demo integration and GUI status/control path;
 - 148-D: current Robinhood read-only parity/preflight using the new complete
   runtime dependency closure;

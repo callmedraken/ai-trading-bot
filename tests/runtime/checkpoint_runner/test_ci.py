@@ -747,6 +747,7 @@ def test_ci_certification_profile_mapping_is_explicit_and_bounded():
         runner.ARCH148_CHURN_NAME: "full",
         runner.ARCH148_INTRADAY_MOMENTUM_NAME: "full",
         runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME: "full",
+        runner.ARCH150_INTRADAY_AI_NAME: "full",
         runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
         runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
         runner.ARCH147_P5A_NAME: "full",

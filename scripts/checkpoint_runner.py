@@ -448,6 +448,21 @@ AI_STRATEGY_DISCOVERY_FOUNDATION_RUFF: Final = (
     "tests/experiments/test_ai_strategy_discovery.py",
     "tests/experiments/test_ai_strategy_discovery_evidence.py",
 )
+ARCH150_INTRADAY_AI_NAME: Final = "arch150-intraday-ai-research-foundation"
+ARCH150_INTRADAY_AI_BRANCH: Final = "feature/research-arch150-intraday-ai-current"
+ARCH150_INTRADAY_AI_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/experiments/test_arch150_intraday_ai.py",
+)
+ARCH150_INTRADAY_AI_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "src/trading_bot/experiments/arch150_intraday_ai.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/experiments/test_arch150_intraday_ai.py",
+)
 AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: Final = "arch-ai-strategy-discovery-g1-engine"
 AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH: Final = (
     "feature/research-ai-strategy-discovery-g1-engine-current"
@@ -771,6 +786,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH148_CHURN_NAME,
     ARCH148_INTRADAY_MOMENTUM_NAME,
     ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
+    ARCH150_INTRADAY_AI_NAME,
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
@@ -787,6 +803,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH148_CHURN_NAME: "full",
     ARCH148_INTRADAY_MOMENTUM_NAME: "full",
     ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME: "full",
+    ARCH150_INTRADAY_AI_NAME: "full",
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
     ARCH147_P5A_NAME: "full",
@@ -26828,6 +26845,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH,
     )
+    values[ARCH150_INTRADAY_AI_NAME] = CheckpointSpec(
+        ARCH150_INTRADAY_AI_NAME,
+        "Source-only Architecture 150 typed intraday AI research foundation",
+        ARCH150_INTRADAY_AI_TESTS,
+        ARCH150_INTRADAY_AI_RUFF,
+        _arch150_intraday_ai_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH150_INTRADAY_AI_BRANCH,
+    )
     values[AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME] = CheckpointSpec(
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         "Source-only G1 daily evaluator and analysis; no campaign authority",
@@ -27485,6 +27512,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH148_CHURN_NAME,
         ARCH148_INTRADAY_MOMENTUM_NAME,
         ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
+        ARCH150_INTRADAY_AI_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -27526,6 +27554,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH148_CHURN_NAME,
         ARCH148_INTRADAY_MOMENTUM_NAME,
         ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
+        ARCH150_INTRADAY_AI_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -28633,6 +28662,50 @@ def _arch149_monthly_defensive_rotation_authority_check(
         workflow
     ):
         failures.append("149 monthly defensive rotation active CI projection drift")
+    return tuple(failures)
+
+
+def _arch150_intraday_ai_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Register Architecture 150 as source-only synthetic research."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH150_INTRADAY_AI_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != ARCH150_INTRADAY_AI_TESTS
+        or spec.ruff_paths != ARCH150_INTRADAY_AI_RUFF
+        or spec.authority_check is not _arch150_intraday_ai_authority_check
+        or spec.remote_branch != ARCH150_INTRADAY_AI_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH150_INTRADAY_AI_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH150_INTRADAY_AI_NAME) != 1
+        or ARCH150_INTRADAY_AI_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(specs, ARCH150_INTRADAY_AI_BRANCH, "push")
+        != ARCH150_INTRADAY_AI_NAME
+    ):
+        failures.append("Architecture 150 source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("Architecture 150 experiment tests are not FULL-owned")
+    required_paths = (
+        "src/trading_bot/experiments/arch150_intraday_ai.py",
+        "tests/experiments/test_arch150_intraday_ai.py",
+        "tests/runtime/checkpoint_runner/test_core.py",
+    )
+    for relative in required_paths:
+        if not (repo_root / relative).is_file():
+            failures.append("Architecture 150 source route is missing " + relative)
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    row = f"              {ARCH150_INTRADAY_AI_NAME} {chr(96)}\n"
+    if workflow.count(row) != 1 or not _arch147_current_batch_workflow_is_reviewed(
+        workflow
+    ):
+        failures.append("Architecture 150 active CI projection drift")
     return tuple(failures)
 
 

@@ -357,6 +357,50 @@ def test_arch149_monthly_defensive_rotation_route_help_is_effect_free(
     assert runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME in capsys.readouterr().out
 
 
+def test_arch150_intraday_ai_checkpoint_is_source_only_and_mapped():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.ARCH150_INTRADAY_AI_NAME]
+
+    assert runner.ARCH150_INTRADAY_AI_NAME == (
+        "arch150-intraday-ai-research-foundation"
+    )
+    assert runner.ARCH150_INTRADAY_AI_BRANCH == (
+        "feature/research-arch150-intraday-ai-current"
+    )
+    assert spec.tests == runner.ARCH150_INTRADAY_AI_TESTS
+    assert spec.ruff_paths == runner.ARCH150_INTRADAY_AI_RUFF
+    assert spec.authority_check is runner._arch150_intraday_ai_authority_check
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert runner.ARCH150_INTRADAY_AI_NAME not in runner.ACTIVE_CI_CHECKPOINTS
+    assert (
+        runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(runner.ARCH150_INTRADAY_AI_NAME) == 1
+    )
+    assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH150_INTRADAY_AI_NAME] == "full"
+    assert (
+        runner.resolve_ci_checkpoint(specs, runner.ARCH150_INTRADAY_AI_BRANCH, "push")
+        == runner.ARCH150_INTRADAY_AI_NAME
+    )
+    assert runner._arch150_intraday_ai_authority_check(repo) == ()
+
+
+def test_arch150_intraday_ai_help_is_effect_free(monkeypatch, capsys):
+    def forbidden(*args, **kwargs):
+        pytest.fail("source-only help dispatched an external effect")
+
+    monkeypatch.setattr(runner.subprocess, "run", forbidden)
+    monkeypatch.setattr(runner, "_git_state", forbidden)
+    monkeypatch.setattr(runner, "_default_evidence_root", forbidden)
+    monkeypatch.setattr(runner, "verify_checkpoint", forbidden)
+    monkeypatch.setattr(runner, "verify_batch", forbidden)
+
+    with pytest.raises(SystemExit) as exit_info:
+        runner.main(["verify", runner.ARCH150_INTRADAY_AI_NAME, "--help"])
+
+    assert exit_info.value.code == 0
+    assert runner.ARCH150_INTRADAY_AI_NAME in capsys.readouterr().out
+
+
 def test_ai_strategy_discovery_checkpoint_is_source_only_and_mapped():
     repo = Path(runner.__file__).resolve().parents[1]
     specs = runner._checkpoint_specs()

@@ -35,6 +35,7 @@ env:
               arch148-churn-research `
               arch148-intraday-momentum-research `
               arch149-monthly-defensive-rotation-research `
+              arch150-intraday-ai-research-foundation `
               arch-ai-strategy-discovery-foundation `
               arch-ai-strategy-discovery-g1-engine `
               arch146-a-historical-research-dataset-enforcement `

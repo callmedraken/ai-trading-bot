@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - late-session intraday hypothesis rejected; next independent strategy research design
+## Current milestone - Architecture 149 monthly defensive-rotation design frozen; source next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -196,10 +196,19 @@ its now-visible P&L.
 
 The observation performed zero credential/network/provider/Robinhood/broker/
 order/production effects, zero baseline replay, and zero `FINAL_HOLDOUT`
-access. `FINAL_HOLDOUT` remains sealed. No already-frozen unevaluated trading
-hypothesis remains in the repository; the next milestone is a separately frozen
-independent strategy-research design rather than another Architecture-148
-variant.
+access. `FINAL_HOLDOUT` remains sealed. No earlier frozen unevaluated trading hypothesis remained after that closeout.
+Architecture 149 now freezes the next independent strategy family:
+`MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,
+monthly cross-asset relative-strength rule over the accepted eight-ETF A147
+universe, with a strict positive-momentum-to-ETF / nonpositive-to-CASH gate and
+no parameter grid. 2016 is warmup; 2017-2023 is exploratory evidence only.
+2024-2026 data is explicitly outside the current input boundary and may be
+acquired only after a surviving exploratory result and a separately frozen
+confirmation contract. Source is not implemented and no Architecture-149 trial
+has run. See
+[Architecture 149](architecture/149-monthly-cross-asset-defensive-rotation.md)
+and its
+[validation plan](validation/arch149-monthly-cross-asset-defensive-rotation.md).
 
 The previously frozen OPEN-only design remains in
 [Architecture 148 late-session intraday momentum research](validation/arch148-intraday-momentum-research.md).

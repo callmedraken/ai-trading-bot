@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: late-session intraday hypothesis rejected; next independent strategy research design
+## Current milestone: Architecture 149 monthly defensive-rotation design frozen; source next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -201,9 +201,15 @@ returns after cost. No confirmation or holdout action is permitted.
 Do not retry, retime, threshold, filter, or mutate this Architecture-148
 hypothesis from its visible result. The observation performed no provider/
 broker/production effect, baseline replay, or `FINAL_HOLDOUT` access.
-`FINAL_HOLDOUT` remains sealed. No other frozen unevaluated trading hypothesis
-is currently queued; the next research step must freeze an independent strategy
-family before evaluation.
+`FINAL_HOLDOUT` remains sealed. No earlier frozen unevaluated trading hypothesis remained after that closeout.
+Architecture 149 now owns the next frozen independent research family:
+`MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,
+uses the accepted SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC daily universe, ranks fixed
+21/252-session momentum only at month end, holds the top ETF only when its score
+is strictly positive, otherwise holds CASH, and executes at the next session
+OPEN under the accepted A147 BASE/STRESS costs. 2016 is warmup and 2017-2023 is
+exploratory. 2024-2026 data is forbidden until a separately frozen confirmation
+step. Source implementation and real replay remain NOT RUN.
 
 The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).

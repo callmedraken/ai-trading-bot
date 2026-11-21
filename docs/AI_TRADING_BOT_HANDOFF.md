@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: AI Strategy Discovery Campaign v1 design frozen; Generation 0 evidence mining next
+## Current milestone: AI Strategy Discovery G2 source accepted/integrated; real confirmation execution next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -134,16 +134,38 @@ The offline requalification source at
 provider retry is authorized. The fixed Architecture 148 churn comparison in
 [`arch148-churn-research.md`](validation/arch148-churn-research.md) is now
 accepted/integrated with the exact evidence recorded above. It rejects all four
-tested variants economically and selects none. The active research boundary is now frozen in
+tested variants economically and selects none. The active research boundary is
 [`ai-strategy-discovery-campaign-v1.md`](validation/ai-strategy-discovery-campaign-v1.md).
-Generation 0 mines already accepted research evidence only; it must not run new
-market-data acquisition, provider calls, production operations or `FINAL_HOLDOUT`.
-The AI research role is hypothesis generation, evidence synthesis and failure
-diagnosis. Deterministic repository engines remain the only authority for
-backtests, fills, costs, ranking, walk-forward evidence and candidate lifecycle.
-Every evaluated candidate, including rejected/failed/zero-trade candidates, must
-be retained in the campaign trial ledger. The previously frozen late-session
-momentum candidate remains queued rather than discarded.
+
+Generation 0 is accepted. The real Generation-1 discovery batch is consumed and
+must not be rerun automatically. Its accepted identities are proposal set
+`b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, batch
+`fd53330e-82ff-58a3-99b8-1818b9a0bbc0`, analysis
+`d5ca081e-7490-5590-921d-10cee373d012` and terminal ledger
+`68418f44-7db0-5080-a6bd-a956a928bd4a`. It consumed exactly 22 G1 trials:
+12 SHORTLISTED and 10 ECONOMICALLY_REJECTED. It consumed zero G2 trials,
+accessed no 2022-2023 campaign confirmation evidence and did not access
+`FINAL_HOLDOUT`.
+
+The source-only G2 checkpoint is accepted/integrated at
+`addfa839b800732cfdaa79b43d2d6291525d32f3` / tree
+`6aea44abdc4faaaf4e3de984e7fcfcbcb0834943`. Feature FULL
+`44870115703`, attempt 1, is SUCCESS. Develop source-gate
+`44871126058`, attempt 1, is SUCCESS with exact feature-certification reuse
+and no duplicate FULL. G2 supports exactly six frozen `ALL_OF` recombinations,
+uses the existing A147 execution/economics path and reports only 2022, 2023 and
+continuous 2022-2023 confirmation evidence.
+
+Real G2 remains NOT RUN: evaluated G2 trials = 0, no real G2 proposal or result
+artifact exists, the accepted A147 dataset has not been consumed by the G2
+evaluator, and `FINAL_HOLDOUT` remains sealed. Next action is a separately
+reviewed one-shot real G2 observation: bind the exact accepted G1 artifacts,
+freeze the six source-bound proposals before any confirmation P&L is visible,
+then evaluate all six once. Any STOP after G2 evaluation begins is NO AUTOMATIC
+RETRY pending review.
+
+The prior late-session intraday-momentum candidate remains queued rather than
+discarded.
 
 The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).

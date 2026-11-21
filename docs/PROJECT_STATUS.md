@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - AI Strategy Discovery Campaign v1 design frozen; Generation 0 evidence mining next
+## Current milestone - AI Strategy Discovery G2 source accepted/integrated; real confirmation execution next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -102,18 +102,44 @@ recorded credential/network/provider/Robinhood/broker/order/production effects
 were zero. Live promotion still requires a viable strategy plus the existing
 provider-scope, whole-share stop, approval-linkage and risk/notional blockers.
 
-The active research roadmap has pivoted to the
+The active research roadmap is the
 [AI Strategy Discovery Campaign v1](validation/ai-strategy-discovery-campaign-v1.md).
+
+Generation 0 is accepted. Generation 1 then evaluated the exact frozen 22-program
+daily multi-asset population once against the accepted A147 dataset over the
+2019-2021 discovery partition. Accepted G1 identities are proposal set
+`b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, batch run
+`fd53330e-82ff-58a3-99b8-1818b9a0bbc0`, whole-panel analysis
+`d5ca081e-7490-5590-921d-10cee373d012` and terminal ledger
+`68418f44-7db0-5080-a6bd-a956a928bd4a`. The ledger records 22 evaluated G1
+trials, 12 SHORTLISTED and 10 ECONOMICALLY_REJECTED, with zero G2 trials.
+Generation-1 results are visible; 2022-2023 confirmation evidence was not read by
+that campaign and `FINAL_HOLDOUT` remains sealed. The accepted G1 evidence is
+preserved under
+`F:\AI\temp\ai-strategy-discovery-g1-run-fd53330e-82ff-58a3-99b8-1818b9a0bbc0`
+and must not be regenerated or overwritten.
+
+The source-only Generation-2 composition checkpoint is independently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`addfa839b800732cfdaa79b43d2d6291525d32f3` / tree
+`6aea44abdc4faaaf4e3de984e7fcfcbcb0834943`, direct parent
+`61df6196a8e9ed41a2f4873ca82f08846aadcca7`. Feature mapped FULL run
+`44870115703`, attempt 1, is terminal SUCCESS with source-static, active-tests,
+source-gates and all seven canonical FULL lanes passing. Develop run
+`44871126058`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse; active/FULL/certification execution was skipped, so no duplicate FULL ran.
+
+G2 is frozen to exactly six typed `ALL_OF` recombinations of accepted G1 parent
+signals. The real G2 trial count remains 0/16. No real G2 proposal/result artifact
+has been created, the accepted A147 dataset has not been read through the G2
+evaluator, 2022-2023 confirmation results remain unseen, and `FINAL_HOLDOUT`
+remains sealed. The next research action is to create the exact source-bound
+six-proposal G2 artifact from the accepted G1 proposal/analysis/terminal-ledger
+evidence, accept all six before evaluation, and execute the 2022-2023
+confirmation batch exactly once. G1 must not be rerun automatically.
+
 The existing Architecture 148 late-session intraday-momentum design remains a
-frozen queued hypothesis; it is not deleted or reinterpreted, but its executable
-implementation is paused while the broader AI campaign mines accepted evidence
-and searches multiple strategy families. Generation 0 is evidence-only and
-performs no new backtest, provider call, model-driven trade, broker effect or
-`FINAL_HOLDOUT` access. AI may propose and diagnose research hypotheses, while
-repository-owned deterministic engines remain authoritative for data, execution,
-costs, ranking, walk-forward evidence and lifecycle transitions. Every evaluated
-candidate must enter the search ledger, including failures, so later selection
-can account for search breadth instead of reporting only winners.
+frozen queued hypothesis rather than discarded research.
 
 The previously frozen OPEN-only design remains in
 [Architecture 148 late-session intraday momentum research](validation/arch148-intraday-momentum-research.md).

@@ -288,6 +288,50 @@ def test_ai_strategy_discovery_checkpoint_is_source_only_and_mapped():
     assert runner._ai_strategy_discovery_foundation_authority_check(repo) == ()
 
 
+def test_ai_strategy_discovery_g1_engine_is_source_only_full_and_mapped():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME]
+
+    assert runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME == (
+        "arch-ai-strategy-discovery-g1-engine"
+    )
+    assert runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH == (
+        "feature/research-ai-strategy-discovery-g1-engine-current"
+    )
+    assert spec.remote_branch == runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH
+    assert (
+        spec.authority_check is runner._ai_strategy_discovery_g1_engine_authority_check
+    )
+    assert spec.tests == runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_TESTS
+    assert spec.ruff_paths == runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_RUFF
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert (
+        runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME not in runner.ACTIVE_CI_CHECKPOINTS
+    )
+    assert (
+        runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(
+            runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME
+        )
+        == 1
+    )
+    assert (
+        runner.CI_CERTIFICATION_PROFILES[runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME]
+        == "full"
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH, "push"
+        )
+        == runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME
+    )
+    assert (
+        runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME
+        in current_source_authority.develop_static_checkpoints(repo)
+    )
+    assert runner._ai_strategy_discovery_g1_engine_authority_check(repo) == ()
+
+
 def test_registry_invariants_accept_additions_and_reject_missing_references():
     specs = runner._checkpoint_specs()
     synthetic_name = "synthetic-future-checkpoint"

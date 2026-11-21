@@ -1,9 +1,11 @@
 """Immutable, effect-free proposals and append-only discovery trial history.
 
-This module defines closed proposal and ledger records only. Supported strategy
-specifications map to the accepted Architecture 147 ``StrategyConfig`` values;
-an evaluator may later pass those values to ``filtered_trend_campaign.evaluate_cell``.
-No campaign, strategy replay, provider, AI service, or lifecycle action is run here.
+This module defines closed proposal and ledger records only. The original
+moving-average and Donchian specifications map to accepted Architecture 147
+``StrategyConfig`` values. Generation 1 also has two typed single-symbol
+specifications compiled by its isolated evaluator. Historical deferred markers
+for those families remain parseable and unsupported. No campaign, strategy
+replay, provider, AI service, or lifecycle action is run here.
 """
 
 from __future__ import annotations
@@ -53,7 +55,7 @@ class DiscoveryError(ValueError):
 
 
 class StrategyFamily(StrEnum):
-    """Frozen campaign vocabulary; only two families compile in this checkpoint."""
+    """Frozen campaign vocabulary; four families have a closed G1 evaluator."""
 
     ABSOLUTE_MOMENTUM = "ABSOLUTE_MOMENTUM"
     MULTI_HORIZON_TREND = "MULTI_HORIZON_TREND"
@@ -133,6 +135,8 @@ class TrialDisposition(StrEnum):
 class _FamilySpecSchema(StrEnum):
     MOVING_AVERAGE_TREND = "moving-average-trend-spec/v1"
     DONCHIAN_BREAKOUT = "donchian-breakout-spec/v1"
+    ABSOLUTE_MOMENTUM = "absolute-momentum-spec/v1"
+    MULTI_HORIZON_TREND = "multi-horizon-trend-spec/v1"
     DEFERRED = "deferred-strategy-spec/v1"
 
 
@@ -192,6 +196,80 @@ class DonchianBreakoutSpec:
         }
 
 
+class MomentumGate(StrEnum):
+    """The only absolute-momentum admission rules in the G1 grammar."""
+
+    NONE = "NONE"
+    ABOVE_SMA200 = "ABOVE_SMA200"
+
+
+class TrendVote(StrEnum):
+    """The two frozen multi-horizon voting thresholds."""
+
+    TWO_OF_THREE = "2_OF_3"
+    THREE_OF_THREE = "3_OF_3"
+
+
+@dataclass(frozen=True, slots=True)
+class AbsoluteMomentumSpec:
+    """A long/flat close-to-close momentum rule with an optional SMA200 gate."""
+
+    lookback_sessions: int
+    gate: MomentumGate
+
+    def __post_init__(self) -> None:
+        if type(self.lookback_sessions) is not int or self.lookback_sessions not in (
+            63,
+            126,
+            252,
+        ):
+            raise DiscoveryError("momentum lookback must be 63, 126, or 252 sessions")
+        if type(self.gate) is not MomentumGate:
+            raise DiscoveryError("momentum gate must be a declared value")
+
+    @property
+    def family(self) -> StrategyFamily:
+        return StrategyFamily.ABSOLUTE_MOMENTUM
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": _FamilySpecSchema.ABSOLUTE_MOMENTUM.value,
+            "family": self.family.value,
+            "lookback_sessions": self.lookback_sessions,
+            "gate": self.gate.value,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class MultiHorizonTrendSpec:
+    """Three fixed completed-session horizons and a closed voting threshold."""
+
+    horizons: tuple[int, int, int]
+    vote: TrendVote
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.horizons) is not tuple
+            or any(type(horizon) is not int for horizon in self.horizons)
+            or self.horizons not in ((21, 63, 126), (63, 126, 252))
+        ):
+            raise DiscoveryError("trend horizons must use a declared three-horizon set")
+        if type(self.vote) is not TrendVote:
+            raise DiscoveryError("trend vote must be a declared value")
+
+    @property
+    def family(self) -> StrategyFamily:
+        return StrategyFamily.MULTI_HORIZON_TREND
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": _FamilySpecSchema.MULTI_HORIZON_TREND.value,
+            "family": self.family.value,
+            "horizons": list(self.horizons),
+            "vote": self.vote.value,
+        }
+
+
 _DEFERRED_FAMILIES = frozenset(
     {
         StrategyFamily.ABSOLUTE_MOMENTUM,
@@ -208,7 +286,11 @@ _DEFERRED_FAMILIES = frozenset(
 
 @dataclass(frozen=True, slots=True)
 class DeferredStrategySpec:
-    """Closed vocabulary marker for a family without an accepted evaluator map."""
+    """Legacy closed marker for a family without an accepted evaluator map.
+
+    Absolute-momentum and multi-horizon markers remain valid historical records;
+    new Generation-1 proposals use their typed specifications instead.
+    """
 
     family: StrategyFamily
 
@@ -227,7 +309,13 @@ class DeferredStrategySpec:
         }
 
 
-StrategySpec = MovingAverageTrendSpec | DonchianBreakoutSpec | DeferredStrategySpec
+StrategySpec = (
+    MovingAverageTrendSpec
+    | DonchianBreakoutSpec
+    | AbsoluteMomentumSpec
+    | MultiHorizonTrendSpec
+    | DeferredStrategySpec
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -392,6 +480,8 @@ class ResearchProposal:
         if type(self.strategy_spec) not in (
             MovingAverageTrendSpec,
             DonchianBreakoutSpec,
+            AbsoluteMomentumSpec,
+            MultiHorizonTrendSpec,
             DeferredStrategySpec,
         ):
             raise DiscoveryError("strategy_spec must use the closed typed grammar")
@@ -711,6 +801,22 @@ def compile_strategy_config(spec: StrategySpec) -> StrategyConfig:
             str(spec.channel_lookback_sessions),
         )
     raise DiscoveryError("strategy family has no accepted evaluator mapping")
+
+
+def compile_generation1_program(
+    spec: StrategySpec,
+) -> StrategyConfig | AbsoluteMomentumSpec | MultiHorizonTrendSpec:
+    """Compile one supported G1 spec without widening A147's config grammar.
+
+    Existing A147-backed families keep the exact historical mapping. The two
+    new families remain their immutable typed specifications for the isolated
+    daily G1 signal compiler. Legacy deferred markers are never compilable.
+    """
+    if type(spec) in (MovingAverageTrendSpec, DonchianBreakoutSpec):
+        return compile_strategy_config(spec)
+    if type(spec) in (AbsoluteMomentumSpec, MultiHorizonTrendSpec):
+        return spec
+    raise DiscoveryError("strategy family has no supported Generation 1 program")
 
 
 @dataclass(frozen=True, slots=True)
@@ -1314,6 +1420,29 @@ def _strategy_spec_from_dict(raw: object) -> StrategySpec:
             fast_window=row["fast_window"],
             slow_window=row["slow_window"],
             channel_lookback_sessions=row["channel_lookback_sessions"],
+        )
+    if schema == _FamilySpecSchema.ABSOLUTE_MOMENTUM.value:
+        row = _exact(
+            raw,
+            {"schema", "family", "lookback_sessions", "gate"},
+        )
+        if row["family"] != StrategyFamily.ABSOLUTE_MOMENTUM.value:
+            raise DiscoveryError("absolute-momentum family/schema mismatch")
+        return AbsoluteMomentumSpec(
+            lookback_sessions=row["lookback_sessions"],
+            gate=_enum(MomentumGate, row["gate"], "momentum gate"),
+        )
+    if schema == _FamilySpecSchema.MULTI_HORIZON_TREND.value:
+        row = _exact(raw, {"schema", "family", "horizons", "vote"})
+        if row["family"] != StrategyFamily.MULTI_HORIZON_TREND.value:
+            raise DiscoveryError("multi-horizon family/schema mismatch")
+        if type(row["horizons"]) is not list or any(
+            type(horizon) is not int for horizon in row["horizons"]
+        ):
+            raise DiscoveryError("multi-horizon values must be an integer list")
+        return MultiHorizonTrendSpec(
+            horizons=tuple(row["horizons"]),
+            vote=_enum(TrendVote, row["vote"], "trend vote"),
         )
     if schema == _FamilySpecSchema.DEFERRED.value:
         row = _exact(raw, {"schema", "family", "deferred_reason"})

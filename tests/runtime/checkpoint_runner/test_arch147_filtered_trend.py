@@ -63,9 +63,12 @@ def test_filtered_trend_route_is_removed_before_frozen_historical_predicate():
     foundation_row = (
         f"              {runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME} {chr(96)}\n"
     )
+    g1_row = f"              {runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME} {chr(96)}\n"
     assert workflow.count(foundation_row) == 1
+    assert workflow.count(g1_row) == 1
     reconstructed = _historical_workflow_view(workflow)
     assert foundation_row not in reconstructed
+    assert g1_row not in reconstructed
     assert runner._ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(reconstructed)
 
 
@@ -78,6 +81,7 @@ def test_current_and_historical_workflow_routes_are_distinct_and_fail_closed():
     foundation_row = (
         f"              {runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME} {chr(96)}\n"
     )
+    g1_row = f"              {runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME} {chr(96)}\n"
     historical_row = f"              {runner.ACTIVE_CI_CHECKPOINTS[0]} {chr(96)}\n"
 
     assert runner._arch147_current_batch_workflow_is_reviewed(workflow)
@@ -87,7 +91,9 @@ def test_current_and_historical_workflow_routes_are_distinct_and_fail_closed():
 
     invalid_views = (
         workflow.replace(current_row, "", 1),
+        workflow.replace(g1_row, "", 1),
         historical.replace(historical_row, historical_row + foundation_row, 1),
+        historical.replace(historical_row, historical_row + g1_row, 1),
         historical.replace(historical_row, historical_row + current_row, 1),
         historical.replace(historical_row, historical_row + historical_row, 1),
         historical + "  certification-full:\n",

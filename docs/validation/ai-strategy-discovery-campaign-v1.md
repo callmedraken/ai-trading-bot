@@ -121,6 +121,17 @@ It must:
 Generation 0 may recommend families for Generation 1, but may not alter any
 candidate after Generation-1 P&L is visible.
 
+Generation 0 is accepted with inventory identity
+`08395fd5-43a4-5a81-9992-877560757a9f`, foundation identity
+`00a845be-228a-56c6-9fd1-9b76c2176cf8`, and A147 bundle identity
+`3b86c5e0-6053-53af-a499-d297265f3cd8` (SHA-256
+`80ff955ce2544f0799d8c1fdc1f77f9c337ecf2b25d01731dda1add90ef392f7`), bound
+to A147 source HEAD/tree
+`6203cbe8729d585dd3a244448bfa81318c7dfc11` /
+`9529749c33fb1dee3b1271e80e7c08f8be0d004d`. Its evaluated-trial count is
+zero. `FINAL_HOLDOUT` remains sealed and AI, provider, broker and production
+effects remain zero.
+
 ## Generation 1A — daily multi-asset hypothesis search
 
 Generation 1A uses the already accepted Architecture 147 daily adjusted
@@ -135,76 +146,73 @@ Generation-1A strategy result is exposed to it. The first generation is capped
 at **32 evaluated candidate programs**, including retained baselines. Duplicate
 semantic candidates are rejected but still recorded in the proposal ledger.
 
-Generation 1A must emphasize materially different mechanisms rather than dense
-numeric tuning. The permitted family vocabulary is:
+The first supported G1 population is frozen at 22 programs. It uses only these
+four families; the remaining campaign families below are deferred and cannot
+be submitted as supported proposals in this checkpoint. The total budget is 32
+evaluated programs with a maximum of 8 programs per family. The unused 10 slots
+remain unused; they are not filled with prose variants, duplicate semantics or
+extra numeric tuning.
 
-- absolute/time-series momentum;
-- multi-horizon trend;
-- moving-average trend;
-- Donchian/channel breakout;
-- volatility-adjusted trend or breakout;
-- bounded mean reversion;
-- cross-sectional relative strength;
-- defensive/risk-on rotation;
-- simple cross-asset regime gating;
-- fixed strategy ensembles formed only from already declared component
-  candidates.
+1. **MOVING_AVERAGE_TREND — 6 retained baselines:** `(35,50)`, `(55,100)` and
+   `(50,200)`, each with the accepted `BASE_MA` and fixed symmetric 1.0% band
+   semantics.
+2. **DONCHIAN_BREAKOUT — 6 retained baselines:** the same three MA pairs,
+   crossed with prior completed-session channel lengths `20` and `55`.
+3. **ABSOLUTE_MOMENTUM — 6 new programs:** lookback `63`, `126` or `252`
+   completed sessions, crossed with gate `NONE` or `ABOVE_SMA200`. At completed
+   session `t`, positive momentum requires `close[t] > close[t-lookback]`; the
+   optional gate also requires `close[t] > SMA200[t]`. Equality is false. The
+   result is LONG or FLAT and takes effect at session `t+1` open.
+4. **MULTI_HORIZON_TREND — 4 new programs:** horizon set `(21,63,126)` or
+   `(63,126,252)`, crossed with vote `2_OF_3` or `3_OF_3`. Each horizon votes
+   positive only when `close[t] > close[t-horizon]`; equality is non-positive.
+   The result is LONG or FLAT and takes effect at session `t+1` open.
 
-Initial parameter values must come from small explicit sets frozen in the
-proposal artifact. The AI may not emit arbitrary continuous thresholds or
-custom Python. No family may consume more than one quarter of the 32-candidate
-budget.
+Existing A147 mappings and execution semantics remain intact for both retained
+baseline families. The two new families use closed typed specifications and a
+separate deterministic evaluator representation; they do not widen the A147
+`StrategyConfig` compiler. No custom code, arbitrary expressions, leverage,
+short, inverse ETF, options or derivatives are supported. No other family is
+currently supported: `VOLATILITY_ADJUSTED_TREND`,
+`BOUNDED_MEAN_REVERSION`, `CROSS_SECTIONAL_RELATIVE_STRENGTH`,
+`DEFENSIVE_ROTATION`, `CROSS_ASSET_REGIME_GATE` and `FIXED_ENSEMBLE` remain
+deferred.
 
-Long-only and FLAT are the default actions for v1. Any leverage, inverse ETF,
-short sale, options or derivatives hypothesis stays outside Generation 1A.
-
-Existing accepted A147 strategies are retained as baseline trials rather than
-being hidden from the search count.
+The complete ordered proposal set must be frozen before any G1 result is
+visible. It binds the accepted Generation-0 identities, source HEAD/tree,
+proposal and semantic-program identities, family counts and budgets; it records
+zero G1 result visibility and a sealed `FINAL_HOLDOUT`. Repeated semantic
+programs are rejected regardless of differences in prose.
 
 ## Deterministic candidate representation
 
-Generation-1 proposals must compile from a closed structured strategy
-specification. The eventual source implementation may use a typed JSON/AST or a
-closed template model, but it must not evaluate arbitrary model-generated code.
+Generation-1 proposals compile only from the exact closed typed specifications
+listed above: the two retained A147 baseline families, absolute momentum and
+multi-horizon trend. Their signal states are LONG or FLAT, and a completed
+session's close can affect execution only at the next session's open. The two
+new families remain separate typed programs and do not expand the A147
+`StrategyConfig` compiler.
 
-The minimum primitive vocabulary may include:
-
-- completed-bar returns over fixed lookbacks;
-- moving averages;
-- realized volatility / ATR;
-- Donchian highs/lows;
-- RSI or bounded oscillator state;
-- absolute momentum sign;
-- cross-sectional rank;
-- AND / OR over closed predicates;
-- LONG / FLAT;
-- fixed top-K selection;
-- fixed equal-weight combination.
-
-Every feature must be computed from information available before the execution
-decision. No same-bar close may determine a fill at that same close or earlier
-price.
-
-Implementation discovery may narrow this primitive set to reuse existing source.
-It may not silently broaden it after P&L is observed.
+Arbitrary model-generated code and unreviewed program primitives are not
+supported. ATR or RSI filters, cross-sectional ranks, top-K selection and fixed
+ensembles remain deferred unless separately reviewed and admitted into a future
+frozen population. No same-bar close may determine a fill at that same close or
+an earlier price.
 
 ## Search chronology
 
 The true `FINAL_HOLDOUT` remains sealed.
 
-Inside OPEN data, v1 uses staged research visibility rather than allowing every
-AI generation to inspect the whole 2016-2023 interval repeatedly.
+The G1 evaluator receives the accepted A147 adjusted daily universe exactly as
+`SPY, QQQ, IWM, EFA, EEM, TLT, GLD, PDBC`. It may use data before 2019 only for
+indicator/lookback warm-up. G1 discovery evidence is exactly
+`[2019-01-01, 2022-01-01)`, with 2019, 2020 and 2021 calendar slices plus one
+continuous 2019-2021 result. The bounded discovery view must remove all bars on
+or after 2022-01-01 before strategy evaluation. The G1 evaluator must not
+compute or expose 2022-2023 results. `FINAL_HOLDOUT` remains inaccessible.
 
-- warm-up/reference history may use 2016-2018 as required by the frozen
-  indicators;
-- Generation 1 discovery evidence uses 2019-2021;
-- the AI may inspect Generation-1 diagnostics and create exactly one bounded
-  Generation-2 mutation/recombination set;
-- Generation-2 proposal semantics must be frozen before 2022-2023 confirmation
-  evidence is exposed;
-- 2022-2023 is confirmation evidence and may not trigger another numeric
-  mutation loop;
-- `FINAL_HOLDOUT` remains untouched after confirmation.
+Any later confirmation or Generation-2 workflow must be separately frozen
+before it can read 2022-2023 evidence; it is outside this source checkpoint.
 
 Prior project research has already exposed some 2022-2023 behavior for other
 strategy families. Therefore 2022-2023 is **not** called a pristine holdout.
@@ -221,7 +229,10 @@ economics:
 
 - base: $1 per fill plus 5 bps adverse slippage;
 - stress: $2 per fill plus 10 bps adverse slippage;
-- whole adjusted-share units;
+- starting cash $100,000 and 95% allocation;
+- whole adjusted-share units and next-session-open execution from the prior
+  completed session's signal;
+- independent per-symbol accounts;
 - no synthetic missing prices.
 
 Every evaluated candidate must retain at least:
@@ -229,41 +240,43 @@ Every evaluated candidate must retain at least:
 - net return under base and stress;
 - maximum drawdown;
 - turnover;
-- trade/fill count;
+- entry, closed-trade and fill counts;
 - time invested/exposure when supported;
-- each calendar-year result;
-- each asset result;
+- each asset/year result and each continuous-symbol result;
 - buy-and-hold comparison where semantically applicable;
-- parameter-neighbor or structural-ablation evidence when predeclared;
-- concentration evidence sufficient to identify dependence on a small number of
-  observations/trades;
-- deterministic result/equity/trade identities where supported.
+- deterministic result/equity/fill identities;
+- breadth and concentration diagnostics sufficient to identify dependence on a
+  small number of assets, years, observations or trades.
 
-Ranking by raw return alone is forbidden.
+The panel has 8 continuous-symbol cells and 24 asset/year cells. Retain separate
+base and stress summaries. For each completed non-zero-trade candidate, classify
+`SHORTLISTED` only when all of these hold under stress economics: median
+continuous-symbol return is strictly positive; at least 5 of 8 continuous
+returns are strictly positive; at least 13 of 24 asset/year returns are
+strictly positive; and the candidate is nondominated on the deterministic
+Pareto frontier. Its objectives are to maximize stress median continuous-symbol
+return, stress minimum continuous-symbol return, positive continuous-symbol
+count and positive asset/year-cell count, and to minimize stress worst
+continuous-symbol drawdown and stress median turnover. Equal objective vectors
+remain ties. Every other completed non-zero-trade candidate is
+`ECONOMICALLY_REJECTED`. `ZERO_TRADE` means exactly zero BUY entries across the
+full discovery panel. Raw return alone never determines the terminal class.
+Stress median turnover is the median across the 24 annual asset/year cells,
+following the accepted A147 aggregate-summary convention.
+
+DSR remains deferred until a candidate may advance beyond exploratory BACKTESTED
+status. Shortlisting grants no lifecycle promotion.
 
 ## Generation filtering
 
 Generation-1 output is descriptive. It does not directly create a production
 candidate.
 
-The deterministic analyzer should use existing Pareto/ranking machinery where
-the result model permits it. The primary research objectives are:
-
-maximize:
-
-- stress-cost return;
-- breadth of positive asset/year evidence;
-- minimum/median confirmation return;
-- persistence across adjacent/predeclared variants;
-
-minimize:
-
-- maximum drawdown;
-- turnover/cost sensitivity;
-- concentration;
-- parameter sensitivity.
-
-A high-return isolated spike is not preferred over a broad robust plateau.
+The deterministic analyzer must validate the complete ordered frozen proposal
+set and complete result panel before applying the terminal rule above. It may
+not calculate a frontier from a cherry-picked subset. Pareto comparisons use
+the six frozen stress dimensions; ties remain ties and no hidden epsilon or
+extra tie-break is allowed.
 
 The AI may diagnose the frontier but may not change the already completed
 Generation-1 rules.
@@ -321,9 +334,10 @@ discipline. Model output alone never gains production authority.
 
 Source/CI tests use no external AI service.
 
-The first source checkpoint should represent AI proposals as supplied canonical
-research input so tests remain deterministic and offline. An online model
-connector may be designed later as a replaceable proposal producer.
+The accepted discovery foundation represents AI proposals as supplied
+canonical research input so tests remain deterministic and offline. The G1
+source checkpoint preserves that boundary. An online model connector may be
+designed later as a replaceable proposal producer.
 
 An AI proposal producer must never have:
 
@@ -350,30 +364,27 @@ leader status is not itself a lifecycle transition.
 
 ## Immediate source milestone
 
-The first implementation checkpoint is a source-only/fake-only **AI research
-campaign foundation**.
+The current implementation checkpoint is the source-only/fake-only G1 daily
+evaluator and analyzer. Generation 0 is already accepted and the accepted AI
+strategy discovery foundation supplies the canonical proposal model, append-only
+ledger and evidence inventory. G1 adds two new single-symbol families, bringing
+the supported set to four, plus the immutable proposal-set contract, bounded
+discovery view, narrow A147 helper reuse, deterministic evaluation and
+complete-panel terminal analysis.
 
-It should reuse the existing research engines and add only the smallest missing
-pieces:
+It must not rewrite accepted A147 behavior or identities, the backtest engine,
+walk-forward machinery or research-candidate lifecycle. All G1 evaluator and
+analyzer tests use synthetic in-memory inputs. The source checkpoint runs no
+real G1 proposal population or market-data replay and creates no G1 result
+artifact. It makes no AI API call, credential read, provider/network call,
+Robinhood or broker call, order effect, production-state read/write,
+`FINAL_HOLDOUT` access or strategy promotion. A real proposal set can be created
+only after source acceptance.
 
-- canonical AI hypothesis/proposal model;
-- append-only semantic trial ledger;
-- Generation-0 evidence inventory/synthesis reader;
-- closed Generation-1 strategy-spec representation;
-- deterministic mapping from supported specs to existing research evaluators;
-- trial-count-aware result metadata;
-- bounded campaign artifact and verifier;
-- focused tests proving no network/provider/broker/production/holdout effects.
-
-Do not rewrite the backtest engine, ranking, Pareto, walk-forward or research
-candidate lifecycle.
-
-The source checkpoint runs no real campaign and makes no provider or AI API
-call. After source acceptance, Generation 0 is the first real research action.
-
-If implementation discovery shows that a requested strategy primitive requires
-a materially new execution model rather than a narrow adapter, STOP and return
-to ChatGPT before broadening the source checkpoint.
+If implementation discovery shows that either new family requires a materially
+new portfolio/execution model, new data acquisition, a chronology change or a
+result-dependent contract adjustment, STOP and return to ChatGPT before
+broadening the source checkpoint.
 
 ## Public research references
 

@@ -12,17 +12,21 @@ from trading_bot.experiments.ai_strategy_discovery import (
     GENERATION_1_MAX_EVALUATED,
     GENERATION_1_MAX_PER_FAMILY,
     GENERATION_2_MAX_EVALUATED,
+    AbsoluteMomentumSpec,
     DeferredStrategySpec,
     DiscoveryError,
     DonchianBreakoutSpec,
     Generation1DiagnosticReference,
     InformationVisibility,
     InvalidProposalReference,
+    MomentumGate,
     MovingAverageRule,
     MovingAverageTrendSpec,
+    MultiHorizonTrendSpec,
     ProposalKind,
     ResearchProposal,
     StrategyFamily,
+    TrendVote,
     TrialDisposition,
     TrialLedger,
     TrialLedgerRecord,
@@ -31,6 +35,7 @@ from trading_bot.experiments.ai_strategy_discovery import (
     VisibleEvidenceReference,
     VisibleTimeframe,
     VisibleTimePartition,
+    compile_generation1_program,
     compile_strategy_config,
 )
 
@@ -70,6 +75,8 @@ def _g1_proposal(
     *,
     spec: MovingAverageTrendSpec
     | DonchianBreakoutSpec
+    | AbsoluteMomentumSpec
+    | MultiHorizonTrendSpec
     | DeferredStrategySpec
     | None = None,
     hypothesis: str = "The frozen trend filter may persist across assets.",
@@ -191,10 +198,8 @@ def test_finite_strategy_grammar_rejects_values_code_and_unknown_fields() -> Non
         ResearchProposal.from_dict(raw)
 
 
-def test_deferred_family_vocabulary_is_explicit_but_not_compilable() -> None:
+def test_legacy_deferred_markers_remain_unsupported() -> None:
     deferred = (
-        StrategyFamily.ABSOLUTE_MOMENTUM,
-        StrategyFamily.MULTI_HORIZON_TREND,
         StrategyFamily.VOLATILITY_ADJUSTED_TREND,
         StrategyFamily.BOUNDED_MEAN_REVERSION,
         StrategyFamily.CROSS_SECTIONAL_RELATIVE_STRENGTH,
@@ -208,6 +213,59 @@ def test_deferred_family_vocabulary_is_explicit_but_not_compilable() -> None:
         assert proposal.family is family
         with pytest.raises(DiscoveryError):
             compile_strategy_config(proposal.strategy_spec)
+
+    for family in (
+        StrategyFamily.ABSOLUTE_MOMENTUM,
+        StrategyFamily.MULTI_HORIZON_TREND,
+    ):
+        legacy = _g1_proposal(spec=DeferredStrategySpec(family))
+        assert legacy.semantic_status.value == "UNSUPPORTED"
+        assert ResearchProposal.from_bytes(legacy.to_bytes()) == legacy
+        with pytest.raises(DiscoveryError):
+            compile_generation1_program(legacy.strategy_spec)
+
+
+@pytest.mark.parametrize(
+    "spec",
+    (
+        AbsoluteMomentumSpec(63, MomentumGate.NONE),
+        AbsoluteMomentumSpec(252, MomentumGate.ABOVE_SMA200),
+        MultiHorizonTrendSpec((21, 63, 126), TrendVote.TWO_OF_THREE),
+        MultiHorizonTrendSpec((63, 126, 252), TrendVote.THREE_OF_THREE),
+    ),
+)
+def test_new_generation1_specs_roundtrip_and_exclude_prose_from_semantic_id(spec):
+    proposal = _g1_proposal(spec=spec)
+    changed_prose = _g1_proposal(
+        spec=spec,
+        hypothesis="Different bounded text with the same exact rule.",
+    )
+
+    assert proposal.semantic_status.value == "SUPPORTED"
+    assert proposal.semantic_program_id == changed_prose.semantic_program_id
+    assert proposal.proposal_id != changed_prose.proposal_id
+    assert compile_generation1_program(spec) is spec
+    assert ResearchProposal.from_bytes(proposal.to_bytes()) == proposal
+
+
+def test_new_generation1_specs_reject_open_or_out_of_grid_parameters() -> None:
+    with pytest.raises(DiscoveryError):
+        AbsoluteMomentumSpec(True, MomentumGate.NONE)
+    with pytest.raises(DiscoveryError):
+        AbsoluteMomentumSpec(64, MomentumGate.NONE)
+    with pytest.raises(DiscoveryError):
+        AbsoluteMomentumSpec(63, "NONE")
+    with pytest.raises(DiscoveryError):
+        MultiHorizonTrendSpec([21, 63, 126], TrendVote.TWO_OF_THREE)
+    with pytest.raises(DiscoveryError):
+        MultiHorizonTrendSpec((21, 63, 252), TrendVote.TWO_OF_THREE)
+    with pytest.raises(DiscoveryError):
+        MultiHorizonTrendSpec((21, 63, 126), "2_OF_3")
+
+    raw = _g1_proposal(spec=AbsoluteMomentumSpec(63, MomentumGate.NONE)).to_dict()
+    raw["strategy_spec"]["expression"] = "arbitrary()"
+    with pytest.raises(DiscoveryError):
+        ResearchProposal.from_dict(raw)
 
 
 def test_g2_requires_prior_g1_parent_diagnostics_and_visibility() -> None:

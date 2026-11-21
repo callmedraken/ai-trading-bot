@@ -401,6 +401,41 @@ AI_STRATEGY_DISCOVERY_FOUNDATION_RUFF: Final = (
     "tests/experiments/test_ai_strategy_discovery.py",
     "tests/experiments/test_ai_strategy_discovery_evidence.py",
 )
+AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: Final = "arch-ai-strategy-discovery-g1-engine"
+AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH: Final = (
+    "feature/research-ai-strategy-discovery-g1-engine-current"
+)
+AI_STRATEGY_DISCOVERY_G1_ENGINE_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/runtime/checkpoint_runner/test_arch147_filtered_trend.py",
+    "tests/experiments/test_ai_strategy_discovery.py",
+    "tests/experiments/test_ai_strategy_discovery_evidence.py",
+    "tests/experiments/test_ai_strategy_discovery_generation1_plan.py",
+    "tests/experiments/test_ai_strategy_discovery_generation1.py",
+    "tests/experiments/test_ai_strategy_discovery_generation1_analysis.py",
+    "tests/experiments/test_filtered_trend_strategies.py",
+    "tests/experiments/test_filtered_trend_campaign.py",
+)
+AI_STRATEGY_DISCOVERY_G1_ENGINE_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/runtime/checkpoint_runner/test_arch147_filtered_trend.py",
+    "src/trading_bot/experiments/ai_strategy_discovery.py",
+    "src/trading_bot/experiments/ai_strategy_discovery_evidence.py",
+    "src/trading_bot/experiments/ai_strategy_discovery_generation1_plan.py",
+    "src/trading_bot/experiments/ai_strategy_discovery_generation1.py",
+    "src/trading_bot/experiments/ai_strategy_discovery_generation1_analysis.py",
+    "src/trading_bot/experiments/filtered_trend_strategies.py",
+    "src/trading_bot/experiments/filtered_trend_campaign.py",
+    "tests/experiments/test_ai_strategy_discovery.py",
+    "tests/experiments/test_ai_strategy_discovery_evidence.py",
+    "tests/experiments/test_ai_strategy_discovery_generation1_plan.py",
+    "tests/experiments/test_ai_strategy_discovery_generation1.py",
+    "tests/experiments/test_ai_strategy_discovery_generation1_analysis.py",
+    "tests/experiments/test_filtered_trend_strategies.py",
+    "tests/experiments/test_filtered_trend_campaign.py",
+)
 ARCH147_NAME: Final = "arch147-desktop-research-profile"
 ARCH147_BRANCH: Final = "feature/research-desktop-product-pivot-current"
 ARCH147_TESTS: Final = (
@@ -688,6 +723,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
     ARCH148_CHURN_NAME,
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
+    AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
 )
 
@@ -701,6 +737,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH147_FILTERED_TREND_NAME: "full",
     ARCH148_CHURN_NAME: "full",
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
+    AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
     ARCH147_P5A_NAME: "full",
     ARCH147_P4_NAME: "full",
     ARCH147_NAME: "full",
@@ -26720,6 +26757,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH,
     )
+    values[AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME] = CheckpointSpec(
+        AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
+        "Source-only G1 daily evaluator and analysis; no campaign authority",
+        AI_STRATEGY_DISCOVERY_G1_ENGINE_TESTS,
+        AI_STRATEGY_DISCOVERY_G1_ENGINE_RUFF,
+        _ai_strategy_discovery_g1_engine_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH,
+    )
     values[ARCH147_NAME] = CheckpointSpec(
         ARCH147_NAME,
         "Current single-user desktop research storage and loader pivot",
@@ -27366,6 +27413,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     for name in (
         ARCH148_CHURN_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
+        AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
         ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
@@ -27404,6 +27452,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
     current_names = (
         ARCH148_CHURN_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
+        AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
         ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
@@ -28456,6 +28505,68 @@ def _ai_strategy_discovery_foundation_authority_check(
     for relative in required_paths:
         if not (repo_root / relative).is_file():
             failures.append("AI strategy discovery source route is missing " + relative)
+    return tuple(failures)
+
+
+def _ai_strategy_discovery_g1_engine_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Register the Generation-1 engine as source-only current research."""
+    from scripts import current_source_authority
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != AI_STRATEGY_DISCOVERY_G1_ENGINE_TESTS
+        or spec.ruff_paths != AI_STRATEGY_DISCOVERY_G1_ENGINE_RUFF
+        or spec.authority_check is not _ai_strategy_discovery_g1_engine_authority_check
+        or spec.remote_branch != AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME)
+        != 1
+        or AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(specs, AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH, "push")
+        != AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME
+        or AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME
+        not in current_source_authority.develop_static_checkpoints(repo_root)
+    ):
+        failures.append("AI strategy discovery G1 source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("AI strategy discovery G1 tests are not FULL-owned")
+    required_paths = (
+        "src/trading_bot/experiments/ai_strategy_discovery.py",
+        "src/trading_bot/experiments/ai_strategy_discovery_evidence.py",
+        "src/trading_bot/experiments/ai_strategy_discovery_generation1_plan.py",
+        "src/trading_bot/experiments/ai_strategy_discovery_generation1.py",
+        "src/trading_bot/experiments/ai_strategy_discovery_generation1_analysis.py",
+        "src/trading_bot/experiments/filtered_trend_campaign.py",
+        "tests/experiments/test_ai_strategy_discovery.py",
+        "tests/experiments/test_ai_strategy_discovery_evidence.py",
+        "tests/experiments/test_ai_strategy_discovery_generation1_plan.py",
+        "tests/experiments/test_ai_strategy_discovery_generation1.py",
+        "tests/experiments/test_ai_strategy_discovery_generation1_analysis.py",
+        "tests/experiments/test_filtered_trend_campaign.py",
+    )
+    for relative in required_paths:
+        if not (repo_root / relative).is_file():
+            failures.append("AI strategy discovery G1 route is missing " + relative)
+    workflow_path = repo_root / ".github/workflows/checkpoint-source-gates.yml"
+    try:
+        workflow = workflow_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        failures.append("AI strategy discovery G1 source workflow is unavailable")
+    else:
+        registration = f"              {AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME} `\n"
+        if workflow.count(
+            registration
+        ) != 1 or not _arch147_current_batch_workflow_is_reviewed(workflow):
+            failures.append("AI strategy discovery G1 source workflow drift")
     return tuple(failures)
 
 

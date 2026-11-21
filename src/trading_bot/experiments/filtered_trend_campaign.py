@@ -406,9 +406,32 @@ def _evaluate_cell(
     prepared_states: tuple[str, ...] | None = None,
 ) -> CellEvidence:
     """Fresh base/stress accounts; prior history contributes indicators only."""
+    if regime not in regime_plan() or config not in strategy_grid():
+        raise ValueError("outside frozen research plan")
+    return _evaluate_prepared_cell(
+        bars,
+        regime,
+        candidate_id,
+        prepared_states=prepared_states,
+        config=config,
+    )
+
+
+def _evaluate_prepared_cell(
+    bars: tuple[Bar, ...],
+    regime: Regime,
+    candidate_id: str,
+    *,
+    prepared_states: tuple[str, ...] | None = None,
+    config: StrategyConfig | None = None,
+) -> CellEvidence:
+    """Replay one closed, already-compiled signal series with A147 economics.
+
+    The Generation-1 adapter supplies only immutable BUY/SELL/HOLD states from
+    its closed typed signal compiler. Existing A147 evaluation still enters
+    through ``_evaluate_cell`` and retains its frozen config/regime checks.
+    """
     with localcontext(CONTEXT):
-        if regime not in regime_plan() or config not in strategy_grid():
-            raise ValueError("outside frozen research plan")
         if not bars or any(b.symbol != bars[0].symbol for b in bars):
             raise ValueError("one symbol per independent account")
         if any(
@@ -427,11 +450,12 @@ def _evaluate_cell(
         )
         if not indices or indices[0] < 253:
             raise ValueError("insufficient regime/warmup history")
-        states = (
-            prepared_states
-            if prepared_states is not None
-            else signal_series(config, bars)
-        )
+        if prepared_states is not None:
+            states = prepared_states
+        elif config is not None:
+            states = signal_series(config, bars)
+        else:
+            raise ValueError("compiled signal states are required")
         if len(states) != len(bars):
             raise ValueError("signal series length mismatch")
         # Wilder ATR helper returns one value per prefix (warmup values are None).

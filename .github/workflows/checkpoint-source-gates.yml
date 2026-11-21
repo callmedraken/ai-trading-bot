@@ -34,6 +34,7 @@ env:
               arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1 `
               arch148-churn-research `
               arch148-intraday-momentum-research `
+              arch149-monthly-defensive-rotation-research `
               arch-ai-strategy-discovery-foundation `
               arch-ai-strategy-discovery-g1-engine `
               arch146-a-historical-research-dataset-enforcement `

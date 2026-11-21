@@ -407,6 +407,29 @@ ARCH148_INTRADAY_MOMENTUM_RUFF: Final = (
     "tests/experiments/test_arch148_intraday_momentum_replay.py",
     "tests/experiments/test_arch148_intraday_momentum_evidence.py",
 )
+ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME: Final = (
+    "arch149-monthly-defensive-rotation-research"
+)
+ARCH149_MONTHLY_DEFENSIVE_ROTATION_BRANCH: Final = (
+    "feature/research-arch149-monthly-defensive-rotation-current"
+)
+ARCH149_MONTHLY_DEFENSIVE_ROTATION_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/experiments/test_filtered_trend_data.py",
+    "tests/experiments/test_arch149_monthly_defensive_rotation.py",
+    "tests/experiments/test_arch149_monthly_defensive_rotation_evidence.py",
+)
+ARCH149_MONTHLY_DEFENSIVE_ROTATION_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "src/trading_bot/experiments/filtered_trend_data.py",
+    "src/trading_bot/experiments/arch149_monthly_defensive_rotation.py",
+    "src/trading_bot/experiments/arch149_monthly_defensive_rotation_evidence.py",
+    "tests/experiments/test_filtered_trend_data.py",
+    "tests/experiments/test_arch149_monthly_defensive_rotation.py",
+    "tests/experiments/test_arch149_monthly_defensive_rotation_evidence.py",
+)
 AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: Final = "arch-ai-strategy-discovery-foundation"
 AI_STRATEGY_DISCOVERY_FOUNDATION_BRANCH: Final = (
     "feature/research-ai-strategy-discovery-current"
@@ -747,6 +770,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
     ARCH148_CHURN_NAME,
     ARCH148_INTRADAY_MOMENTUM_NAME,
+    ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
@@ -762,6 +786,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH147_FILTERED_TREND_NAME: "full",
     ARCH148_CHURN_NAME: "full",
     ARCH148_INTRADAY_MOMENTUM_NAME: "full",
+    ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME: "full",
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
     ARCH147_P5A_NAME: "full",
@@ -26783,6 +26808,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH148_INTRADAY_MOMENTUM_BRANCH,
     )
+    values[ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME] = CheckpointSpec(
+        ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
+        "Source-only Architecture 149 monthly defensive rotation research",
+        ARCH149_MONTHLY_DEFENSIVE_ROTATION_TESTS,
+        ARCH149_MONTHLY_DEFENSIVE_ROTATION_RUFF,
+        _arch149_monthly_defensive_rotation_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH149_MONTHLY_DEFENSIVE_ROTATION_BRANCH,
+    )
     values[AI_STRATEGY_DISCOVERY_FOUNDATION_NAME] = CheckpointSpec(
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         "Source-only AI strategy discovery proposal and evidence foundation",
@@ -27449,6 +27484,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     for name in (
         ARCH148_CHURN_NAME,
         ARCH148_INTRADAY_MOMENTUM_NAME,
+        ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -27489,6 +27525,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
     current_names = (
         ARCH148_CHURN_NAME,
         ARCH148_INTRADAY_MOMENTUM_NAME,
+        ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -28542,6 +28579,60 @@ def _arch148_intraday_momentum_authority_check(
     for relative in required_paths:
         if not (repo_root / relative).is_file():
             failures.append("148 intraday momentum source route is missing " + relative)
+    return tuple(failures)
+
+
+def _arch149_monthly_defensive_rotation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Register source-only monthly rotation without evaluation dispatch."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != ARCH149_MONTHLY_DEFENSIVE_ROTATION_TESTS
+        or spec.ruff_paths != ARCH149_MONTHLY_DEFENSIVE_ROTATION_RUFF
+        or spec.authority_check
+        is not _arch149_monthly_defensive_rotation_authority_check
+        or spec.remote_branch != ARCH149_MONTHLY_DEFENSIVE_ROTATION_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME)
+        != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME)
+        != 1
+        or ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(
+            specs, ARCH149_MONTHLY_DEFENSIVE_ROTATION_BRANCH, "push"
+        )
+        != ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME
+    ):
+        failures.append("149 monthly defensive rotation source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("149 monthly defensive rotation tests are not FULL-owned")
+    required_paths = (
+        "src/trading_bot/experiments/arch149_monthly_defensive_rotation.py",
+        "src/trading_bot/experiments/arch149_monthly_defensive_rotation_evidence.py",
+        "tests/experiments/test_arch149_monthly_defensive_rotation.py",
+        "tests/experiments/test_arch149_monthly_defensive_rotation_evidence.py",
+    )
+    for relative in required_paths:
+        if not (repo_root / relative).is_file():
+            failures.append(
+                "149 monthly defensive rotation route is missing " + relative
+            )
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    row = f"              {ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME} {chr(96)}\n"
+    if workflow.count(row) != 1 or not _arch147_current_batch_workflow_is_reviewed(
+        workflow
+    ):
+        failures.append("149 monthly defensive rotation active CI projection drift")
     return tuple(failures)
 
 

@@ -1,25 +1,28 @@
 # Validation — Architecture 149 monthly cross-asset defensive rotation
 
-Status: **DESIGN FROZEN; SOURCE NOT IMPLEMENTED**.
+Status: **Design frozen. Source implemented and awaiting independent acceptance.**
 
 This plan validates the exact one-candidate Architecture-149 contract in
 `../architecture/149-monthly-cross-asset-defensive-rotation.md`.
 
 ## Source route
 
-Planned checkpoint:
+Registered source-only checkpoint:
 
 `arch149-monthly-defensive-rotation-research`
 
-Planned branch:
+Registered branch:
 
 `feature/research-arch149-monthly-defensive-rotation-current`
 
-Planned worktree:
+Source worktree:
 
 `F:\AI\worktrees\ai-trading-bot-arch149-monthly-defensive-rotation-current`
 
-Create the route/worktree only during the source checkpoint.
+The current route is mapped to the `full` certification profile and accepts the
+exact `feature/research-arch149-monthly-defensive-rotation-current` branch on
+push. It has no preflight, execute, or remote-head environment dispatch. This
+registration grants source verification only.
 
 ## Source-only requirements
 
@@ -55,6 +58,12 @@ Use focused tests with `-p no:cacheprovider` and a fresh external
 Run focused Ruff check/format check and `git diff --check`.
 
 Do not run local canonical FULL or ROBINHOOD.
+
+## Reporting conventions
+
+Tests and source reports must follow the metric timing and formulas in the
+architecture's `Reporting semantics` section. In particular, missing-input
+no-rebalance remains distinct from a valid signal decision that targets CASH.
 
 ## Publication
 

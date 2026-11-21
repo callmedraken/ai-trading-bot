@@ -1,6 +1,6 @@
 # Architecture 149 — Monthly cross-asset defensive rotation research
 
-Status: **DESIGN FROZEN; SOURCE NOT IMPLEMENTED**.
+Status: **Design frozen. Source implemented and awaiting independent acceptance.**
 
 ## Purpose
 
@@ -192,6 +192,32 @@ For each cost case preserve at minimum:
 - complete daily-equity identity;
 - QQQ/SPY buy-and-hold descriptive comparators;
 - zero-effect counters.
+
+### Reporting semantics
+
+The 2016 interval is warmup only and contributes no signals, actions, or
+performance. A December 2023 month-end target remains in the target history as
+the terminal non-executable decision. It must not cause a 2024 date or open
+price lookup.
+
+Count signals and CASH targets on their signal dates. Count executable
+rebalances, unchanged-versus-held outcomes, ETF switches, fills, and turnover
+on their action or fill dates. Report a missing-input no-rebalance separately
+from a valid signal decision, including a valid decision that targets CASH.
+Time invested is the fraction of scoring sessions held at the close. Per-symbol
+months held counts qualified month-end closing holdings.
+
+Report returns after costs. Calculate 1-year and 7-year calendar-span CAGR from
+the corresponding continuous portfolio path. Daily net returns are simple
+returns, with the first daily return measured from the scoring slice's opening
+equity. Annualized volatility uses sample standard deviation multiplied by
+square root of 252. The zero-risk-free daily Sharpe ratio uses the mean divided
+by sample standard deviation, multiplied by square root of 252. It is undefined
+when sample standard deviation is degenerate.
+
+QQQ and SPY passive comparisons run from the first scoring-session OPEN through
+the last scoring-session CLOSE. They remain descriptive and do not reset the
+portfolio path.
 
 ## Frozen exploratory classification
 

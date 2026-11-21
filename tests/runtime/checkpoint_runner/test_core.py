@@ -296,6 +296,67 @@ def test_arch148_intraday_momentum_route_help_is_effect_free(monkeypatch, capsys
     assert runner.ARCH148_INTRADAY_MOMENTUM_NAME in capsys.readouterr().out
 
 
+def test_arch149_monthly_defensive_rotation_checkpoint_is_source_only_and_mapped():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME]
+
+    assert runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME == (
+        "arch149-monthly-defensive-rotation-research"
+    )
+    assert runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_BRANCH == (
+        "feature/research-arch149-monthly-defensive-rotation-current"
+    )
+    assert spec.remote_branch == runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_BRANCH
+    assert (
+        spec.authority_check
+        is runner._arch149_monthly_defensive_rotation_authority_check
+    )
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert (
+        runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME
+        not in runner.ACTIVE_CI_CHECKPOINTS
+    )
+    assert (
+        runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(
+            runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME
+        )
+        == 1
+    )
+    assert (
+        runner.CI_CERTIFICATION_PROFILES[runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME]
+        == "full"
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_BRANCH, "push"
+        )
+        == runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME
+    )
+    assert runner._arch149_monthly_defensive_rotation_authority_check(repo) == ()
+
+
+def test_arch149_monthly_defensive_rotation_route_help_is_effect_free(
+    monkeypatch, capsys
+):
+    def forbidden(*args, **kwargs):
+        pytest.fail("route help dispatched a protected runner effect")
+
+    monkeypatch.setattr(runner.subprocess, "run", forbidden)
+    monkeypatch.setattr(runner, "_git_state", forbidden)
+    monkeypatch.setattr(runner, "_default_evidence_root", forbidden)
+    monkeypatch.setattr(runner, "verify_checkpoint", forbidden)
+    monkeypatch.setattr(runner, "verify_batch", forbidden)
+
+    with pytest.raises(SystemExit) as exit_info:
+        runner.main(
+            ["verify", runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME, "--help"]
+        )
+
+    assert exit_info.value.code == 0
+    assert runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME in capsys.readouterr().out
+
+
 def test_ai_strategy_discovery_checkpoint_is_source_only_and_mapped():
     repo = Path(runner.__file__).resolve().parents[1]
     specs = runner._checkpoint_specs()

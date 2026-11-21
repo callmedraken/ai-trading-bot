@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - AI Strategy Discovery G2 source accepted/integrated; real confirmation execution next
+## Current milestone - AI Strategy Discovery selection-bias source accepted/integrated; real DSR observation next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -105,38 +105,52 @@ provider-scope, whole-share stop, approval-linkage and risk/notional blockers.
 The active research roadmap is the
 [AI Strategy Discovery Campaign v1](validation/ai-strategy-discovery-campaign-v1.md).
 
-Generation 0 is accepted. Generation 1 then evaluated the exact frozen 22-program
-daily multi-asset population once against the accepted A147 dataset over the
-2019-2021 discovery partition. Accepted G1 identities are proposal set
-`b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, batch run
-`fd53330e-82ff-58a3-99b8-1818b9a0bbc0`, whole-panel analysis
+Generation 0 is accepted. Generation 1 consumed the exact frozen 22-program
+daily multi-asset population once over the 2019-2021 discovery partition.
+Accepted G1 identities are proposal set
+`b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, batch
+`fd53330e-82ff-58a3-99b8-1818b9a0bbc0`, analysis
 `d5ca081e-7490-5590-921d-10cee373d012` and terminal ledger
-`68418f44-7db0-5080-a6bd-a956a928bd4a`. The ledger records 22 evaluated G1
-trials, 12 SHORTLISTED and 10 ECONOMICALLY_REJECTED, with zero G2 trials.
-Generation-1 results are visible; 2022-2023 confirmation evidence was not read by
-that campaign and `FINAL_HOLDOUT` remains sealed. The accepted G1 evidence is
-preserved under
+`68418f44-7db0-5080-a6bd-a956a928bd4a`. G1 consumed 22 trials:
+12 SHORTLISTED and 10 ECONOMICALLY_REJECTED. Its immutable evidence remains at
 `F:\AI\temp\ai-strategy-discovery-g1-run-fd53330e-82ff-58a3-99b8-1818b9a0bbc0`
 and must not be regenerated or overwritten.
 
-The source-only Generation-2 composition checkpoint is independently
+Generation 2 is also consumed and must not be rerun or mutated using visible
+confirmation results. Its proposal set is
+`c958130d-7594-535b-aa46-065525a10c46`, batch
+`8c85731c-75dd-5a60-9456-10f237a6b0dd`, analysis
+`821697c8-9917-5b76-b519-f81a2452d7f6` and terminal ledger
+`e86be80c-562c-5243-bc56-9e4a9e4c9f6d`. It consumed six G2 trials:
+0 CONFIRMATION_PASSED and 6 CONFIRMATION_REJECTED. The frozen momentum-admission
+recombination hypothesis is rejected. Total campaign evaluated trials are 28.
+The G2 evidence root is
+`F:\AI\temp\ai-strategy-discovery-g2-run-8c85731c-75dd-5a60-9456-10f237a6b0dd`.
+`FINAL_HOLDOUT` remains sealed.
+
+The G1 selection-bias source checkpoint is independently
 SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
-`addfa839b800732cfdaa79b43d2d6291525d32f3` / tree
-`6aea44abdc4faaaf4e3de984e7fcfcbcb0834943`, direct parent
-`61df6196a8e9ed41a2f4873ca82f08846aadcca7`. Feature mapped FULL run
-`44870115703`, attempt 1, is terminal SUCCESS with source-static, active-tests,
-source-gates and all seven canonical FULL lanes passing. Develop run
-`44871126058`, attempt 1, is terminal SUCCESS with exact feature-certification
+`c26315b37c9b5fce355f323484f639368ce95749` / tree
+`b3c678459062d24ae67f901b40cf7bc496ea6b87`, direct parent
+`170790fb60615e57c26e6a6c073834d4c94bb03a`. Feature mapped FULL run
+`44881687514`, attempt 1, is terminal SUCCESS with source-static, active-tests,
+source-gates and all seven mapped FULL lanes passing. Develop run
+`44882606523`, attempt 1, is terminal SUCCESS with exact feature-certification
 reuse; active/FULL/certification execution was skipped, so no duplicate FULL ran.
 
-G2 is frozen to exactly six typed `ALL_OF` recombinations of accepted G1 parent
-signals. The real G2 trial count remains 0/16. No real G2 proposal/result artifact
-has been created, the accepted A147 dataset has not been read through the G2
-evaluator, 2022-2023 confirmation results remain unseen, and `FINAL_HOLDOUT`
-remains sealed. The next research action is to create the exact source-bound
-six-proposal G2 artifact from the accepted G1 proposal/analysis/terminal-ledger
-evidence, accept all six before evaluation, and execute the 2022-2023
-confirmation batch exactly once. G1 must not be rerun automatically.
+The accepted source reconstructs all 176 continuous stress equity traces from
+the accepted G1 fills and adjusted closes without replaying strategy signals,
+requires exact accepted equity-trace identities, builds one equal-weight
+eight-sleeve daily return series for each of all 22 G1 programs, and applies the
+frozen 22-trial Deflated Sharpe Ratio plus the separately labeled
+28-trial Bonferroni PSR sensitivity. Only the 12 original G1 shortlists are
+eligible for SELECTION_BIAS_PASSED/REJECTED. Real selection-bias observation is
+NOT RUN: no real DSR report exists yet, no G1/G2 campaign replay is authorized,
+and G2 confirmation metrics are not selection inputs. The next research action
+is one exact effect-free observation using only the immutable G1 artifacts and
+accepted A147 dataset through a bounded 2019-2021 DiscoveryView. Passing this
+gate grants only permission to proceed to a separately frozen walk-forward
+gate; it grants no SHADOW, PAPER_CANDIDATE, live or production authority.
 
 The existing Architecture 148 late-session intraday-momentum design remains a
 frozen queued hypothesis rather than discarded research.

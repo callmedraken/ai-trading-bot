@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: AI Strategy Discovery G2 source accepted/integrated; real confirmation execution next
+## Current milestone: AI Strategy Discovery selection-bias source accepted/integrated; real DSR observation next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -137,32 +137,38 @@ accepted/integrated with the exact evidence recorded above. It rejects all four
 tested variants economically and selects none. The active research boundary is
 [`ai-strategy-discovery-campaign-v1.md`](validation/ai-strategy-discovery-campaign-v1.md).
 
-Generation 0 is accepted. The real Generation-1 discovery batch is consumed and
-must not be rerun automatically. Its accepted identities are proposal set
-`b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, batch
+Generation 1 is consumed and must not be rerun automatically. Accepted G1
+identities are proposal set `b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, batch
 `fd53330e-82ff-58a3-99b8-1818b9a0bbc0`, analysis
 `d5ca081e-7490-5590-921d-10cee373d012` and terminal ledger
-`68418f44-7db0-5080-a6bd-a956a928bd4a`. It consumed exactly 22 G1 trials:
-12 SHORTLISTED and 10 ECONOMICALLY_REJECTED. It consumed zero G2 trials,
-accessed no 2022-2023 campaign confirmation evidence and did not access
-`FINAL_HOLDOUT`.
+`68418f44-7db0-5080-a6bd-a956a928bd4a`. G1 consumed exactly 22 trials:
+12 SHORTLISTED and 10 ECONOMICALLY_REJECTED.
 
-The source-only G2 checkpoint is accepted/integrated at
-`addfa839b800732cfdaa79b43d2d6291525d32f3` / tree
-`6aea44abdc4faaaf4e3de984e7fcfcbcb0834943`. Feature FULL
-`44870115703`, attempt 1, is SUCCESS. Develop source-gate
-`44871126058`, attempt 1, is SUCCESS with exact feature-certification reuse
-and no duplicate FULL. G2 supports exactly six frozen `ALL_OF` recombinations,
-uses the existing A147 execution/economics path and reports only 2022, 2023 and
-continuous 2022-2023 confirmation evidence.
+Generation 2 is consumed and its confirmation evidence is visible. Accepted G2
+identities are proposal set `c958130d-7594-535b-aa46-065525a10c46`, batch
+`8c85731c-75dd-5a60-9456-10f237a6b0dd`, analysis
+`821697c8-9917-5b76-b519-f81a2452d7f6` and terminal ledger
+`e86be80c-562c-5243-bc56-9e4a9e4c9f6d`. It consumed six trials:
+0 CONFIRMATION_PASSED and 6 CONFIRMATION_REJECTED. Do not rerun, mutate or
+design another G2 candidate from the visible 2022-2023 results. Total campaign
+trial count is 28. `FINAL_HOLDOUT` remains sealed.
 
-Real G2 remains NOT RUN: evaluated G2 trials = 0, no real G2 proposal or result
-artifact exists, the accepted A147 dataset has not been consumed by the G2
-evaluator, and `FINAL_HOLDOUT` remains sealed. Next action is a separately
-reviewed one-shot real G2 observation: bind the exact accepted G1 artifacts,
-freeze the six source-bound proposals before any confirmation P&L is visible,
-then evaluate all six once. Any STOP after G2 evaluation begins is NO AUTOMATIC
-RETRY pending review.
+The G1 selection-bias source is accepted/integrated at
+`c26315b37c9b5fce355f323484f639368ce95749` / tree
+`b3c678459062d24ae67f901b40cf7bc496ea6b87`. Feature run
+`44881687514`, attempt 1, is SUCCESS with all seven mapped FULL lanes.
+Develop run `44882606523`, attempt 1, is SUCCESS with exact feature
+certification reuse and no duplicate FULL.
+
+Real selection-bias observation is NOT RUN. The next operation must open only
+the immutable accepted G1 proposal set, G1-only terminal ledger, G1 outcomes and
+analysis plus the accepted A147 daily dataset; reconstruct and exact-identity
+check all 176 continuous stress traces; build all 22 fixed eight-sleeve
+2019-2021 return series; calculate the frozen 22-trial DSR search benchmark; and
+apply the separate 28-trial Bonferroni PSR sensitivity only to the 12 original
+shortlists. It must not replay G1 signals, consume G2 metrics as ranking input,
+or access `FINAL_HOLDOUT`. The result is a research-only selection-bias
+artifact. A pass authorizes only the separately frozen walk-forward gate.
 
 The prior late-session intraday-momentum candidate remains queued rather than
 discarded.

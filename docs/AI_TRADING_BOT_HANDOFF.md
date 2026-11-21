@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: daily AI Strategy Discovery branch closed; late-session intraday source next
+## Current milestone: late-session intraday source accepted/integrated; real OPEN observation next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -175,8 +175,17 @@ sealed. Do not retry, tune or mutate the daily branch from these visible
 results.
 
 The frozen late-session intraday-momentum candidate
-`OPENING_DRIVE_LATE_CAPTURE_V1` is now the active independent research track.
-Its existing design remains unchanged and unevaluated.
+`OPENING_DRIVE_LATE_CAPTURE_V1` now has accepted/integrated source at
+`370ebccf52a61e91979bc61efaac0001dd563be6` / tree
+`49dbdc10401203422d5f8af7d4a936d9cd92a7f3`. Feature mapped FULL
+`44888198054`, attempt 1, is SUCCESS. Develop run `44889299328`, attempt 1,
+is SUCCESS with exact feature-certification reuse and no duplicate FULL.
+
+The implementation keeps the candidate single-shot and parameter-free, uses the
+explicit accepted XNYS schedule, preserves the existing 3% stop/safety/forced
+flat semantics, and separates the inherited QQQ data-readiness veto from the
+strategy's four frozen no-trade reasons. Real sparse OPEN evaluation is NOT RUN;
+no result artifact exists and `FINAL_HOLDOUT` remains sealed.
 
 The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).
@@ -185,9 +194,9 @@ first-half-hour return from the previous regular-session close fixes the
 session direction; at most one TQQQ/SQQQ position may enter at official
 close minus 35 minutes and then remains held until the 3% hard stop, a safety
 exit, or forced flat at close minus 5 minutes. There are no EMA/VWAP/RSI
-regime exits, cooldown variants or same-session re-entry. This is a design
-freeze only; executable source and OPEN evidence remain pending. Preserve
-`FINAL_HOLDOUT` and all provider/broker boundaries.
+regime exits, cooldown variants or same-session re-entry. Source is now
+accepted/integrated; the single real OPEN evidence observation remains pending.
+Preserve `FINAL_HOLDOUT` and all provider/broker boundaries.
 
 Architecture 148-B1 is accepted/integrated at `68b9526f022458cbcdd4f25ff268e0de7c56e562` / tree `85e4830e71cb3b0ab5e85c5da9131f90f7ce575b`. The initial B1 commit `70b0a8de5cb3b2cf4fb826352b6ada3650c57614` remains preserved with green run `44432367772` but was exact-source rejected; corrective C1 closed the reviewed defects. Feature mapped FULL `44438409583`, attempt 1, is SUCCESS. Develop `44465681331`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. The operator integration report records both canonical F: worktrees and both live refs at the exact accepted HEAD/tree and clean; the feature checkout required no catch-up.
 

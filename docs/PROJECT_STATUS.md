@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - daily AI Strategy Discovery branch closed; late-session intraday source next
+## Current milestone - late-session intraday source accepted/integrated; real OPEN observation next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -162,10 +162,28 @@ read no G2 artifact, performed zero provider/broker/production effects, and
 kept `FINAL_HOLDOUT` sealed. Do not tune, mutate, rerun, or reopen this daily
 branch using the visible G1/G2/DSR results.
 
-The existing Architecture 148 late-session intraday-momentum design
-`OPENING_DRIVE_LATE_CAPTURE_V1` is now the active independent research track.
-Its design remains frozen and unevaluated; executable source is the next
-milestone.
+The Architecture 148 late-session intraday-momentum source checkpoint for
+`OPENING_DRIVE_LATE_CAPTURE_V1` is independently SOURCE/CERTIFICATION ACCEPTED
+and FAST-FORWARD INTEGRATED at HEAD
+`370ebccf52a61e91979bc61efaac0001dd563be6` / tree
+`49dbdc10401203422d5f8af7d4a936d9cd92a7f3`, direct parent
+`92affe94d076b6035ad7e511ef7625335127f5e3`. Feature mapped FULL run
+`44888198054`, attempt 1, is terminal SUCCESS with source-static, active-tests,
+source-gates and all seven mapped FULL lanes passing. Develop run
+`44889299328`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse; active/FULL/certification execution was skipped, so no duplicate FULL
+ran.
+
+The source preserves exactly one frozen candidate, explicit XNYS authority,
+previous-close/first-half-hour direction, close-minus-35-minute scheduled entry,
+one-entry-per-session, the existing 3% stop/safety/forced-flat semantics, and
+the two accepted cost cases. The preserved QQQ data-readiness veto is recorded
+separately from strategy eligibility and was frozen before real results.
+
+Real OPEN observation is NOT RUN. The accepted sparse dataset has not been
+opened through this candidate source, no real result artifact exists, and
+`FINAL_HOLDOUT` remains sealed. The next action is one separately reviewed,
+effect-free offline observation over the immutable accepted sparse evidence.
 
 The previously frozen OPEN-only design remains in
 [Architecture 148 late-session intraday momentum research](validation/arch148-intraday-momentum-research.md).
@@ -177,8 +195,8 @@ until the existing 3% hard stop, a safety exit, or the existing forced-flat
 boundary at close minus 5 minutes. EMA/VWAP/RSI regime flips, cooldowns and
 same-session re-entry are not part of this candidate. The design uses only
 the accepted sparse OPEN dataset, both accepted cost cases and the existing
-2016-2023 reporting partitions; no executable source or result is claimed by
-this docs-only freeze. `FINAL_HOLDOUT` remains sealed and all provider/broker
+2016-2023 reporting partitions. Executable source is now accepted/integrated;
+no real OPEN result is claimed yet. `FINAL_HOLDOUT` remains sealed and all provider/broker
 boundaries remain unchanged.
 
 The accepted sparse OPEN baseline remains unchanged at

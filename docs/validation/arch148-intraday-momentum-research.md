@@ -4,10 +4,17 @@
 
 This document freezes the source-only OPEN research design after the accepted
 Architecture 148 churn study rejected CONTROL and all three fixed
-churn-reduction variants. The source checkpoint registers the design as a
-current research route without evaluation dispatch. It does not report an
-evaluation result, select a live strategy, grant provider/broker authority, or
-access `FINAL_HOLDOUT`.
+churn-reduction variants. The source checkpoint is independently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`370ebccf52a61e91979bc61efaac0001dd563be6` / tree
+`49dbdc10401203422d5f8af7d4a936d9cd92a7f3`, direct parent
+`92affe94d076b6035ad7e511ef7625335127f5e3`. Feature run
+`44888198054`, attempt 1, and develop reuse run `44889299328`, attempt 1,
+are terminal SUCCESS; develop did not duplicate FULL.
+
+The route has no evaluation dispatch. Real OPEN observation remains NOT RUN.
+This document does not report an evaluation result, select a live strategy,
+grant provider/broker authority, or access `FINAL_HOLDOUT`.
 
 The design uses only the already accepted sparse Architecture 148 OPEN dataset
 and custody identities:
@@ -208,12 +215,13 @@ Focused tests must pin at least:
 - deterministic identities/hashes and both cost cases;
 - `FINAL_HOLDOUT` exclusion and zero provider/broker effects.
 
-The source checkpoint freezes these semantics without opening the accepted
-sparse data or producing a real observation. Exact-source review and source
-acceptance must finish first. Only then may one separately named and separately
-reviewed offline OPEN observation be considered, bound to the accepted source
-and following the evidence-preservation model used by the accepted churn study.
-Source admission and mapped GitHub CI are source/certification gates, not
+The accepted source checkpoint froze these semantics without opening the
+accepted sparse data or producing a real observation. Exact-source review,
+feature certification, integration and develop certification reuse are now
+complete. The next permitted action is one separately named and separately
+reviewed offline OPEN observation bound to the exact accepted source above and
+following the evidence-preservation model used by the accepted churn study.
+Source admission and mapped GitHub CI remain source/certification gates, not
 research execution authority.
 
 If implementation discovery requires changing this contract, STOP and return to

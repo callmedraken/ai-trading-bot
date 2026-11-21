@@ -25,6 +25,32 @@ Automatic strategy promotion remains prohibited. Human promotion remains
 required. `FINAL_HOLDOUT` remains sealed until a separately frozen final
 candidate or candidate portfolio exists.
 
+### Current campaign state
+
+The accepted G1 population consumed 22 trials. Its proposal set is
+`b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, its complete-panel analysis is
+`d5ca081e-7490-5590-921d-10cee373d012`, and its terminal ledger is
+`68418f44-7db0-5080-a6bd-a956a928bd4a`. Twelve programs were SHORTLISTED and ten
+were ECONOMICALLY_REJECTED.
+
+The G2 population consumed six trials. Its proposal set is
+`c958130d-7594-535b-aa46-065525a10c46`, its batch is
+`8c85731c-75dd-5a60-9456-10f237a6b0dd`, its analysis is
+`821697c8-9917-5b76-b519-f81a2452d7f6`, and its terminal ledger is
+`e86be80c-562c-5243-bc56-9e4a9e4c9f6d`. Zero candidates passed confirmation and
+all six were CONFIRMATION_REJECTED. The G2 momentum-admission hypothesis is
+rejected. Do not mutate or rerun G2, and do not use its 2022-2023 results to
+design another candidate.
+
+The current implementation milestone is a source-only selection-bias analysis
+for the 12 G1 shortlisted programs. Its tests use synthetic inputs. Real
+selection-bias observation is deferred until the source checkpoint is accepted.
+The 22 G1 programs form the complete primary search distribution. G2 contributes
+only its six consumed trials to the separately labeled campaign-wide
+Bonferroni sensitivity, making that sensitivity count 28. G2 identities,
+outcomes, confirmation visibility and metrics do not enter G1 candidate
+selection or its DSR benchmark. `FINAL_HOLDOUT` remains sealed.
+
 ## Existing evidence is the starting point
 
 Generation 0 performs **no new backtests**. It consumes only already completed
@@ -87,15 +113,51 @@ Each proposal records at least:
 - terminal disposition.
 
 The exact number of evaluated trials is behaviorally material evidence for
-later selection-bias analysis.
+selection-bias analysis. Before any candidate advances beyond exploratory
+BACKTESTED status, this campaign requires a trial-count-aware correction.
+Bailey and López de Prado's Deflated Sharpe Ratio is the primary method.
 
-Before any candidate advances beyond exploratory BACKTESTED status, the
-campaign must evaluate selection bias using a trial-count-aware method. Version
-1 targets the Deflated Sharpe Ratio or an equivalently reviewed deterministic
-multiple-testing correction. The research literature motivating this boundary
-includes Bailey and Lopez de Prado, *The Deflated Sharpe Ratio: Correcting for
-Selection Bias, Backtest Overfitting and Non-Normality* (2014):
-https://doi.org/10.3905/jpm.2014.40.5.094
+For candidate daily Sharpe `SR`, sample length `T`, skewness `γ1`, and raw
+Pearson kurtosis `κ`, the non-normality-adjusted statistic is
+
+`z = (SR - SR0) * sqrt(T - 1) / sqrt(1 - γ1 * SR + (κ - 1) * SR^2 / 4)`
+
+and DSR is `Φ(z)`. The primary search benchmark uses all 22 G1 daily Sharpe
+values, including the ten economically rejected programs. Its frozen
+zero-centered expected maximum is
+
+`SR0 = sqrt(sample_variance(SR_1, ..., SR_22, ddof=1)) * [(1 - γ) * Φ^-1(1 - 1/22) + γ * Φ^-1(1 - 1/(22e))]`.
+
+No empirical mean of the 22 Sharpe values is added to this zero-centered null.
+Here `γ` is the Euler-Mascheroni constant.
+The independence approximation is explicit. The 22 G1 trials are treated as
+independent in the expected-maximum formula even though their strategies may be
+dependent.
+
+Candidate daily Sharpe is arithmetic mean daily return divided by sample
+standard deviation with `ddof=1`. The annualized display is daily Sharpe times
+`sqrt(252)` and is not used in the DSR calculation. Central moments use divisor
+`T`, with skewness `m3 / m2^(3/2)` and raw Pearson kurtosis `m4 / m2^2`. Raw
+kurtosis is not replaced with excess kurtosis, and no finite-sample bias
+correction is applied. Statistics use a fixed Decimal context with precision 60
+and `ROUND_HALF_EVEN`. The deterministic normal calculation uses an erf power
+series through absolute z-score 8, a Mills-ratio continued fraction above 8,
+and bisection for inverse upper-tail quantiles.
+
+The separate campaign-wide sensitivity uses a zero-benchmark one-sided PSR
+p-value. It uses
+
+`z0 = SR * sqrt(T - 1) / sqrt(1 - γ1 * SR + (κ - 1) * SR^2 / 4)`
+
+and `p_campaign = 1 - Φ(z0)` with `alpha = 0.05 / 28`. A shortlisted G1
+candidate passes only when DSR is at least `0.95` and this p-value is at most
+the campaign alpha. This count includes six consumed G2 trials, but no G2
+Sharpe values are pooled with the G1 population. The PSR sensitivity is distinct
+from the DSR.
+
+The campaign literature includes Bailey and López de Prado, *The Deflated
+Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting and
+Non-Normality* (2014), https://doi.org/10.3905/jpm.2014.40.5.094.
 
 Walk-forward evidence remains required but is not treated as sufficient by
 itself when a large AI search preceded selection. A later source checkpoint may
@@ -211,10 +273,10 @@ continuous 2019-2021 result. The bounded discovery view must remove all bars on
 or after 2022-01-01 before strategy evaluation. The G1 evaluator must not
 compute or expose 2022-2023 results. `FINAL_HOLDOUT` remains inaccessible.
 
-The Generation-2 confirmation chronology and selection rule are now frozen
-below. This source checkpoint implements only their synthetic-input evaluator
-and complete-panel analyzer. It does not read the accepted A147 dataset or run
-confirmation research.
+The frozen Generation-2 confirmation design below preceded the later one-shot
+campaign run. That run consumed six G2 trials and rejected all six. Its
+confirmation metrics do not enter the current G1 selection-bias analysis, and
+the accepted A147 dataset is not reread for G2.
 
 Prior project research has already exposed some 2022-2023 behavior for other
 strategy families. Therefore 2022-2023 is **not** called a pristine holdout.
@@ -266,8 +328,9 @@ full discovery panel. Raw return alone never determines the terminal class.
 Stress median turnover is the median across the 24 annual asset/year cells,
 following the accepted A147 aggregate-summary convention.
 
-DSR remains deferred until a candidate may advance beyond exploratory BACKTESTED
-status. Shortlisting grants no lifecycle promotion.
+The selection-bias gate applies only to the 12 previously shortlisted G1
+programs. Shortlisting itself grants no lifecycle promotion and the separate
+selection-bias disposition does not change the G1 terminal ledger.
 
 ## Generation filtering
 
@@ -279,9 +342,9 @@ evaluation call. The runner keeps interim outcomes private and appends terminal
 records only after every proposal has been attempted and the complete ordered
 panel has been analyzed. Completed outcomes then expose P&L and diagnostics;
 deterministic evaluation failures expose diagnostics only because they have no
-result P&L. A separately frozen Generation-2 proposal set may cite an exact
-visible G1 diagnostic. Once any G1 terminal output is visible, the ledger
-rejects additional G1 proposals.
+result P&L. The consumed G2 proposal set cited exact visible G1 diagnostics
+before its one-shot evaluation. Once any G1 terminal output is visible, the
+ledger rejects additional G1 proposals.
 
 The deterministic analyzer must validate the complete ordered frozen proposal
 set and complete result panel before applying the terminal rule above. It may
@@ -294,10 +357,10 @@ Generation-1 rules.
 
 ## Generation 2
 
-Generation 2 is frozen to exactly six structural recombinations. The campaign's
-existing maximum remains **16 evaluated G2 trials**. This wave evaluates six
-and leaves ten unused. No prose variants or additional candidates may fill the
-unused budget.
+Generation 2 was frozen to exactly six structural recombinations. The campaign's
+maximum remains **16 evaluated G2 trials**. The six frozen trials were consumed
+once, leaving ten unused. No prose variants, additional candidates or reruns
+may fill the unused budget.
 
 The accepted G1 proposal set is
 `b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, its terminal ledger is
@@ -307,8 +370,9 @@ identities, its own source HEAD/tree, the ordered six proposal and semantic
 program identities, each exact pair of G1 parent proposal IDs, and both exact
 visible parent diagnostic references from that accepted terminal ledger. It
 records a maximum budget of 16, six planned evaluations, zero confirmation
-result visibility at freeze, and a sealed `FINAL_HOLDOUT`. This source-only
-checkpoint creates no real G2 proposal or result artifact.
+result visibility at freeze, and a sealed `FINAL_HOLDOUT`. The G2 source-only
+checkpoint created no real proposal or result artifact. The later one-shot
+campaign run and its terminal dispositions are recorded above.
 
 Each G2 program is a closed `ConjunctiveTrendSpec` containing exactly two
 supported G1 semantic specifications. The fixed operation for every pair is
@@ -332,15 +396,18 @@ composite is LONG only when both accepted parent signals are LONG. It is FLAT
 otherwise. A state change executes at session `t+1` OPEN through the existing
 A147 single-symbol path. No portfolio weighting or capital splitting is added.
 
-The later confirmation view may use pre-2022 bars for indicator warmup. Its
-reported evidence is only `[2022-01-01, 2024-01-01)`, with calendar 2022,
+The frozen confirmation view permitted pre-2022 bars for indicator warmup. Its
+reported evidence was limited to `[2022-01-01, 2024-01-01)`, with calendar 2022,
 calendar 2023 and continuous 2022-2023 slices. It rejects 2024 and later bars.
-The accepted A147 daily dataset remains the only market-data source. The
-original A147 economics above remain unchanged, each symbol and reported slice
-uses an independent starting account, and `FINAL_HOLDOUT` is inaccessible.
+The accepted A147 daily dataset was the only market-data source. The original
+A147 economics above remained unchanged, each symbol and reported slice used
+an independent starting account, and `FINAL_HOLDOUT` was inaccessible.
 
-At this source freeze, six evaluations are planned and zero G2 trials have
-actually been evaluated.
+At the source freeze, six evaluations were planned and zero G2 trials had been
+evaluated. The subsequent one-shot campaign run consumed six trials. All six
+were `CONFIRMATION_REJECTED`, none were `CONFIRMATION_PASSED`, and the G2
+momentum-admission hypothesis is rejected. No confirmation metrics are included
+in this validation contract or the G1 DSR search population.
 
 A completed G2 candidate is `CONFIRMATION_PASSED` only if its STRESS metrics
 meet all of these requirements.
@@ -372,7 +439,8 @@ The G1 ledger prefix and G1 results are immutable. G2 outcomes never promote a
 candidate to `WALK_FORWARD_PASSED`, `SHADOW`, `PAPER_CANDIDATE`, live or
 production status. DSR or an equivalently reviewed multiple-testing correction
 remains required before a survivor may advance beyond exploratory `BACKTESTED`
-research status.
+research status. G2's terminal outcomes remain immutable and do not supply a
+survivor for a further G2 generation.
 
 ## Intraday track
 
@@ -437,28 +505,61 @@ leader status is not itself a lifecycle transition.
 
 ## Immediate source milestone
 
-The current implementation checkpoint is the source-only/fake-only G2
-composition evaluator and complete-panel analyzer, runner and synthetic tests.
-The accepted G1 evidence and the three identities above remain unchanged. This
-checkpoint adds the exact six `ALL_OF` recombinations, the bounded 2022-2023
-confirmation view, stress selection gates and complete-population Pareto
-analysis while reusing the accepted G1 signal semantics and A147 execution and
-economics.
+The current implementation checkpoint is source-only selection-bias analytics
+for the 12 previously shortlisted G1 programs. The G1 proposals, outcomes,
+terminal dispositions and A147 behavior remain unchanged. The separate
+selection-bias disposition does not modify the G1 trial ledger.
 
-All G2 source tests use synthetic in-memory inputs. This source checkpoint runs
-no real G2 proposal population or market-data replay, reads no accepted A147
-dataset, creates no proposal/result artifact, and exposes no 2022-2023 market
-results. It performs no AI API call, credential read, provider/network call,
-Robinhood or broker call, order effect, production-state read/write,
-`FINAL_HOLDOUT` access or strategy promotion. It does not change G1 proposal
-semantics, G1 results, A147 behavior/identities, the backtest engine,
-walk-forward machinery or the research-candidate lifecycle. A future real G2
-run requires a separately reviewed effect boundary after source acceptance.
+The synthetic return-series helper reconstructs one accepted G1 continuous
+stress cell from its exact accepted fill evidence, adjusted daily bars for the
+same symbol, the regime `[2019-01-01, 2022-01-01)`, and starting cash of
+`$100,000`. It applies accepted fill, cash and position semantics, then marks
+positions to adjusted daily close at each session end. It does not compute
+signals or call the G1 evaluator. The helper recomputes
+`semantic_identity("equity-trace", equity_values)` and requires exact equality
+with the accepted `Metrics.equity_trace_identity`. A mismatch is terminal
+evidence failure.
 
-If implementation discovery shows that these six recombinations require a
-materially new execution engine, data acquisition, chronology change or
-result-dependent contract adjustment, STOP and return to ChatGPT before
-broadening the source checkpoint.
+The eight continuous symbol sleeves each start with `$100,000`, for aggregate
+initial equity of `$800,000`. On each common session the basket equity is the
+sum of all eight sleeve equities, and its daily simple return is
+`aggregate_equity[t] / aggregate_equity[t-1] - 1`. All eight accepted A147
+symbols must be present on every basket session. There is no rebalancing,
+capital transfer, optimization, or missing-session zero substitution.
+
+Future real selection-bias observation accepts only the accepted G1 proposal
+set, terminal ledger, outcomes and evidence, the accepted A147 dataset, exact
+G1 identities and hashes, and the frozen campaign trial-count constants. It
+rejects G2 outcomes or analysis objects, 2022-2023 confirmation metrics,
+confirmation visibility as a ranking input, and `FINAL_HOLDOUT` data. The six
+G2 trials contribute only to the campaign-wide sensitivity count of 28. Their
+identities and performance do not affect the G1 ranking or DSR.
+
+The separate versioned selection-bias evidence schema binds the campaign
+version, exact G1 proposal-set, analysis and terminal-ledger identities, exact
+accepted dataset and evidence identities, source HEAD and tree, the complete
+22-program Sharpe population, the 12 eligible proposal IDs, all eight
+reconstructed equity-trace identities, the aggregate basket-return identity,
+the retained Sharpe and moment inputs, the DSR result, the 28-trial PSR
+sensitivity, the terminal selection-bias disposition, zero-effect counters,
+and the sealed `FINAL_HOLDOUT` flag. This source checkpoint creates no real
+selection-bias artifact.
+
+Only the 12 G1 shortlisted programs are eligible for the separate gate. A
+candidate receives `SELECTION_BIAS_PASSED` only when its 22-trial DSR
+probability is at least `0.95`, its campaign-wide one-sided PSR p-value is at
+most `0.05 / 28`, all eight reconstructed trace identities match exactly, and
+no input, evidence or chronology failure exists. Every other eligible program
+receives `SELECTION_BIAS_REJECTED`. A pass permits only progression to the
+separately frozen walk-forward gate. It does not confer `WALK_FORWARD_PASSED`,
+`SHADOW`, `PAPER_CANDIDATE`, live or production status.
+
+All tests for this source checkpoint use synthetic in-memory inputs. They do
+not read real G1 outcomes, the accepted A147 dataset, G2 confirmation evidence,
+or `FINAL_HOLDOUT`. No replay, real result artifact, AI API call, credential
+read, provider or network call, Robinhood or broker call, order effect,
+production-state read or write, or strategy promotion occurs in this source
+checkpoint.
 
 ## Public research references
 

@@ -1,6 +1,6 @@
 # Architecture 149 — Monthly cross-asset defensive rotation research
 
-Status: **Design frozen; source accepted/integrated; real exploratory replay NOT RUN.**
+Status: **Exploratory evidence CONSUMED / EXPLORATORY_CANDIDATE_ONLY; 2024-2026 confirmation contract frozen.**
 
 Accepted source identity:
 - HEAD `57087af056767c59ee48e3edb86063ac4f20c10d`;
@@ -10,7 +10,22 @@ Accepted source identity:
 - develop source gate `44935678418`, attempt 1, SUCCESS with exact feature
   certification reuse and no duplicate FULL.
 
-Real 2017-2023 exploratory evidence remains NOT RUN.
+Consumed exploratory evidence:
+- report identity `8a3d7c3a-d2f9-5f10-91e6-ba06c3935d84`;
+- SHA-256
+  `69f941721aaba736cef45b80543f7a238a30dcdb74f03c046c3fc01aabb5dbcf`;
+- classification `EXPLORATORY_CANDIDATE_ONLY`;
+- STRESS full return approximately +82.59%;
+- STRESS CAGR approximately 8.98%;
+- STRESS maximum drawdown approximately 28.15%;
+- STRESS median annual return approximately 10.86%;
+- six of seven years positive;
+- one strategy trial consumed;
+- all provider/broker/production/FINAL_HOLDOUT effects zero.
+
+No exploratory rerun or mutation is authorized. The exact 2024-2026
+confirmation contract is frozen separately in
+`../validation/arch149-monthly-defensive-rotation-confirmation.md`.
 
 ## Purpose
 

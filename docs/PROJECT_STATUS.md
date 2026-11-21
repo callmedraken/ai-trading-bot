@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 149 source accepted/integrated; real 2017-2023 exploratory replay next
+## Current milestone - Architecture 149 exploratory PASS; 2024-2026 confirmation contract frozen
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -219,9 +219,24 @@ reuse and no duplicate FULL.
 The accepted evaluator binds the exact A147 dataset identity and canonical
 SHA-256 before replay, physically rejects post-2023 bars, retains December 2023
 as a terminal non-executable target without a 2024 lookup, and implements one
-continuous $100,000 BASE/STRESS portfolio path. Real Architecture-149
-exploratory replay is NOT RUN and no result artifact exists. The next permitted
-action is the single separately reviewed 2017-2023 exploratory observation.
+continuous $100,000 BASE/STRESS portfolio path.
+
+The one authorized 2017-2023 exploratory replay is CONSUMED and classified
+`EXPLORATORY_CANDIDATE_ONLY`. Report identity
+`8a3d7c3a-d2f9-5f10-91e6-ba06c3935d84`, SHA-256
+`69f941721aaba736cef45b80543f7a238a30dcdb74f03c046c3fc01aabb5dbcf`,
+is preserved at
+`F:\AI\temp\arch149-monthly-defensive-rotation-8a3d7c3a-d2f9-5f10-91e6-ba06c3935d84\research.json`.
+Under STRESS it returned about +82.59% across 2017-2023, CAGR about 8.98%,
+maximum drawdown about 28.15%, Sharpe about 0.5183, median annual return about
+10.86%, and six of seven calendar years positive. The result consumed exactly
+one Architecture-149 strategy trial and performed zero provider/broker/
+production/FINAL_HOLDOUT effects.
+
+The 2024-2026 confirmation contract is now frozen before any confirmation data
+is opened. Partial 2026 or year-to-date confirmation is forbidden. Source-only
+confirmation support is the next implementation milestone; real confirmation
+data acquisition/replay must wait until calendar 2026 is complete.
 See
 [Architecture 149](architecture/149-monthly-cross-asset-defensive-rotation.md)
 and its

@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 149 source accepted/integrated; real 2017-2023 exploratory replay next
+## Current milestone: Architecture 149 exploratory PASS; 2024-2026 confirmation contract frozen
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -215,10 +215,21 @@ Source is accepted/integrated at
 `57087af056767c59ee48e3edb86063ac4f20c10d` / tree
 `da80c3f560d54d959822f7716a50fc45c3ead716`. Feature FULL
 `44914956812`, attempt 1, is SUCCESS. Develop run `44935678418`, attempt 1,
-is SUCCESS with exact feature-certification reuse and no duplicate FULL. Real
-exploratory replay is NOT RUN. The next action must open only the immutable
-accepted A147 2016-2023 dataset, evaluate the single candidate once, preserve
-BASE/STRESS evidence, and leave all 2024+ data and `FINAL_HOLDOUT` untouched.
+is SUCCESS with exact feature-certification reuse and no duplicate FULL.
+
+The one authorized exploratory replay is CONSUMED / `EXPLORATORY_CANDIDATE_ONLY`.
+Report `8a3d7c3a-d2f9-5f10-91e6-ba06c3935d84`, SHA-256
+`69f941721aaba736cef45b80543f7a238a30dcdb74f03c046c3fc01aabb5dbcf`,
+records STRESS full return about +82.59%, 8.98% CAGR, 28.15% maximum drawdown,
+0.5183 Sharpe, 10.86% median annual return and 6/7 positive years. It consumed
+one strategy trial and performed zero protected effects.
+
+The separately frozen confirmation contract is
+[Architecture 149 2024-2026 confirmation](validation/arch149-monthly-defensive-rotation-confirmation.md).
+It preserves the exact strategy, starts a fresh $100,000 confirmation portfolio,
+uses pre-2024 A147 history only as signal warmup, and evaluates exactly calendar
+2024-2026. No partial-2026 peek is allowed. Source-only confirmation support is
+next; real acquisition/replay waits for completed 2026 data.
 
 The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).

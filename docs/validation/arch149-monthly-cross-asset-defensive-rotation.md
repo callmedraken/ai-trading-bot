@@ -1,6 +1,6 @@
 # Validation — Architecture 149 monthly cross-asset defensive rotation
 
-Status: **Design frozen; source accepted/integrated; real exploratory replay NOT RUN.**
+Status: **Source accepted/integrated; exploratory replay CONSUMED / EXPLORATORY_CANDIDATE_ONLY.**
 
 Accepted source:
 - HEAD `57087af056767c59ee48e3edb86063ac4f20c10d`;
@@ -9,8 +9,11 @@ Accepted source:
 - develop reuse `44935678418`, attempt 1, SUCCESS;
 - duplicate develop FULL: NO.
 
-The route remains source-only. Real A147 data has not been opened through this
-candidate and no real Architecture-149 artifact exists yet.
+The route remains source-only. The separate one-shot exploratory operator has now
+consumed the accepted A147 dataset and produced immutable report
+`8a3d7c3a-d2f9-5f10-91e6-ba06c3935d84` /
+`69f941721aaba736cef45b80543f7a238a30dcdb74f03c046c3fc01aabb5dbcf`.
+The source route itself still performs no real-data or protected effects.
 
 This plan validates the exact one-candidate Architecture-149 contract in
 `../architecture/149-monthly-cross-asset-defensive-rotation.md`.
@@ -98,7 +101,9 @@ the accepted A147 2016-2023 dataset and replay the single fixed candidate once.
 
 No 2024+ data may be opened.
 
-If the candidate is rejected, close Architecture 149 without variants.
+The candidate passed as `EXPLORATORY_CANDIDATE_ONLY`; the exploratory replay is
+consumed and must not be rerun or mutated.
 
-If it is `EXPLORATORY_CANDIDATE_ONLY`, freeze the 2024-2026 confirmation
-contract before any new acquisition or result.
+The 2024-2026 confirmation contract is now frozen in
+`arch149-monthly-defensive-rotation-confirmation.md` before any confirmation
+data acquisition or result.

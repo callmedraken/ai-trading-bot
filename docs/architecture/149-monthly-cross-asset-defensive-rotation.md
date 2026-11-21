@@ -1,6 +1,16 @@
 # Architecture 149 — Monthly cross-asset defensive rotation research
 
-Status: **Design frozen. Source implemented and awaiting independent acceptance.**
+Status: **Design frozen; source accepted/integrated; real exploratory replay NOT RUN.**
+
+Accepted source identity:
+- HEAD `57087af056767c59ee48e3edb86063ac4f20c10d`;
+- tree `da80c3f560d54d959822f7716a50fc45c3ead716`;
+- direct parent `088f5aa4581bcb2b211c69f71f447ab9cb98e645`;
+- feature mapped FULL `44914956812`, attempt 1, SUCCESS;
+- develop source gate `44935678418`, attempt 1, SUCCESS with exact feature
+  certification reuse and no duplicate FULL.
+
+Real 2017-2023 exploratory evidence remains NOT RUN.
 
 ## Purpose
 

@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 149 monthly defensive-rotation design frozen; source next
+## Current milestone - Architecture 149 source accepted/integrated; real 2017-2023 exploratory replay next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -197,15 +197,32 @@ its now-visible P&L.
 The observation performed zero credential/network/provider/Robinhood/broker/
 order/production effects, zero baseline replay, and zero `FINAL_HOLDOUT`
 access. `FINAL_HOLDOUT` remains sealed. No earlier frozen unevaluated trading hypothesis remained after that closeout.
-Architecture 149 now freezes the next independent strategy family:
+Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,
 monthly cross-asset relative-strength rule over the accepted eight-ETF A147
 universe, with a strict positive-momentum-to-ETF / nonpositive-to-CASH gate and
 no parameter grid. 2016 is warmup; 2017-2023 is exploratory evidence only.
-2024-2026 data is explicitly outside the current input boundary and may be
-acquired only after a surviving exploratory result and a separately frozen
-confirmation contract. Source is not implemented and no Architecture-149 trial
-has run. See
+2024-2026 data remains outside the current input boundary and may be acquired
+only after a surviving exploratory result and a separately frozen confirmation
+contract.
+
+The Architecture-149 source checkpoint is independently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`57087af056767c59ee48e3edb86063ac4f20c10d` / tree
+`da80c3f560d54d959822f7716a50fc45c3ead716`, direct parent
+`088f5aa4581bcb2b211c69f71f447ab9cb98e645`. Feature mapped FULL run
+`44914956812`, attempt 1, is terminal SUCCESS with source-static, active-tests,
+source-gates and all seven FULL lanes passing. Develop run
+`44935678418`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse and no duplicate FULL.
+
+The accepted evaluator binds the exact A147 dataset identity and canonical
+SHA-256 before replay, physically rejects post-2023 bars, retains December 2023
+as a terminal non-executable target without a 2024 lookup, and implements one
+continuous $100,000 BASE/STRESS portfolio path. Real Architecture-149
+exploratory replay is NOT RUN and no result artifact exists. The next permitted
+action is the single separately reviewed 2017-2023 exploratory observation.
+See
 [Architecture 149](architecture/149-monthly-cross-asset-defensive-rotation.md)
 and its
 [validation plan](validation/arch149-monthly-cross-asset-defensive-rotation.md).

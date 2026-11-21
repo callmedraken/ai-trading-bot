@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 149 monthly defensive-rotation design frozen; source next
+## Current milestone: Architecture 149 source accepted/integrated; real 2017-2023 exploratory replay next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -208,8 +208,17 @@ uses the accepted SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC daily universe, ranks fixed
 21/252-session momentum only at month end, holds the top ETF only when its score
 is strictly positive, otherwise holds CASH, and executes at the next session
 OPEN under the accepted A147 BASE/STRESS costs. 2016 is warmup and 2017-2023 is
-exploratory. 2024-2026 data is forbidden until a separately frozen confirmation
-step. Source implementation and real replay remain NOT RUN.
+exploratory. 2024-2026 data remains forbidden until a separately frozen
+confirmation step.
+
+Source is accepted/integrated at
+`57087af056767c59ee48e3edb86063ac4f20c10d` / tree
+`da80c3f560d54d959822f7716a50fc45c3ead716`. Feature FULL
+`44914956812`, attempt 1, is SUCCESS. Develop run `44935678418`, attempt 1,
+is SUCCESS with exact feature-certification reuse and no duplicate FULL. Real
+exploratory replay is NOT RUN. The next action must open only the immutable
+accepted A147 2016-2023 dataset, evaluate the single candidate once, preserve
+BASE/STRESS evidence, and leave all 2024+ data and `FINAL_HOLDOUT` untouched.
 
 The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).

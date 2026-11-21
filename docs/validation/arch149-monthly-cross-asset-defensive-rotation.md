@@ -1,6 +1,16 @@
 # Validation — Architecture 149 monthly cross-asset defensive rotation
 
-Status: **Design frozen. Source implemented and awaiting independent acceptance.**
+Status: **Design frozen; source accepted/integrated; real exploratory replay NOT RUN.**
+
+Accepted source:
+- HEAD `57087af056767c59ee48e3edb86063ac4f20c10d`;
+- tree `da80c3f560d54d959822f7716a50fc45c3ead716`;
+- feature certification `44914956812`, attempt 1, SUCCESS;
+- develop reuse `44935678418`, attempt 1, SUCCESS;
+- duplicate develop FULL: NO.
+
+The route remains source-only. Real A147 data has not been opened through this
+candidate and no real Architecture-149 artifact exists yet.
 
 This plan validates the exact one-candidate Architecture-149 contract in
 `../architecture/149-monthly-cross-asset-defensive-rotation.md`.

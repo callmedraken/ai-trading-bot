@@ -314,14 +314,15 @@ class Generation1BatchRun:
                 if type(outcome) is Generation1EvaluationFailure
                 else _disposition_code(program.disposition)
             )
-            or record.pnl_visible
-            or record.diagnostic_visible
+            or record.pnl_visible is not (type(outcome) is Generation1ProgramResult)
+            or record.diagnostic_visible is not True
             for record, program, outcome in zip(
                 terminal_records, self.analysis.programs, self.outcomes, strict=True
             )
         ):
             raise Generation1AnalysisError(
-                "terminal ledger is incomplete or exposes results"
+                "terminal ledger is incomplete or visibility disagrees "
+                "with completed outcomes"
             )
         if (
             self.terminal_ledger.evaluated_trial_count
@@ -573,8 +574,8 @@ def run_generation1_batch(
                 evaluation_id=evaluation_id,
                 result_id=result_id,
                 terminal_diagnostic_code=diagnostic_code,
-                pnl_visible=False,
-                diagnostic_visible=False,
+                pnl_visible=type(outcome) is Generation1ProgramResult,
+                diagnostic_visible=True,
             )
         )
 

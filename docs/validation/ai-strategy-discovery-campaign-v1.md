@@ -272,6 +272,15 @@ status. Shortlisting grants no lifecycle promotion.
 Generation-1 output is descriptive. It does not directly create a production
 candidate.
 
+Every frozen G1 proposal receives its acceptance event before the first
+evaluation call. The runner keeps interim outcomes private and appends terminal
+records only after every proposal has been attempted and the complete ordered
+panel has been analyzed. Completed outcomes then expose P&L and diagnostics;
+deterministic evaluation failures expose diagnostics only because they have no
+result P&L. A separately frozen Generation-2 proposal set may cite an exact
+visible G1 diagnostic. Once any G1 terminal output is visible, the ledger
+rejects additional G1 proposals.
+
 The deterministic analyzer must validate the complete ordered frozen proposal
 set and complete result panel before applying the terminal rule above. It may
 not calculate a frontier from a cherry-picked subset. Pareto comparisons use

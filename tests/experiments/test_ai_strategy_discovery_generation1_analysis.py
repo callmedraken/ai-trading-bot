@@ -4,6 +4,7 @@ import os
 import socket
 import subprocess
 import urllib.request
+from dataclasses import replace
 from datetime import date, datetime, time
 from decimal import Decimal
 from functools import cache
@@ -16,6 +17,9 @@ from trading_bot.experiments.ai_strategy_discovery import (
     CAMPAIGN_VERSION,
     AbsoluteMomentumSpec,
     DeferredStrategySpec,
+    DiscoveryError,
+    DonchianBreakoutSpec,
+    Generation1DiagnosticReference,
     InformationVisibility,
     InvalidProposalReference,
     MomentumGate,
@@ -40,6 +44,7 @@ from trading_bot.experiments.ai_strategy_discovery_generation1 import (
 from trading_bot.experiments.ai_strategy_discovery_generation1_analysis import (
     ZERO_EFFECT_COUNTER_NAMES,
     Generation1AnalysisError,
+    Generation1BatchRun,
     Generation1FailureCode,
     analyze_generation1_batch,
     run_generation1_batch,
@@ -498,9 +503,59 @@ def test_runner_preserves_prior_history_and_reports_zero_effects(
     import trading_bot.experiments.ai_strategy_discovery_generation1_analysis as module
 
     calls: list[str] = []
+    appended_events: list[TrialLedgerRecord] = []
+    analysis_complete = False
+    original_append = TrialLedger.append
+    original_analyze = module.analyze_generation1_batch
+
+    def append_with_order_spy(
+        ledger: TrialLedger, record: TrialLedgerRecord
+    ) -> TrialLedger:
+        if record.disposition is not TrialDisposition.ACCEPTED_FOR_EVALUATION:
+            assert analysis_complete
+            assert calls == list(plan.proposal_identities)
+        appended_events.append(record)
+        return original_append(ledger, record)
+
+    monkeypatch.setattr(TrialLedger, "append", append_with_order_spy)
+
+    def analyze_complete_batch(*args: object, **kwargs: object):
+        nonlocal analysis_complete
+        assert calls == list(plan.proposal_identities)
+        prior_acceptances = tuple(
+            record.proposal_id
+            for record in prior.records
+            if record.disposition is TrialDisposition.ACCEPTED_FOR_EVALUATION
+        )
+        generated_acceptances = tuple(
+            record.proposal_id
+            for record in appended_events
+            if record.disposition is TrialDisposition.ACCEPTED_FOR_EVALUATION
+        )
+        assert prior_acceptances + generated_acceptances == plan.proposal_identities
+        analysis = original_analyze(*args, **kwargs)
+        analysis_complete = True
+        return analysis
+
+    monkeypatch.setattr(module, "analyze_generation1_batch", analyze_complete_batch)
 
     def evaluator(proposal: ResearchProposal, bounded_view: DiscoveryView):
         assert bounded_view is view
+        acceptances_before_dispatch = tuple(
+            record.proposal_id
+            for record in prior.records
+            if record.disposition is TrialDisposition.ACCEPTED_FOR_EVALUATION
+        ) + tuple(
+            record.proposal_id
+            for record in appended_events
+            if record.disposition is TrialDisposition.ACCEPTED_FOR_EVALUATION
+        )
+        assert acceptances_before_dispatch == plan.proposal_identities
+        assert not analysis_complete
+        assert all(
+            record.disposition is TrialDisposition.ACCEPTED_FOR_EVALUATION
+            for record in appended_events
+        )
         calls.append(proposal.proposal_id)
         if proposal is first:
             raise ValueError("synthetic deterministic replay rejection")
@@ -520,6 +575,8 @@ def test_runner_preserves_prior_history_and_reports_zero_effects(
     )
 
     assert calls == list(plan.proposal_identities)
+    assert analysis_complete
+    assert (plan.max_evaluated, plan.max_per_family) == (32, 8)
     assert run.pre_evaluation_ledger.records[: len(prior.records)] == prior.records
     assert tuple(
         record.disposition
@@ -539,12 +596,84 @@ def test_runner_preserves_prior_history_and_reports_zero_effects(
     assert (
         run.outcomes[0].evaluation_id == run.terminal_ledger.records[-2].evaluation_id
     )
-    assert all(
-        record.dataset_evidence_id == _DATA_EVIDENCE_ID
-        and not record.pnl_visible
-        and not record.diagnostic_visible
-        for record in run.terminal_ledger.records[-2:]
+    failed_record, completed_record = run.terminal_ledger.records[-2:]
+    assert failed_record.dataset_evidence_id == _DATA_EVIDENCE_ID
+    assert failed_record.result_id is None
+    assert failed_record.pnl_visible is False
+    assert failed_record.diagnostic_visible is True
+    assert completed_record.dataset_evidence_id == _DATA_EVIDENCE_ID
+    assert completed_record.result_id == run.outcomes[1].identity
+    assert completed_record.pnl_visible is True
+    assert completed_record.diagnostic_visible is True
+
+    diagnostic_reference = Generation1DiagnosticReference(
+        second.proposal_id,
+        completed_record.trial_ordinal,
+        completed_record.diagnostic_id,
     )
+    g2_proposal = ResearchProposal(
+        campaign_version=CAMPAIGN_VERSION,
+        generation=2,
+        proposal_kind=ProposalKind.MUTATION,
+        parent_proposal_ids=(second.proposal_id,),
+        strategy_spec=DonchianBreakoutSpec(35, 50, 20),
+        hypothesis="A visible G1 diagnostic motivates this structural change.",
+        expected_mechanism="The fixed breakout may improve stress breadth.",
+        falsification_condition="Confirmation rejects the G1-motivated change.",
+        source_reference_labels=("PRIOR_A147",),
+        information_visibility=InformationVisibility(
+            VisibilityStage.GENERATION_2_PRE_CONFIRMATION,
+            visible_evidence=(second.information_visibility.visible_evidence[0],),
+            visible_generation1_diagnostics=(diagnostic_reference,),
+        ),
+        producer_label="offline-fixture-g2",
+    )
+    g2_acceptance = TrialLedgerRecord(
+        event_ordinal=len(run.terminal_ledger.records) + 1,
+        trial_ordinal=(
+            max(record.trial_ordinal for record in run.terminal_ledger.records) + 1
+        ),
+        proposal=g2_proposal,
+        disposition=TrialDisposition.ACCEPTED_FOR_EVALUATION,
+    )
+    g2_ledger = run.terminal_ledger.append(g2_acceptance)
+    assert g2_ledger.records[-1] == g2_acceptance
+    assert g2_ledger.evaluated_trial_count == 2
+
+    late_g1 = _proposal(
+        MovingAverageTrendSpec(55, 100, MovingAverageRule.MA_PERCENT_BAND_010),
+        hypothesis="A late G1 proposal must not follow visible G1 output.",
+    )
+    late_g1_acceptance = TrialLedgerRecord(
+        event_ordinal=len(run.terminal_ledger.records) + 1,
+        trial_ordinal=(
+            max(record.trial_ordinal for record in run.terminal_ledger.records) + 1
+        ),
+        proposal=late_g1,
+        disposition=TrialDisposition.ACCEPTED_FOR_EVALUATION,
+    )
+    with pytest.raises(DiscoveryError, match="Generation 1 proposals must be frozen"):
+        run.terminal_ledger.append(late_g1_acceptance)
+
+    for terminal_index, changed in (
+        (-1, replace(completed_record, pnl_visible=False)),
+        (-1, replace(completed_record, diagnostic_visible=False)),
+        (-2, replace(failed_record, diagnostic_visible=False)),
+    ):
+        malformed_records = list(run.terminal_ledger.records)
+        malformed_records[terminal_index] = changed
+        malformed_ledger = TrialLedger(tuple(malformed_records))
+        with pytest.raises(Generation1AnalysisError, match="visibility disagrees"):
+            Generation1BatchRun(
+                run.proposal_set_identity,
+                run.discovery_view_identity,
+                run.dataset_identity,
+                run.dataset_evidence_id,
+                run.pre_evaluation_ledger,
+                malformed_ledger,
+                run.outcomes,
+                run.analysis,
+            )
     assert tuple(name for name, _ in run.zero_effects) == ZERO_EFFECT_COUNTER_NAMES
     assert all(value == 0 for _, value in run.zero_effects)
     assert run.final_holdout_sealed is True

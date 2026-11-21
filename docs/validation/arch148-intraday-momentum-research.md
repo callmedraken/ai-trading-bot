@@ -2,9 +2,10 @@
 
 ## Status and authority
 
-This document freezes the next source-only OPEN research design after the
-accepted Architecture 148 churn study rejected CONTROL and all three fixed
-churn-reduction variants. It does not contain executable source, report an
+This document freezes the source-only OPEN research design after the accepted
+Architecture 148 churn study rejected CONTROL and all three fixed
+churn-reduction variants. The source checkpoint registers the design as a
+current research route without evaluation dispatch. It does not report an
 evaluation result, select a live strategy, grant provider/broker authority, or
 access `FINAL_HOLDOUT`.
 
@@ -56,9 +57,9 @@ part of this checkpoint.
 For each expected XNYS regular session:
 
 1. Resolve the immediately preceding expected XNYS regular session.
-2. `previous_close` is the close of that prior session's final qualified QQQ
-   five-minute bar. If that observation is unavailable, the current session is
-   ineligible with reason `MISSING_PREVIOUS_QQQ_CLOSE`.
+2. `previous_close` is the close of that prior session's final scheduled and
+   qualified QQQ five-minute slot. If that observation is unavailable, the
+   current session is ineligible with reason `MISSING_PREVIOUS_QQQ_CLOSE`.
 3. Require all six expected QQQ five-minute bars spanning the current session's
    first 30 regular-session minutes. The sixth bar's close is
    `first_half_hour_close`. Any missing required slot makes the session
@@ -77,15 +78,20 @@ For each expected XNYS regular session:
    bar's OPEN and the existing cost-model execution-price semantics. If the
    exact target bar is absent, skip the session with reason
    `MISSING_SCHEDULED_ENTRY_BAR`.
+   Resolve `MISSING_PREVIOUS_QQQ_CLOSE`, `INCOMPLETE_FIRST_HALF_HOUR_QQQ`,
+   `ZERO_OPENING_DRIVE` and `MISSING_SCHEDULED_ENTRY_BAR` in that order before
+   applying the preserved operational data-readiness veto
+   `QQQ_DATA_SAFETY_AT_ENTRY`. That veto is not a strategy signal. The
+   candidate has no indicator warmup.
 8. At most one position may be opened in the session. There is no same-session
    re-entry, inverse flip, cooldown, normal regime exit, or second entry.
 9. The existing 3.00% hard stop is active immediately from the entry fill and
    retains current conservative entry-bar gap/breach semantics.
 10. Otherwise hold the position until the earliest existing mandatory safety
     exit or the existing forced-flat boundary beginning at official close minus
-    5 minutes. The current sparse simulator's real-bar-only execution,
-    missing-held-bar pending-exit behavior and final-session flatten invariant
-    remain authoritative.
+    5 minutes. The existing sparse simulator remains authoritative for
+    real-bar-only execution, stop priority, pending exits after missing held-ETF
+    bars and final-session flattening.
 11. Early-close sessions use the published XNYS close and the same relative
     `close-35m` / `close-5m` timing. Nothing is hard-coded to 15:25 or 15:55.
 12. The session ends FLAT. No position or research state carries overnight.
@@ -150,6 +156,11 @@ The evidence must bind the exact source commit/tree, design/version identifier,
 dataset/custody/requalification identities, schedule identity, simulator
 version, cost case, partition and effect counters.
 
+The QQQ late-window return uses QQQ opens from the exact scheduled
+`close - 35 minutes` and `close - 5 minutes` slots. If either endpoint is
+missing, exclude that observation from the diagnostic denominator. These
+diagnostics are descriptive and do not select or tune the candidate.
+
 ## Frozen result classification
 
 This OPEN study has no automatic live/default promotion rule.
@@ -178,6 +189,11 @@ module, with the smallest explicit extension to
 missing-bar and valuation semantics. Do not change the accepted live runtime
 strategy in this checkpoint.
 
+The evaluator requires the already admitted immutable XNYS schedule as an
+explicit in-memory `authority` argument of type
+`HistoricalIntradaySessionAuthority`. It does not discover or load the schedule
+implicitly.
+
 Focused tests must pin at least:
 
 - previous-session close linkage;
@@ -192,12 +208,13 @@ Focused tests must pin at least:
 - deterministic identities/hashes and both cost cases;
 - `FINAL_HOLDOUT` exclusion and zero provider/broker effects.
 
-The source checkpoint must freeze these semantics before replay. After an exact
-local commit and general source admission, the OPEN evaluation may run as a
-separately named offline evidence step bound to that exact source before
-publication, following the same evidence-preservation model used by the
-accepted churn study. Mapped GitHub CI remains an admission/certification gate,
-not the research execution engine.
+The source checkpoint freezes these semantics without opening the accepted
+sparse data or producing a real observation. Exact-source review and source
+acceptance must finish first. Only then may one separately named and separately
+reviewed offline OPEN observation be considered, bound to the accepted source
+and following the evidence-preservation model used by the accepted churn study.
+Source admission and mapped GitHub CI are source/certification gates, not
+research execution authority.
 
 If implementation discovery requires changing this contract, STOP and return to
 ChatGPT for a new design decision before evaluating any P&L.

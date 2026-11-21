@@ -6,10 +6,10 @@ may value or execute a position. Missing ETF observations never become prices.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from decimal import Decimal, localcontext
+from decimal import Context, Decimal, localcontext
 from zoneinfo import ZoneInfo
 
 from trading_bot.domain import Bar, OrderSide
@@ -46,6 +46,7 @@ from trading_bot.live_runtime.strategy import (
     analyze_market,
     session_decision,
 )
+from trading_bot.review_paper.session_admission import ReviewPaperSessionSchedule
 
 _BAR_WIDTH = timedelta(minutes=5)
 _NEW_YORK = ZoneInfo("America/New_York")
@@ -55,6 +56,76 @@ _NEW_YORK = ZoneInfo("America/New_York")
 class _PendingExit:
     reason: str
     reversal_source: MarketRegime | None = None
+
+
+class _ScheduledMarketDataQualityStream:
+    """Apply current-session QQQ readiness without indicator calculations.
+
+    ``SparseIntradayDataset`` already rejects invalid, duplicate, off-grid,
+    interpolated, and fully missing-session observations. This stream keeps the
+    remaining live safety checks: current-session opening coverage, contiguous
+    completed bars, the latest expected completion, and freshness.
+    """
+
+    def __init__(self, authority: HistoricalIntradaySessionAuthority) -> None:
+        self._authority = authority
+        self._last_bar: CompletedBar | None = None
+        self._session_schedule: ReviewPaperSessionSchedule | None = None
+        self._session_first_timestamp: datetime | None = None
+        self._session_gap = False
+
+    def append(self, bar: CompletedBar) -> None:
+        previous = self._last_bar
+        session_date = bar.timestamp.astimezone(_NEW_YORK).date()
+        schedule = self._authority.schedule_for(session_date)
+        if schedule is None:
+            raise Arch148IntradayError(
+                "scheduled quality received a bar outside the accepted schedule"
+            )
+        if self._session_schedule != schedule:
+            self._session_schedule = schedule
+            self._session_first_timestamp = bar.timestamp
+            self._session_gap = False
+        elif previous is not None and bar.timestamp - previous.timestamp != _BAR_WIDTH:
+            self._session_gap = True
+        self._last_bar = bar
+
+    @staticmethod
+    def _latest_completed_end(
+        as_of: datetime, schedule: ReviewPaperSessionSchedule
+    ) -> datetime:
+        bounded_as_of = min(as_of, schedule.closes_at)
+        elapsed = bounded_as_of - schedule.opens_at
+        completed_slots = elapsed // _BAR_WIDTH
+        return schedule.opens_at + completed_slots * _BAR_WIDTH
+
+    def assess(self, as_of: datetime) -> tuple[MarketQuality, str]:
+        if self._last_bar is None:
+            return MarketQuality.NO_CURRENT_SESSION_DATA, "NO_COMPLETED_BARS"
+        current_session_date = as_of.astimezone(_NEW_YORK).date()
+        if (
+            self._session_schedule is None
+            or self._session_schedule.session_date != current_session_date
+        ):
+            current_schedule = self._authority.schedule_for(current_session_date)
+            if current_schedule is not None:
+                latest_expected_end = self._latest_completed_end(
+                    as_of, current_schedule
+                )
+                if latest_expected_end > current_schedule.opens_at:
+                    return MarketQuality.GAP, "MISSING_LATEST_COMPLETED_BAR"
+            return MarketQuality.NO_CURRENT_SESSION_DATA, "NO_CURRENT_SESSION_BARS"
+
+        schedule = self._session_schedule
+        if self._session_first_timestamp != schedule.opens_at:
+            return MarketQuality.GAP, "SESSION_OPEN_MISSING"
+        if self._session_gap:
+            return MarketQuality.GAP, "NONCONTIGUOUS_CURRENT_SESSION_BARS"
+        if self._last_bar.ends_at != self._latest_completed_end(as_of, schedule):
+            return MarketQuality.GAP, "MISSING_LATEST_COMPLETED_BAR"
+        if as_of - self._last_bar.ends_at > _BAR_WIDTH:
+            return MarketQuality.STALE, "LATEST_COMPLETED_BAR_STALE"
+        return MarketQuality.READY, "SCHEDULED_DATA_READY"
 
 
 def _completed_bar(bar: Bar) -> CompletedBar:
@@ -92,6 +163,12 @@ def _add(left: Decimal, right: Decimal) -> Decimal:
         return left + right
 
 
+def sparse_backtest_decimal_context() -> Context:
+    """Return a fresh copy of the sparse replay's explicit Decimal context."""
+
+    return _DECIMAL_CONTEXT.copy()
+
+
 def run_sparse_backtest(
     dataset: SparseIntradayDataset,
     *,
@@ -104,6 +181,12 @@ def run_sparse_backtest(
     on_trade_close: (
         Callable[[BacktestTrade, Decimal, MarketRegime | None], None] | None
     ) = None,
+    scheduled_entries: Mapping[datetime, str] | None = None,
+    scheduled_authority: HistoricalIntradaySessionAuthority | None = None,
+    on_scheduled_entry_quality: (
+        Callable[[datetime, MarketQuality], None] | None
+    ) = None,
+    on_missing_held_bar: Callable[[datetime, str], None] | None = None,
 ) -> BacktestResult:
     """Replay a sparse dataset without fabricating execution or valuation bars.
 
@@ -116,7 +199,11 @@ def run_sparse_backtest(
     not carry forward a stale valuation. ``churn_policy`` adds a research-only
     exit/entry gate; CONTROL preserves the existing strategy behavior. Optional
     observers receive only emitted equity marks and settled trade facts, without
-    changing the returned result.
+    changing the returned result. ``scheduled_entries`` is a narrow research
+    seam for fixed close-relative entries. It retains the sparse simulator's
+    real-bar execution and safety/stop/pending-exit/forced-flat ordering while
+    checking QQQ data readiness without computing indicators or requiring
+    indicator warmup.
     """
 
     if type(dataset) is not SparseIntradayDataset:
@@ -139,8 +226,79 @@ def run_sparse_backtest(
         raise Arch148IntradayError("equity observer must be callable")
     if on_trade_close is not None and not callable(on_trade_close):
         raise Arch148IntradayError("trade observer must be callable")
+    if on_scheduled_entry_quality is not None and not callable(
+        on_scheduled_entry_quality
+    ):
+        raise Arch148IntradayError("scheduled quality observer must be callable")
+    if on_missing_held_bar is not None and not callable(on_missing_held_bar):
+        raise Arch148IntradayError("missing-held-bar observer must be callable")
+    if scheduled_entries is None and (
+        on_scheduled_entry_quality is not None or on_missing_held_bar is not None
+    ):
+        raise Arch148IntradayError("scheduled observers require scheduled-entry mode")
 
-    authority = HistoricalIntradaySessionAuthority()
+    scheduled_mode = scheduled_entries is not None
+    if scheduled_mode:
+        if type(scheduled_authority) is not HistoricalIntradaySessionAuthority:
+            raise Arch148IntradayError(
+                "scheduled entries require the preconstructed accepted authority"
+            )
+        authority = scheduled_authority
+    else:
+        if scheduled_authority is not None:
+            raise Arch148IntradayError(
+                "scheduled authority is only valid with scheduled entries"
+            )
+        authority = HistoricalIntradaySessionAuthority()
+    normalized_scheduled_entries: dict[datetime, str] = {}
+    if scheduled_mode:
+        if analyzer is not analyze_market:
+            raise Arch148IntradayError(
+                "scheduled entries cannot be combined with a custom analyzer"
+            )
+        if churn_policy is not ChurnPolicy.CONTROL:
+            raise Arch148IntradayError(
+                "scheduled entries exclude churn regime-exit policies"
+            )
+        if session_policy is not None:
+            raise Arch148IntradayError(
+                "scheduled entries use the accepted session policy"
+            )
+        if not isinstance(scheduled_entries, Mapping):
+            raise Arch148IntradayError("scheduled entries must be a mapping")
+        entry_dates: set[date] = set()
+        for at, symbol in scheduled_entries.items():
+            if type(at) is not datetime or at.tzinfo is None:
+                raise Arch148IntradayError(
+                    "scheduled entry timestamps must be timezone-aware"
+                )
+            if type(symbol) is not str or symbol not in (
+                TQQQ_SYMBOL,
+                SQQQ_SYMBOL,
+            ):
+                raise Arch148IntradayError(
+                    "scheduled entry symbol must be TQQQ or SQQQ"
+                )
+            if at < dataset.start or at >= dataset.end_exclusive:
+                raise Arch148IntradayError(
+                    "scheduled entry must be within the dataset range"
+                )
+            local_at = at.astimezone(_NEW_YORK)
+            schedule = authority.schedule_for(local_at.date())
+            if schedule is None or local_at != schedule.closes_at - timedelta(
+                minutes=35
+            ):
+                raise Arch148IntradayError(
+                    "scheduled entries must use the close-minus-35-minute slot"
+                )
+            if local_at.date() in entry_dates:
+                raise Arch148IntradayError(
+                    "scheduled entries allow at most one entry per session"
+                )
+            entry_dates.add(local_at.date())
+            if at in normalized_scheduled_entries:
+                raise Arch148IntradayError("scheduled entry timestamps must be unique")
+            normalized_scheduled_entries[at] = symbol
     session_policy = session_policy or (
         lambda as_of: session_decision(as_of, authority=authority)
     )
@@ -151,7 +309,12 @@ def run_sparse_backtest(
     completed_history: list[CompletedBar] = []
     has_completed_qqq = False
     signal_stream = (
-        _CompletedBarSignalStream(authority) if analyzer is analyze_market else None
+        _CompletedBarSignalStream(authority)
+        if analyzer is analyze_market and not scheduled_mode
+        else None
+    )
+    quality_stream = (
+        _ScheduledMarketDataQualityStream(authority) if scheduled_mode else None
     )
     cash = initial_capital
     position: _OpenBacktestPosition | None = None
@@ -192,9 +355,11 @@ def run_sparse_backtest(
             and qqq_bars[qqq_pointer].timestamp + _BAR_WIDTH <= as_of
         ):
             completed = _completed_bar(qqq_bars[qqq_pointer])
+            if quality_stream is not None:
+                quality_stream.append(completed)
             if signal_stream is not None:
                 signal_stream.append(completed)
-            else:
+            elif quality_stream is None:
                 completed_history.append(completed)
             has_completed_qqq = True
             qqq_pointer += 1
@@ -209,7 +374,14 @@ def run_sparse_backtest(
             bar_pointers[symbol] = pointer
 
         signal: SignalAnalysis | None = None
-        if has_completed_qqq:
+        scheduled_quality: MarketQuality | None = None
+        scheduled_symbol: str | None = None
+        if quality_stream is not None:
+            scheduled_quality, _ = quality_stream.assess(as_of)
+            scheduled_symbol = normalized_scheduled_entries.get(as_of)
+            if scheduled_symbol is not None and on_scheduled_entry_quality is not None:
+                on_scheduled_entry_quality(as_of, scheduled_quality)
+        elif has_completed_qqq:
             if signal_stream is not None:
                 signal = signal_stream.analyze(as_of)
             else:
@@ -217,12 +389,19 @@ def run_sparse_backtest(
                     MarketSnapshot(as_of, tuple(completed_history), (), {}),
                     authority=authority,
                 )
+        quality_ready = (
+            scheduled_quality is MarketQuality.READY
+            if scheduled_mode
+            else signal is not None and signal.quality is MarketQuality.READY
+        )
         decision = session_policy(as_of)
         acted = False
         valuation_bar: Bar | None = None
         current_bar = (
             current_bars.get(position.symbol) if position is not None else None
         )
+        if position is not None and current_bar is None and on_missing_held_bar:
+            on_missing_held_bar(as_of, position.symbol)
 
         if position is not None and current_bar is not None:
             valuation_bar = current_bar
@@ -271,12 +450,17 @@ def run_sparse_backtest(
             reversal_source: MarketRegime | None = None
             if decision.force_flat:
                 exit_reason = "FORCED_FLAT"
-            elif signal is None or signal.quality is not MarketQuality.READY:
+            elif not quality_ready:
                 exit_reason = "SAFETY"
-            elif churn_policy.should_exit_regime(
-                signal, TargetPosition(position.symbol)
+            elif (
+                not scheduled_mode
+                and signal is not None
+                and churn_policy.should_exit_regime(
+                    signal, TargetPosition(position.symbol)
+                )
             ):
                 exit_reason = "REGIME_EXIT"
+                assert signal is not None
                 reversal_source = churn_policy.reversal_source(signal)
             if exit_reason is not None:
                 pending_exit = _PendingExit(exit_reason, reversal_source)
@@ -304,23 +488,30 @@ def run_sparse_backtest(
                     acted = True
                     valuation_bar = None
 
-        if (
+        target: str | None = None
+        can_consider_entry = (
             position is None
             and pending_exit is None
             and not acted
-            and signal is not None
-            and signal.quality is MarketQuality.READY
+            and quality_ready
             and decision.can_enter
             and not decision.force_flat
+            and cooldown_until is None
+        )
+        if can_consider_entry and scheduled_mode:
+            target = scheduled_symbol
+        elif (
+            can_consider_entry
+            and signal is not None
             and signal.entry_confirmation
             in (MarketRegime.BULLISH, MarketRegime.BEARISH)
-            and cooldown_until is None
         ):
             target = (
                 TQQQ_SYMBOL
                 if signal.entry_confirmation is MarketRegime.BULLISH
                 else SQQQ_SYMBOL
             )
+        if target is not None:
             target_bar = current_bars.get(target)
             if target_bar is not None:
                 raw_entry = target_bar.open
@@ -423,4 +614,4 @@ def run_sparse_backtest(
         )
 
 
-__all__ = ["run_sparse_backtest"]
+__all__ = ["run_sparse_backtest", "sparse_backtest_decimal_context"]

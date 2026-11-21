@@ -244,6 +244,58 @@ def test_arch148_churn_checkpoint_is_source_only_and_mapped():
     assert runner._arch148_churn_authority_check(repo) == ()
 
 
+def test_arch148_intraday_momentum_checkpoint_is_source_only_and_mapped():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.ARCH148_INTRADAY_MOMENTUM_NAME]
+
+    assert runner.ARCH148_INTRADAY_MOMENTUM_NAME == (
+        "arch148-intraday-momentum-research"
+    )
+    assert runner.ARCH148_INTRADAY_MOMENTUM_BRANCH == (
+        "feature/research-arch148-intraday-momentum-current"
+    )
+    assert spec.remote_branch == runner.ARCH148_INTRADAY_MOMENTUM_BRANCH
+    assert spec.authority_check is runner._arch148_intraday_momentum_authority_check
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert runner.ARCH148_INTRADAY_MOMENTUM_NAME not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.ARCH148_INTRADAY_MOMENTUM_NAME in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert (
+        runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(
+            runner.ARCH148_INTRADAY_MOMENTUM_NAME
+        )
+        == 1
+    )
+    assert (
+        runner.CI_CERTIFICATION_PROFILES[runner.ARCH148_INTRADAY_MOMENTUM_NAME]
+        == "full"
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, runner.ARCH148_INTRADAY_MOMENTUM_BRANCH, "push"
+        )
+        == runner.ARCH148_INTRADAY_MOMENTUM_NAME
+    )
+    assert runner._arch148_intraday_momentum_authority_check(repo) == ()
+
+
+def test_arch148_intraday_momentum_route_help_is_effect_free(monkeypatch, capsys):
+    def forbidden(*args, **kwargs):
+        pytest.fail("route help dispatched a protected runner effect")
+
+    monkeypatch.setattr(runner.subprocess, "run", forbidden)
+    monkeypatch.setattr(runner, "_git_state", forbidden)
+    monkeypatch.setattr(runner, "_default_evidence_root", forbidden)
+    monkeypatch.setattr(runner, "verify_checkpoint", forbidden)
+    monkeypatch.setattr(runner, "verify_batch", forbidden)
+
+    with pytest.raises(SystemExit) as exit_info:
+        runner.main(["verify", runner.ARCH148_INTRADAY_MOMENTUM_NAME, "--help"])
+
+    assert exit_info.value.code == 0
+    assert runner.ARCH148_INTRADAY_MOMENTUM_NAME in capsys.readouterr().out
+
+
 def test_ai_strategy_discovery_checkpoint_is_source_only_and_mapped():
     repo = Path(runner.__file__).resolve().parents[1]
     specs = runner._checkpoint_specs()

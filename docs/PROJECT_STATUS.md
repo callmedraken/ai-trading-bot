@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 149 exploratory PASS; 2024-2026 confirmation contract frozen
+## Current milestone - Architecture 150 intraday AI day-trading campaign frozen; foundation next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -197,6 +197,21 @@ its now-visible P&L.
 The observation performed zero credential/network/provider/Robinhood/broker/
 order/production effects, zero baseline replay, and zero `FINAL_HOLDOUT`
 access. `FINAL_HOLDOUT` remains sealed. No earlier frozen unevaluated trading hypothesis remained after that closeout.
+Architecture 149 remains a valid preserved secondary benchmark, but it no
+longer blocks the primary bot roadmap. Its exploratory result and frozen
+2024-2026 confirmation contract remain immutable; confirmation may be resumed
+later as a low-turnover benchmark.
+
+The primary product roadmap is now
+[Architecture 150 intraday AI day-trading campaign](architecture/150-intraday-ai-day-trading-campaign.md).
+It targets frequent same-day opportunities on SPY/QQQ, mandatory end-of-session
+flatness, bounded AI-generated deterministic intraday programs, realistic
+per-fill costs, full trial-ledger selection-bias correction, an untouched
+2024-2025 historical holdout, and a fixed Jan-Oct 2026 recent-regime extension.
+This uses completed historical periods available now and does not require
+waiting for calendar year-end. The foundation source is NOT IMPLEMENTED and no
+Architecture-150 real data has been opened.
+
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,
 monthly cross-asset relative-strength rule over the accepted eight-ETF A147

@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 149 exploratory PASS; 2024-2026 confirmation contract frozen
+## Current milestone: Architecture 150 intraday AI day-trading campaign frozen; foundation next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -202,6 +202,19 @@ Do not retry, retime, threshold, filter, or mutate this Architecture-148
 hypothesis from its visible result. The observation performed no provider/
 broker/production effect, baseline replay, or `FINAL_HOLDOUT` access.
 `FINAL_HOLDOUT` remains sealed. No earlier frozen unevaluated trading hypothesis remained after that closeout.
+Primary product direction is now Architecture 150 intraday day trading.
+Architecture 149 is preserved as a secondary benchmark/capital-parking research
+path and does not block intraday work.
+
+Architecture 150 freezes a same-day, session-flat SPY/QQQ research campaign with
+three typed families (noise-area/VWAP momentum, VWAP trend/reversal, and
+opening-range/early-session breakout-reversal), a 24-program G1 budget,
+frequency requirements, explicit ETF costs, complete trial-ledger
+selection-bias correction, 2024-2025 untouched historical holdout, and a fixed
+Jan-Oct 2026 recent-regime extension. No end-of-2026 wait is required. See
+[Architecture 150](architecture/150-intraday-ai-day-trading-campaign.md) and
+its [validation plan](validation/arch150-intraday-ai-day-trading-campaign.md).
+
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,
 uses the accepted SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC daily universe, ranks fixed

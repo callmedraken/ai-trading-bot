@@ -67,6 +67,7 @@ class StrategyFamily(StrEnum):
     DEFENSIVE_ROTATION = "DEFENSIVE_ROTATION"
     CROSS_ASSET_REGIME_GATE = "CROSS_ASSET_REGIME_GATE"
     FIXED_ENSEMBLE = "FIXED_ENSEMBLE"
+    CONJUNCTIVE_TREND = "CONJUNCTIVE_TREND"
 
 
 class MovingAverageRule(StrEnum):
@@ -130,6 +131,8 @@ class TrialDisposition(StrEnum):
     DETERMINISTIC_EVALUATION_FAILED = "DETERMINISTIC_EVALUATION_FAILED"
     ECONOMICALLY_REJECTED = "ECONOMICALLY_REJECTED"
     SHORTLISTED = "SHORTLISTED"
+    CONFIRMATION_PASSED = "CONFIRMATION_PASSED"
+    CONFIRMATION_REJECTED = "CONFIRMATION_REJECTED"
 
 
 class _FamilySpecSchema(StrEnum):
@@ -137,6 +140,7 @@ class _FamilySpecSchema(StrEnum):
     DONCHIAN_BREAKOUT = "donchian-breakout-spec/v1"
     ABSOLUTE_MOMENTUM = "absolute-momentum-spec/v1"
     MULTI_HORIZON_TREND = "multi-horizon-trend-spec/v1"
+    CONJUNCTIVE_TREND = "conjunctive-trend-spec/v1"
     DEFERRED = "deferred-strategy-spec/v1"
 
 
@@ -270,6 +274,96 @@ class MultiHorizonTrendSpec:
         }
 
 
+class ConjunctiveOperation(StrEnum):
+    """Closed Generation-2 logical operator vocabulary."""
+
+    ALL_OF = "ALL_OF"
+
+
+def _spec_canonical_key(
+    spec: MovingAverageTrendSpec
+    | DonchianBreakoutSpec
+    | AbsoluteMomentumSpec
+    | MultiHorizonTrendSpec,
+) -> bytes:
+    return canonical_json_bytes(spec.to_dict())
+
+
+def _conjunctive_pair_key(
+    left: MovingAverageTrendSpec
+    | DonchianBreakoutSpec
+    | AbsoluteMomentumSpec
+    | MultiHorizonTrendSpec,
+    right: MovingAverageTrendSpec
+    | DonchianBreakoutSpec
+    | AbsoluteMomentumSpec
+    | MultiHorizonTrendSpec,
+) -> tuple[bytes, bytes]:
+    return tuple(sorted((_spec_canonical_key(left), _spec_canonical_key(right))))
+
+
+def frozen_generation2_parent_pairs() -> tuple[
+    tuple[tuple[str, StrategySpec], tuple[str, StrategySpec]], ...
+]:
+    """Return the ordered six accepted G1 parent-ID/spec pairings for G2."""
+    return _FROZEN_GENERATION2_PARENT_PAIRS
+
+
+@dataclass(frozen=True, slots=True)
+class ConjunctiveTrendSpec:
+    """One of six closed G2 ALL_OF pairs of accepted G1 trend programs."""
+
+    components: tuple[
+        MovingAverageTrendSpec
+        | DonchianBreakoutSpec
+        | AbsoluteMomentumSpec
+        | MultiHorizonTrendSpec,
+        MovingAverageTrendSpec
+        | DonchianBreakoutSpec
+        | AbsoluteMomentumSpec
+        | MultiHorizonTrendSpec,
+    ]
+    operation: ConjunctiveOperation = ConjunctiveOperation.ALL_OF
+
+    def __post_init__(self) -> None:
+        allowed_types = (
+            MovingAverageTrendSpec,
+            DonchianBreakoutSpec,
+            AbsoluteMomentumSpec,
+            MultiHorizonTrendSpec,
+        )
+        if type(self.components) is not tuple or len(self.components) != 2:
+            raise DiscoveryError("conjunctive trend requires exactly two components")
+        if any(type(component) not in allowed_types for component in self.components):
+            raise DiscoveryError("conjunctive components must be typed G1 programs")
+        if type(self.operation) is not ConjunctiveOperation or (
+            self.operation is not ConjunctiveOperation.ALL_OF
+        ):
+            raise DiscoveryError("only the ALL_OF operation is supported")
+        canonical_components = tuple(sorted(self.components, key=_spec_canonical_key))
+        object.__setattr__(self, "components", canonical_components)
+        if _spec_canonical_key(canonical_components[0]) == _spec_canonical_key(
+            canonical_components[1]
+        ):
+            raise DiscoveryError("conjunctive component cannot duplicate itself")
+        if _conjunctive_pair_key(*canonical_components) not in (
+            _ALLOWED_CONJUNCTIVE_COMPONENT_PAIRS
+        ):
+            raise DiscoveryError("component pair is outside the six frozen G2 programs")
+
+    @property
+    def family(self) -> StrategyFamily:
+        return StrategyFamily.CONJUNCTIVE_TREND
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "schema": _FamilySpecSchema.CONJUNCTIVE_TREND.value,
+            "family": self.family.value,
+            "operation": self.operation.value,
+            "components": [component.to_dict() for component in self.components],
+        }
+
+
 _DEFERRED_FAMILIES = frozenset(
     {
         StrategyFamily.ABSOLUTE_MOMENTUM,
@@ -314,6 +408,7 @@ StrategySpec = (
     | DonchianBreakoutSpec
     | AbsoluteMomentumSpec
     | MultiHorizonTrendSpec
+    | ConjunctiveTrendSpec
     | DeferredStrategySpec
 )
 
@@ -482,6 +577,7 @@ class ResearchProposal:
             DonchianBreakoutSpec,
             AbsoluteMomentumSpec,
             MultiHorizonTrendSpec,
+            ConjunctiveTrendSpec,
             DeferredStrategySpec,
         ):
             raise DiscoveryError("strategy_spec must use the closed typed grammar")
@@ -504,11 +600,32 @@ class ResearchProposal:
                 self.proposal_kind
                 not in (ProposalKind.ORIGINAL, ProposalKind.RETAINED_BASELINE)
                 or self.parent_proposal_ids
+                or type(self.strategy_spec) is ConjunctiveTrendSpec
                 or visibility.stage is not VisibilityStage.GENERATION_1_PRE_RESULTS
                 or visibility.visible_generation1_diagnostics
             ):
                 raise DiscoveryError("invalid Generation 1 proposal chronology")
             return
+        if type(self.strategy_spec) is ConjunctiveTrendSpec:
+            if (
+                self.proposal_kind is not ProposalKind.RECOMBINATION
+                or visibility.stage is not VisibilityStage.GENERATION_2_PRE_CONFIRMATION
+                or len(self.parent_proposal_ids) != 2
+                or self.parent_proposal_ids != tuple(sorted(self.parent_proposal_ids))
+                or tuple(
+                    item.parent_proposal_id
+                    for item in visibility.visible_generation1_diagnostics
+                )
+                != self.parent_proposal_ids
+            ):
+                raise DiscoveryError(
+                    "a conjunctive G2 proposal requires a canonical two-parent "
+                    "recombination with exact earlier diagnostics"
+                )
+            return
+
+        # Preserve proposal-only G2 fixtures used by the accepted foundation.
+        # The six-program G2 campaign boundary is enforced by the typed plan.
         if (
             self.proposal_kind
             not in (ProposalKind.MUTATION, ProposalKind.RECOMBINATION)
@@ -1150,6 +1267,23 @@ def _validate_record_bindings(record: TrialLedgerRecord) -> None:
         or _DIAGNOSTIC.fullmatch(record.terminal_diagnostic_code) is None
     ):
         raise DiscoveryError("terminal disposition requires a bounded diagnostic code")
+    if record.disposition in (
+        TrialDisposition.CONFIRMATION_PASSED,
+        TrialDisposition.CONFIRMATION_REJECTED,
+    ):
+        if (
+            record.generation != 2
+            or type(record.proposal) is not ResearchProposal
+            or type(record.proposal.strategy_spec) is not ConjunctiveTrendSpec
+            or not attempted
+            or record.result_id is None
+            or not record.pnl_visible
+            or not record.diagnostic_visible
+        ):
+            raise DiscoveryError(
+                "G2 confirmation disposition requires a visible bound result"
+            )
+        return
     if record.disposition is TrialDisposition.DUPLICATE_REJECTED:
         if (
             attempted
@@ -1444,6 +1578,33 @@ def _strategy_spec_from_dict(raw: object) -> StrategySpec:
             horizons=tuple(row["horizons"]),
             vote=_enum(TrendVote, row["vote"], "trend vote"),
         )
+    if schema == _FamilySpecSchema.CONJUNCTIVE_TREND.value:
+        row = _exact(raw, {"schema", "family", "operation", "components"})
+        if row["family"] != StrategyFamily.CONJUNCTIVE_TREND.value:
+            raise DiscoveryError("conjunctive family/schema mismatch")
+        if type(row["components"]) is not list or len(row["components"]) != 2:
+            raise DiscoveryError("conjunctive components must be a two-item list")
+        primitive_schemas = {
+            _FamilySpecSchema.MOVING_AVERAGE_TREND.value,
+            _FamilySpecSchema.DONCHIAN_BREAKOUT.value,
+            _FamilySpecSchema.ABSOLUTE_MOMENTUM.value,
+            _FamilySpecSchema.MULTI_HORIZON_TREND.value,
+        }
+        if any(
+            type(component) is not dict
+            or component.get("schema") not in primitive_schemas
+            for component in row["components"]
+        ):
+            raise DiscoveryError("conjunctive components must be primitive G1 specs")
+        components = tuple(
+            _strategy_spec_from_dict(component) for component in row["components"]
+        )
+        return ConjunctiveTrendSpec(
+            components=components,
+            operation=_enum(
+                ConjunctiveOperation, row["operation"], "conjunctive operation"
+            ),
+        )
     if schema == _FamilySpecSchema.DEFERRED.value:
         row = _exact(raw, {"schema", "family", "deferred_reason"})
         if row["deferred_reason"] != "NO_ACCEPTED_STANDALONE_EVALUATOR":
@@ -1570,6 +1731,49 @@ def _validate_pair(fast: object, slow: object) -> None:
         or (fast, slow) not in _SUPPORTED_PAIRS
     ):
         raise DiscoveryError("moving-average pair is outside the accepted finite set")
+
+
+_G2_MA35_50_BAND = MovingAverageTrendSpec(35, 50, MovingAverageRule.MA_PERCENT_BAND_010)
+_G2_ABSOLUTE_MOMENTUM_63 = AbsoluteMomentumSpec(63, MomentumGate.NONE)
+_G2_ABSOLUTE_MOMENTUM_252_SMA200 = AbsoluteMomentumSpec(252, MomentumGate.ABOVE_SMA200)
+_G2_MULTI_HORIZON_3_OF_3 = MultiHorizonTrendSpec(
+    (63, 126, 252), TrendVote.THREE_OF_THREE
+)
+_G2_MA35_50_BASE = MovingAverageTrendSpec(35, 50, MovingAverageRule.BASE_MA)
+_G2_DONCHIAN20_MA35_50 = DonchianBreakoutSpec(35, 50, 20)
+_FROZEN_GENERATION2_PARENT_PAIRS = (
+    (
+        ("6ff56e8f-ab41-50f3-aa3b-2474bfb37537", _G2_MA35_50_BAND),
+        ("926f7b9f-d40f-5c4b-8e56-de498786e440", _G2_ABSOLUTE_MOMENTUM_63),
+    ),
+    (
+        ("6ff56e8f-ab41-50f3-aa3b-2474bfb37537", _G2_MA35_50_BAND),
+        (
+            "f6739ed9-f812-5f62-938c-6b0ea7407825",
+            _G2_ABSOLUTE_MOMENTUM_252_SMA200,
+        ),
+    ),
+    (
+        ("6ff56e8f-ab41-50f3-aa3b-2474bfb37537", _G2_MA35_50_BAND),
+        ("369a6806-1609-53b4-8972-b4d248505e2d", _G2_MULTI_HORIZON_3_OF_3),
+    ),
+    (
+        ("c5d6574d-a9dc-5b4f-8a68-b95b1cdd3e59", _G2_MA35_50_BASE),
+        ("926f7b9f-d40f-5c4b-8e56-de498786e440", _G2_ABSOLUTE_MOMENTUM_63),
+    ),
+    (
+        ("b4c598f0-688d-5c81-b924-219fabd90e2a", _G2_DONCHIAN20_MA35_50),
+        ("926f7b9f-d40f-5c4b-8e56-de498786e440", _G2_ABSOLUTE_MOMENTUM_63),
+    ),
+    (
+        ("b4c598f0-688d-5c81-b924-219fabd90e2a", _G2_DONCHIAN20_MA35_50),
+        ("369a6806-1609-53b4-8972-b4d248505e2d", _G2_MULTI_HORIZON_3_OF_3),
+    ),
+)
+_ALLOWED_CONJUNCTIVE_COMPONENT_PAIRS = frozenset(
+    _conjunctive_pair_key(left[1], right[1])
+    for left, right in frozen_generation2_parent_pairs()
+)
 
 
 def _bounded_positive_int(value: object, maximum: int, label: str) -> None:

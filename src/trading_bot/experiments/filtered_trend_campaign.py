@@ -537,6 +537,35 @@ def evaluate_cell(
     return _evaluate_cell(bars, config, regime, candidate_id)
 
 
+def evaluate_prepared_signal_cell(
+    bars: tuple[Bar, ...],
+    regime: Regime,
+    candidate_id: str,
+    *,
+    prepared_states: tuple[str, ...],
+) -> CellEvidence:
+    """Replay a closed point-in-time signal tape with the accepted A147 path.
+
+    This narrow adapter keeps the existing independent account, next-open,
+    risk, cost, and evidence behavior while allowing bounded research
+    compositions to provide their own already-compiled state tape.
+    """
+    if type(regime) is not Regime:
+        raise ValueError("a typed research regime is required")
+    if type(prepared_states) is not tuple or any(
+        state not in ("BUY", "SELL", "HOLD") for state in prepared_states
+    ):
+        raise ValueError("prepared states must be an immutable closed signal tape")
+    if len(prepared_states) != len(bars):
+        raise ValueError("prepared signal tape length mismatch")
+    return _evaluate_prepared_cell(
+        bars,
+        regime,
+        candidate_id,
+        prepared_states=prepared_states,
+    )
+
+
 def summarize(
     cells: tuple[CellEvidence, ...], *, stress: bool = False
 ) -> AggregateSummary:

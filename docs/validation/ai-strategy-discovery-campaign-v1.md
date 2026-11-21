@@ -211,8 +211,10 @@ continuous 2019-2021 result. The bounded discovery view must remove all bars on
 or after 2022-01-01 before strategy evaluation. The G1 evaluator must not
 compute or expose 2022-2023 results. `FINAL_HOLDOUT` remains inaccessible.
 
-Any later confirmation or Generation-2 workflow must be separately frozen
-before it can read 2022-2023 evidence; it is outside this source checkpoint.
+The Generation-2 confirmation chronology and selection rule are now frozen
+below. This source checkpoint implements only their synthetic-input evaluator
+and complete-panel analyzer. It does not read the accepted A147 dataset or run
+confirmation research.
 
 Prior project research has already exposed some 2022-2023 behavior for other
 strategy families. Therefore 2022-2023 is **not** called a pristine holdout.
@@ -292,23 +294,85 @@ Generation-1 rules.
 
 ## Generation 2
 
-Generation 2 is optional and bounded.
+Generation 2 is frozen to exactly six structural recombinations. The campaign's
+existing maximum remains **16 evaluated G2 trials**. This wave evaluates six
+and leaves ten unused. No prose variants or additional candidates may fill the
+unused budget.
 
-After Generation 1 completes, the AI may propose at most **16** candidates.
-Every Generation-2 proposal must cite one or more Generation-1 parent proposals
-and identify the exact diagnostic that motivates its mutation or recombination.
+The accepted G1 proposal set is
+`b2b3cadc-c11d-5a7a-be0b-5a2e16b9b39b`, its terminal ledger is
+`68418f44-7db0-5080-a6bd-a956a928bd4a`, and its complete-panel analysis is
+`d5ca081e-7490-5590-921d-10cee373d012`. The G2 proposal set binds all three
+identities, its own source HEAD/tree, the ordered six proposal and semantic
+program identities, each exact pair of G1 parent proposal IDs, and both exact
+visible parent diagnostic references from that accepted terminal ledger. It
+records a maximum budget of 16, six planned evaluations, zero confirmation
+result visibility at freeze, and a sealed `FINAL_HOLDOUT`. This source-only
+checkpoint creates no real G2 proposal or result artifact.
 
-Permitted changes are structural:
+Each G2 program is a closed `ConjunctiveTrendSpec` containing exactly two
+supported G1 semantic specifications. The fixed operation for every pair is
+`ALL_OF`.
 
-- remove a failing filter;
-- add one already permitted regime gate;
-- combine two complementary accepted primitives;
-- replace one discrete lookback with an adjacent predeclared value;
-- build a fixed ensemble from declared Generation-1 components.
+| Order | First G1 parent | Second G1 parent |
+| --- | --- | --- |
+| 1 | `6ff56e8f-ab41-50f3-aa3b-2474bfb37537` — MA 35/50, fixed 1% band | `926f7b9f-d40f-5c4b-8e56-de498786e440` — 63-session absolute momentum, no SMA gate |
+| 2 | `6ff56e8f-ab41-50f3-aa3b-2474bfb37537` — MA 35/50, fixed 1% band | `f6739ed9-f812-5f62-938c-6b0ea7407825` — 252-session absolute momentum plus SMA200 |
+| 3 | `6ff56e8f-ab41-50f3-aa3b-2474bfb37537` — MA 35/50, fixed 1% band | `369a6806-1609-53b4-8972-b4d248505e2d` — 63/126/252 multi-horizon, 3_OF_3 |
+| 4 | `c5d6574d-a9dc-5b4f-8a68-b95b1cdd3e59` — plain MA 35/50 | `926f7b9f-d40f-5c4b-8e56-de498786e440` — 63-session absolute momentum, no SMA gate |
+| 5 | `b4c598f0-688d-5c81-b924-219fabd90e2a` — Donchian-20 plus MA 35/50 | `926f7b9f-d40f-5c4b-8e56-de498786e440` — 63-session absolute momentum, no SMA gate |
+| 6 | `b4c598f0-688d-5c81-b924-219fabd90e2a` — Donchian-20 plus MA 35/50 | `369a6806-1609-53b4-8972-b4d248505e2d` — 63/126/252 multi-horizon, 3_OF_3 |
 
-Generation 2 may not perform unrestricted parameter search, continuous
-optimization, custom Python generation or iterative mutation after confirmation
-results are visible.
+Component order is canonical, so A+B and B+A are one semantic trial. A proposal
+uses `ProposalKind.RECOMBINATION`, names exactly those two G1 parent proposal
+IDs, and has `GENERATION_2_PRE_CONFIRMATION` visibility. No arbitrary
+expression, nested tree, `OR`, `NOT`, custom Python, weighted ensemble, extra
+component or other G2 program is supported. At completed session `t`, the
+composite is LONG only when both accepted parent signals are LONG. It is FLAT
+otherwise. A state change executes at session `t+1` OPEN through the existing
+A147 single-symbol path. No portfolio weighting or capital splitting is added.
+
+The later confirmation view may use pre-2022 bars for indicator warmup. Its
+reported evidence is only `[2022-01-01, 2024-01-01)`, with calendar 2022,
+calendar 2023 and continuous 2022-2023 slices. It rejects 2024 and later bars.
+The accepted A147 daily dataset remains the only market-data source. The
+original A147 economics above remain unchanged, each symbol and reported slice
+uses an independent starting account, and `FINAL_HOLDOUT` is inaccessible.
+
+At this source freeze, six evaluations are planned and zero G2 trials have
+actually been evaluated.
+
+A completed G2 candidate is `CONFIRMATION_PASSED` only if its STRESS metrics
+meet all of these requirements.
+
+- 2022 and 2023 median cross-asset returns are strictly positive.
+- Continuous 2022-2023 median cross-asset return is strictly positive.
+- At least 5 of 8 continuous-symbol returns are strictly positive.
+- At least 9 of 16 asset/year returns are strictly positive.
+- Continuous worst-symbol return is greater than `-0.10`.
+- The candidate is nondominated on the complete completed-candidate population's
+  confirmation frontier.
+
+Every other completed result is `CONFIRMATION_REJECTED`.
+
+The frozen Pareto dimensions maximize stress continuous median return, stress
+minimum continuous-symbol return, positive continuous-symbol count and positive
+asset/year count, while minimizing stress worst continuous drawdown and median
+annual turnover. The frontier includes every completed G2 candidate, including
+economically failing candidates. Deterministic failures have no metric vector,
+remain diagnostic-only and are excluded from the frontier. Equal objective
+vectors remain ties, with no hidden epsilon or tie-break.
+
+Every frozen G2 proposal receives its acceptance event before the first
+evaluator call. Interim outcomes remain private until all six evaluations and
+complete-panel validation/analysis finish. Each attempted evaluation, including
+a deterministic failure, consumes exactly one trial. Completed results may
+then expose P&L and diagnostics. Deterministic failures expose diagnostics only.
+The G1 ledger prefix and G1 results are immutable. G2 outcomes never promote a
+candidate to `WALK_FORWARD_PASSED`, `SHADOW`, `PAPER_CANDIDATE`, live or
+production status. DSR or an equivalently reviewed multiple-testing correction
+remains required before a survivor may advance beyond exploratory `BACKTESTED`
+research status.
 
 ## Intraday track
 
@@ -373,25 +437,26 @@ leader status is not itself a lifecycle transition.
 
 ## Immediate source milestone
 
-The current implementation checkpoint is the source-only/fake-only G1 daily
-evaluator and analyzer. Generation 0 is already accepted and the accepted AI
-strategy discovery foundation supplies the canonical proposal model, append-only
-ledger and evidence inventory. G1 adds two new single-symbol families, bringing
-the supported set to four, plus the immutable proposal-set contract, bounded
-discovery view, narrow A147 helper reuse, deterministic evaluation and
-complete-panel terminal analysis.
+The current implementation checkpoint is the source-only/fake-only G2
+composition evaluator and complete-panel analyzer, runner and synthetic tests.
+The accepted G1 evidence and the three identities above remain unchanged. This
+checkpoint adds the exact six `ALL_OF` recombinations, the bounded 2022-2023
+confirmation view, stress selection gates and complete-population Pareto
+analysis while reusing the accepted G1 signal semantics and A147 execution and
+economics.
 
-It must not rewrite accepted A147 behavior or identities, the backtest engine,
-walk-forward machinery or research-candidate lifecycle. All G1 evaluator and
-analyzer tests use synthetic in-memory inputs. The source checkpoint runs no
-real G1 proposal population or market-data replay and creates no G1 result
-artifact. It makes no AI API call, credential read, provider/network call,
+All G2 source tests use synthetic in-memory inputs. This source checkpoint runs
+no real G2 proposal population or market-data replay, reads no accepted A147
+dataset, creates no proposal/result artifact, and exposes no 2022-2023 market
+results. It performs no AI API call, credential read, provider/network call,
 Robinhood or broker call, order effect, production-state read/write,
-`FINAL_HOLDOUT` access or strategy promotion. A real proposal set can be created
-only after source acceptance.
+`FINAL_HOLDOUT` access or strategy promotion. It does not change G1 proposal
+semantics, G1 results, A147 behavior/identities, the backtest engine,
+walk-forward machinery or the research-candidate lifecycle. A future real G2
+run requires a separately reviewed effect boundary after source acceptance.
 
-If implementation discovery shows that either new family requires a materially
-new portfolio/execution model, new data acquisition, a chronology change or a
+If implementation discovery shows that these six recombinations require a
+materially new execution engine, data acquisition, chronology change or
 result-dependent contract adjustment, STOP and return to ChatGPT before
 broadening the source checkpoint.
 

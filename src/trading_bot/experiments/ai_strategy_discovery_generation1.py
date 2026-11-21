@@ -21,6 +21,7 @@ from trading_bot.experiments.ai_strategy_discovery import (
     MultiHorizonTrendSpec,
     ProposalSemanticStatus,
     ResearchProposal,
+    StrategySpec,
     TrendVote,
     compile_generation1_program,
 )
@@ -39,7 +40,10 @@ from trading_bot.experiments.filtered_trend_data import (
     MultiAssetDataset,
     ProviderProvenance,
 )
-from trading_bot.experiments.filtered_trend_strategies import StrategyConfig
+from trading_bot.experiments.filtered_trend_strategies import (
+    StrategyConfig,
+    signal_series,
+)
 
 NY = ZoneInfo("America/New_York")
 DISCOVERY_START = date(2019, 1, 1)
@@ -290,6 +294,26 @@ def evaluate_generation1_program(
         view.dataset_identity,
         tuple(cells),
     )
+
+
+def generation1_signal_series(
+    spec: StrategySpec, bars: tuple[Bar, ...]
+) -> tuple[str, ...]:
+    """Compile one accepted G1 spec to its completed-session signal tape.
+
+    Existing A147 strategies retain their exact hysteretic signal series;
+    momentum and trend-vote programs use the same closed G1 state compiler as
+    the Generation-1 evaluator. This public seam is also used by bounded G2
+    composition without duplicating either compiler.
+    """
+    if type(bars) is not tuple or not bars:
+        raise ValueError("an immutable nonempty daily bar series is required")
+    program = compile_generation1_program(spec)
+    if type(program) is StrategyConfig:
+        return signal_series(program, bars)
+    if type(program) in (AbsoluteMomentumSpec, MultiHorizonTrendSpec):
+        return _new_program_states(program, bars)
+    raise ValueError("proposal did not compile to a supported G1 program")
 
 
 def _new_program_states(

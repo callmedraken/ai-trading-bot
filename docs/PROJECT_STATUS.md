@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - late-session intraday source accepted/integrated; real OPEN observation next
+## Current milestone - late-session intraday hypothesis rejected; next independent strategy research design
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -180,10 +180,26 @@ one-entry-per-session, the existing 3% stop/safety/forced-flat semantics, and
 the two accepted cost cases. The preserved QQQ data-readiness veto is recorded
 separately from strategy eligibility and was frozen before real results.
 
-Real OPEN observation is NOT RUN. The accepted sparse dataset has not been
-opened through this candidate source, no real result artifact exists, and
-`FINAL_HOLDOUT` remains sealed. The next action is one separately reviewed,
-effect-free offline observation over the immutable accepted sparse evidence.
+The one-shot real OPEN observation is CONSUMED and terminally
+`ECONOMICALLY_REJECTED`. Report identity
+`42355698-d57e-5f6b-8347-6a752e5b4572`, SHA-256
+`e6349ea0c7f1e1b09f165bede8c93b68fb6bc6168940fda0ae2270bf9079f19b`,
+is preserved at
+`F:\AI\temp\arch148-intraday-momentum-research-42355698-d57e-5f6b-8347-6a752e5b4572\research.json`.
+ZERO_COST OPEN_FULL returned about +24.96%, but CONSERVATIVE_10_BPS returned
+about -97.65%; the median conservative annual return was about -39.86%, with
+only 2020 positive among the eight calendar-year partitions. The opening-drive
+direction hit rate was about 49.48%, and both TQQQ and SQQQ realized mean
+returns were negative under conservative costs. No confirmation/holdout step is
+authorized. Do not tune, threshold, retime, rerun or mutate this hypothesis from
+its now-visible P&L.
+
+The observation performed zero credential/network/provider/Robinhood/broker/
+order/production effects, zero baseline replay, and zero `FINAL_HOLDOUT`
+access. `FINAL_HOLDOUT` remains sealed. No already-frozen unevaluated trading
+hypothesis remains in the repository; the next milestone is a separately frozen
+independent strategy-research design rather than another Architecture-148
+variant.
 
 The previously frozen OPEN-only design remains in
 [Architecture 148 late-session intraday momentum research](validation/arch148-intraday-momentum-research.md).

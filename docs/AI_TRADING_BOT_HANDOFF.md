@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: late-session intraday source accepted/integrated; real OPEN observation next
+## Current milestone: late-session intraday hypothesis rejected; next independent strategy research design
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -181,11 +181,29 @@ The frozen late-session intraday-momentum candidate
 `44888198054`, attempt 1, is SUCCESS. Develop run `44889299328`, attempt 1,
 is SUCCESS with exact feature-certification reuse and no duplicate FULL.
 
-The implementation keeps the candidate single-shot and parameter-free, uses the
-explicit accepted XNYS schedule, preserves the existing 3% stop/safety/forced
-flat semantics, and separates the inherited QQQ data-readiness veto from the
-strategy's four frozen no-trade reasons. Real sparse OPEN evaluation is NOT RUN;
-no result artifact exists and `FINAL_HOLDOUT` remains sealed.
+The implementation kept the candidate single-shot and parameter-free, used the
+explicit accepted XNYS schedule, preserved the existing 3% stop/safety/forced
+flat semantics, and separated the inherited QQQ data-readiness veto from the
+strategy's four frozen no-trade reasons.
+
+The single real sparse OPEN observation is now CONSUMED and
+`ECONOMICALLY_REJECTED`. Report
+`42355698-d57e-5f6b-8347-6a752e5b4572`, SHA-256
+`e6349ea0c7f1e1b09f165bede8c93b68fb6bc6168940fda0ae2270bf9079f19b`,
+is preserved at
+`F:\AI\temp\arch148-intraday-momentum-research-42355698-d57e-5f6b-8347-6a752e5b4572\research.json`.
+ZERO_COST OPEN_FULL was about +24.96%, while CONSERVATIVE_10_BPS was about
+-97.65%; median conservative annual return was about -39.86%. Seven of eight
+calendar years were negative at conservative cost, opening-drive hit rate was
+about 49.48%, and both leveraged target directions had negative realized mean
+returns after cost. No confirmation or holdout action is permitted.
+
+Do not retry, retime, threshold, filter, or mutate this Architecture-148
+hypothesis from its visible result. The observation performed no provider/
+broker/production effect, baseline replay, or `FINAL_HOLDOUT` access.
+`FINAL_HOLDOUT` remains sealed. No other frozen unevaluated trading hypothesis
+is currently queued; the next research step must freeze an independent strategy
+family before evaluation.
 
 The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).

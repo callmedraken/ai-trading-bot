@@ -12,9 +12,12 @@ SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
 `44888198054`, attempt 1, and develop reuse run `44889299328`, attempt 1,
 are terminal SUCCESS; develop did not duplicate FULL.
 
-The route has no evaluation dispatch. Real OPEN observation remains NOT RUN.
-This document does not report an evaluation result, select a live strategy,
-grant provider/broker authority, or access `FINAL_HOLDOUT`.
+The route has no evaluation dispatch. The single separately reviewed real OPEN
+observation is now CONSUMED and `ECONOMICALLY_REJECTED`. Report identity
+`42355698-d57e-5f6b-8347-6a752e5b4572`, SHA-256
+`e6349ea0c7f1e1b09f165bede8c93b68fb6bc6168940fda0ae2270bf9079f19b`,
+is the terminal research evidence for this fixed hypothesis. It does not select
+a live strategy, grant provider/broker authority, or access `FINAL_HOLDOUT`.
 
 The design uses only the already accepted sparse Architecture 148 OPEN dataset
 and custody identities:
@@ -184,6 +187,25 @@ holdout decision may be considered. It does not authorize `FINAL_HOLDOUT`,
 live-runtime replacement, provider reads, broker effects or production use.
 No rule may be relaxed after results are visible.
 
+
+### Consumed OPEN result
+
+The one authorized OPEN observation is consumed:
+
+- report identity `42355698-d57e-5f6b-8347-6a752e5b4572`;
+- report SHA-256
+  `e6349ea0c7f1e1b09f165bede8c93b68fb6bc6168940fda0ae2270bf9079f19b`;
+- classification `ECONOMICALLY_REJECTED`;
+- ZERO_COST OPEN_FULL net return approximately `+0.2495849`;
+- CONSERVATIVE_10_BPS OPEN_FULL net return approximately `-0.9764516`;
+- median conservative annual net return approximately `-0.3986263`;
+- seven of eight conservative annual partitions negative;
+- opening-drive directional hit rate approximately `0.494758`;
+- zero provider/broker/production/baseline replay/FINAL_HOLDOUT effects.
+
+The frozen classification therefore closes this candidate. No confirmation,
+`FINAL_HOLDOUT`, live, paper, threshold, timing, filter or variant action is
+authorized from this result.
 ## Implementation boundary
 
 The intended checkpoint route is
@@ -215,14 +237,12 @@ Focused tests must pin at least:
 - deterministic identities/hashes and both cost cases;
 - `FINAL_HOLDOUT` exclusion and zero provider/broker effects.
 
-The accepted source checkpoint froze these semantics without opening the
-accepted sparse data or producing a real observation. Exact-source review,
-feature certification, integration and develop certification reuse are now
-complete. The next permitted action is one separately named and separately
-reviewed offline OPEN observation bound to the exact accepted source above and
-following the evidence-preservation model used by the accepted churn study.
-Source admission and mapped GitHub CI remain source/certification gates, not
-research execution authority.
+The accepted source checkpoint froze these semantics before results were visible.
+Exact-source review, certification, integration and the single authorized OPEN
+observation are now complete. The observation is terminally rejected under the
+pre-frozen rule above. Do not rerun or mutate the candidate from visible P&L.
+Source admission and mapped GitHub CI remain source/certification gates rather
+than research execution authority.
 
 If implementation discovery requires changing this contract, STOP and return to
 ChatGPT for a new design decision before evaluating any P&L.

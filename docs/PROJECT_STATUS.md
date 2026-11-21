@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - AI Strategy Discovery selection-bias source accepted/integrated; real DSR observation next
+## Current milestone - daily AI Strategy Discovery branch closed; late-session intraday source next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -143,17 +143,29 @@ the accepted G1 fills and adjusted closes without replaying strategy signals,
 requires exact accepted equity-trace identities, builds one equal-weight
 eight-sleeve daily return series for each of all 22 G1 programs, and applies the
 frozen 22-trial Deflated Sharpe Ratio plus the separately labeled
-28-trial Bonferroni PSR sensitivity. Only the 12 original G1 shortlists are
-eligible for SELECTION_BIAS_PASSED/REJECTED. Real selection-bias observation is
-NOT RUN: no real DSR report exists yet, no G1/G2 campaign replay is authorized,
-and G2 confirmation metrics are not selection inputs. The next research action
-is one exact effect-free observation using only the immutable G1 artifacts and
-accepted A147 dataset through a bounded 2019-2021 DiscoveryView. Passing this
-gate grants only permission to proceed to a separately frozen walk-forward
-gate; it grants no SHADOW, PAPER_CANDIDATE, live or production authority.
+28-trial Bonferroni PSR sensitivity. Only the 12 original G1 shortlists were
+eligible for SELECTION_BIAS_PASSED/REJECTED.
 
-The existing Architecture 148 late-session intraday-momentum design remains a
-frozen queued hypothesis rather than discarded research.
+The real selection-bias observation is CONSUMED at source
+`d68672d998b059d677fdc0a05e225a3c9689c1fc` / tree
+`a771f9d51e6fa3570071b237756ba6d3141a78bb`. Report identity
+`854a1c95-f236-5dd7-9706-41035dd7fdf7`, SHA-256
+`99e407ea3f646ecdd3ce17d9652356b1d0ee40bc0504d639841d2fcffd8bd708`,
+is preserved at
+`F:\AI\temp\ai-strategy-discovery-selection-bias-854a1c95-f236-5dd7-9706-41035dd7fdf7\selection-bias.json`.
+All 12 eligible G1 shortlists were SELECTION_BIAS_REJECTED; zero passed. The
+best shortlisted DSR was about 0.918051, below the frozen 0.95 threshold, and
+its one-sided campaign PSR p-value was about 0.0139583 versus
+`0.05 / 28 = 0.001785714...`. No walk-forward candidate survives this daily
+campaign. The observation added zero new strategy trials, replayed no strategy,
+read no G2 artifact, performed zero provider/broker/production effects, and
+kept `FINAL_HOLDOUT` sealed. Do not tune, mutate, rerun, or reopen this daily
+branch using the visible G1/G2/DSR results.
+
+The existing Architecture 148 late-session intraday-momentum design
+`OPENING_DRIVE_LATE_CAPTURE_V1` is now the active independent research track.
+Its design remains frozen and unevaluated; executable source is the next
+milestone.
 
 The previously frozen OPEN-only design remains in
 [Architecture 148 late-session intraday momentum research](validation/arch148-intraday-momentum-research.md).

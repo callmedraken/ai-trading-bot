@@ -42,14 +42,24 @@ all six were CONFIRMATION_REJECTED. The G2 momentum-admission hypothesis is
 rejected. Do not mutate or rerun G2, and do not use its 2022-2023 results to
 design another candidate.
 
-The current implementation milestone is a source-only selection-bias analysis
-for the 12 G1 shortlisted programs. Its tests use synthetic inputs. Real
-selection-bias observation is deferred until the source checkpoint is accepted.
-The 22 G1 programs form the complete primary search distribution. G2 contributes
-only its six consumed trials to the separately labeled campaign-wide
-Bonferroni sensitivity, making that sensitivity count 28. G2 identities,
-outcomes, confirmation visibility and metrics do not enter G1 candidate
-selection or its DSR benchmark. `FINAL_HOLDOUT` remains sealed.
+The source-only selection-bias checkpoint is accepted and its one-shot real
+observation is CONSUMED. Report identity
+`854a1c95-f236-5dd7-9706-41035dd7fdf7`, SHA-256
+`99e407ea3f646ecdd3ce17d9652356b1d0ee40bc0504d639841d2fcffd8bd708`,
+binds the complete 22-program G1 search distribution and the 12 eligible G1
+shortlists. All 12 eligible programs are `SELECTION_BIAS_REJECTED`; zero
+passed. The best shortlisted DSR was approximately `0.918051`, below the
+frozen `0.95` threshold, and its campaign-wide PSR p-value was approximately
+`0.0139583`, above `0.05 / 28`. Therefore no daily G1 program advances to
+walk-forward. The daily G1/G2 branch is closed: do not retry, mutate or
+parameter-tune it from the now-visible discovery, confirmation or DSR results.
+The observation consumed no new strategy trial and kept `FINAL_HOLDOUT`
+sealed.
+
+The next independent campaign milestone is the already-frozen Architecture 148
+late-session intraday candidate `OPENING_DRIVE_LATE_CAPTURE_V1`. It remains
+unevaluated and must proceed first through its existing source-only/fake-only
+implementation boundary before any OPEN replay.
 
 ## Existing evidence is the starting point
 
@@ -505,61 +515,43 @@ leader status is not itself a lifecycle transition.
 
 ## Immediate source milestone
 
-The current implementation checkpoint is source-only selection-bias analytics
-for the 12 previously shortlisted G1 programs. The G1 proposals, outcomes,
-terminal dispositions and A147 behavior remain unchanged. The separate
-selection-bias disposition does not modify the G1 trial ledger.
+The daily Generation-1/Generation-2/selection-bias branch is complete and has no
+survivor. Its G1 and G2 trial ledgers, result artifacts and selection-bias
+report remain immutable historical evidence. No walk-forward checkpoint is
+authorized for those daily candidates.
 
-The synthetic return-series helper reconstructs one accepted G1 continuous
-stress cell from its exact accepted fill evidence, adjusted daily bars for the
-same symbol, the regime `[2019-01-01, 2022-01-01)`, and starting cash of
-`$100,000`. It applies accepted fill, cash and position semantics, then marks
-positions to adjusted daily close at each session end. It does not compute
-signals or call the G1 evaluator. The helper recomputes
-`semantic_identity("equity-trace", equity_values)` and requires exact equality
-with the accepted `Metrics.equity_trace_identity`. A mismatch is terminal
-evidence failure.
+The current source milestone is the already-frozen Architecture 148 late-session
+intraday-momentum design in
+`docs/validation/arch148-intraday-momentum-research.md`:
+`OPENING_DRIVE_LATE_CAPTURE_V1`.
 
-The eight continuous symbol sleeves each start with `$100,000`, for aggregate
-initial equity of `$800,000`. On each common session the basket equity is the
-sum of all eight sleeve equities, and its daily simple return is
-`aggregate_equity[t] / aggregate_equity[t-1] - 1`. All eight accepted A147
-symbols must be present on every basket session. There is no rebalancing,
-capital transfer, optimization, or missing-session zero substitution.
+This is an independent strategy architecture rather than a mutation of the
+failed daily trend search. Preserve the frozen design exactly:
 
-Future real selection-bias observation accepts only the accepted G1 proposal
-set, terminal ledger, outcomes and evidence, the accepted A147 dataset, exact
-G1 identities and hashes, and the frozen campaign trial-count constants. It
-rejects G2 outcomes or analysis objects, 2022-2023 confirmation metrics,
-confirmation visibility as a ranking input, and `FINAL_HOLDOUT` data. The six
-G2 trials contribute only to the campaign-wide sensitivity count of 28. Their
-identities and performance do not affect the G1 ranking or DSR.
+- previous regular-session QQQ close to current first-half-hour QQQ close fixes
+  one direction for the day;
+- positive opening drive selects TQQQ, negative selects SQQQ, zero means no
+  trade;
+- require all six first-half-hour QQQ bars;
+- enter only at official close minus 35 minutes using the exact target ETF bar;
+- permit at most one entry, no re-entry, no inverse flip and no indicator-regime
+  exit;
+- retain the existing 3% hard stop, safety exits and close-minus-5-minute
+  forced-flat boundary;
+- use the accepted sparse OPEN dataset only, with ZERO_COST and
+  CONSERVATIVE_10_BPS and the frozen 2016-2023 reporting partitions;
+- perform no provider reacquisition, Robinhood/broker/production effect or
+  `FINAL_HOLDOUT` access.
 
-The separate versioned selection-bias evidence schema binds the campaign
-version, exact G1 proposal-set, analysis and terminal-ledger identities, exact
-accepted dataset and evidence identities, source HEAD and tree, the complete
-22-program Sharpe population, the 12 eligible proposal IDs, all eight
-reconstructed equity-trace identities, the aggregate basket-return identity,
-the retained Sharpe and moment inputs, the DSR result, the 28-trial PSR
-sensitivity, the terminal selection-bias disposition, zero-effect counters,
-and the sealed `FINAL_HOLDOUT` flag. This source checkpoint creates no real
-selection-bias artifact.
+The intended source route remains
+`arch148-intraday-momentum-research`. Implementation is source-only/fake-only.
+It should reuse the accepted sparse simulator's fill, stop, missing-bar,
+forced-flat and valuation semantics with the smallest explicit extension needed.
+Do not alter the live runtime strategy in this checkpoint.
 
-Only the 12 G1 shortlisted programs are eligible for the separate gate. A
-candidate receives `SELECTION_BIAS_PASSED` only when its 22-trial DSR
-probability is at least `0.95`, its campaign-wide one-sided PSR p-value is at
-most `0.05 / 28`, all eight reconstructed trace identities match exactly, and
-no input, evidence or chronology failure exists. Every other eligible program
-receives `SELECTION_BIAS_REJECTED`. A pass permits only progression to the
-separately frozen walk-forward gate. It does not confer `WALK_FORWARD_PASSED`,
-`SHADOW`, `PAPER_CANDIDATE`, live or production status.
-
-All tests for this source checkpoint use synthetic in-memory inputs. They do
-not read real G1 outcomes, the accepted A147 dataset, G2 confirmation evidence,
-or `FINAL_HOLDOUT`. No replay, real result artifact, AI API call, credential
-read, provider or network call, Robinhood or broker call, order effect,
-production-state read or write, or strategy promotion occurs in this source
-checkpoint.
+After exact source acceptance, run the single frozen OPEN candidate once as a
+separately reviewed offline evidence step. Do not add thresholds, timing
+variants, filters, cooldowns or other alternatives after seeing its P&L.
 
 ## Public research references
 

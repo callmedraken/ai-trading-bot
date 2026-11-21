@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: AI Strategy Discovery selection-bias source accepted/integrated; real DSR observation next
+## Current milestone: daily AI Strategy Discovery branch closed; late-session intraday source next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -160,18 +160,23 @@ The G1 selection-bias source is accepted/integrated at
 Develop run `44882606523`, attempt 1, is SUCCESS with exact feature
 certification reuse and no duplicate FULL.
 
-Real selection-bias observation is NOT RUN. The next operation must open only
-the immutable accepted G1 proposal set, G1-only terminal ledger, G1 outcomes and
-analysis plus the accepted A147 daily dataset; reconstruct and exact-identity
-check all 176 continuous stress traces; build all 22 fixed eight-sleeve
-2019-2021 return series; calculate the frozen 22-trial DSR search benchmark; and
-apply the separate 28-trial Bonferroni PSR sensitivity only to the 12 original
-shortlists. It must not replay G1 signals, consume G2 metrics as ranking input,
-or access `FINAL_HOLDOUT`. The result is a research-only selection-bias
-artifact. A pass authorizes only the separately frozen walk-forward gate.
+The real selection-bias observation is CONSUMED. Report
+`854a1c95-f236-5dd7-9706-41035dd7fdf7`, SHA-256
+`99e407ea3f646ecdd3ce17d9652356b1d0ee40bc0504d639841d2fcffd8bd708`,
+is preserved at
+`F:\AI\temp\ai-strategy-discovery-selection-bias-854a1c95-f236-5dd7-9706-41035dd7fdf7\selection-bias.json`.
+All 12 G1 shortlists were SELECTION_BIAS_REJECTED and zero passed. The best
+shortlisted DSR was about 0.918051 against the frozen 0.95 threshold; its
+campaign PSR p-value was about 0.0139583 against alpha
+`0.001785714...`. No G1 candidate may proceed to walk-forward. The observation
+added zero strategy trials, replayed no G1/G2 strategy, read no G2 artifact,
+performed zero provider/broker/production effects, and kept `FINAL_HOLDOUT`
+sealed. Do not retry, tune or mutate the daily branch from these visible
+results.
 
-The prior late-session intraday-momentum candidate remains queued rather than
-discarded.
+The frozen late-session intraday-momentum candidate
+`OPENING_DRIVE_LATE_CAPTURE_V1` is now the active independent research track.
+Its existing design remains unchanged and unevaluated.
 
 The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).

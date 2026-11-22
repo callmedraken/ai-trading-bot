@@ -27,7 +27,10 @@ Source-only/fake-only.
 Implement:
 
 - typed intraday program grammar for the three frozen families;
-- trial ledger and trial-budget enforcement;
+- deterministic ordered G1 proposal manifest frozen before evaluation, with an
+  opened-discovery, slot-bound evaluator and immutable terminal trial ledger;
+- post-discovery finalization and candidate authorization bound to the complete
+  manifest, result ledger, and discovery dataset;
 - deterministic session-flat replay interface;
 - BASE/STRESS/zero-friction cost contracts;
 - frequency diagnostics;
@@ -66,8 +69,13 @@ Pin at minimum:
 - no pyramiding/martingale/averaging-down;
 - at most three median trades per active session for advancing candidates;
 - active-session and annual trade-frequency diagnostics;
-- exact 24-trial G1 budget / 8-per-family;
-- invalid/duplicate/zero-trade failures consume trials;
+- at most 24 frozen G1 trial slots / at most 8 per family, including valid and
+  explicit invalid proposals;
+- nonempty ordered manifest identity is deterministic and preserves duplicate
+  proposal slots;
+- every official evaluation consumes only the next exact frozen slot;
+- invalid, duplicate, zero-trade, deterministic-failure, economic-rejection, and
+  shortlist results all consume their frozen trial slot;
 - BASE 2-bps/fill and STRESS 5-bps/fill contracts;
 - zero-friction cannot qualify;
 - complete-trial-ledger DSR/multiple-testing inputs;

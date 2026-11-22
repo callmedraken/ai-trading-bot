@@ -27,8 +27,11 @@ from trading_bot.experiments.arch148_intraday import (
 
 ARCH150_SCHEMA = "arch150-intraday-ai-research-foundation/v1"
 PROGRAM_SCHEMA = "arch150-typed-intraday-program/v1"
-TRIAL_LEDGER_SCHEMA = "arch150-consumed-trial-ledger/v1"
-SELECTION_BIAS_SCHEMA = "arch150-selection-bias-input/v1"
+TRIAL_LEDGER_SCHEMA = "arch150-consumed-trial-ledger/v2"
+G1_POPULATION_SCHEMA = "arch150-g1-pre-evaluation-population/v1"
+G1_RESULT_SCHEMA = "arch150-g1-trial-result/v1"
+DISCOVERY_RESULT_SCHEMA = "arch150-discovery-result-freeze/v1"
+SELECTION_BIAS_SCHEMA = "arch150-selection-bias-input/v2"
 REPLAY_SCHEMA = "arch150-deterministic-replay/v1"
 
 DISCOVERY_START = date(2016, 1, 1)
@@ -64,9 +67,16 @@ _TRIAL_LEDGER_SEAL = object()
 _TRADE_NAMESPACE = UUID("d1b8463f-349d-5d1d-9d1c-88a1f235122e")
 _REPLAY_NAMESPACE = UUID("e22c9066-4b42-5d7f-bdb8-a0b3d62e0c13")
 _FILL_NAMESPACE = UUID("0d76dd95-78fb-5fb5-93f1-0718fd6a7b9b")
-_POPULATION_FREEZE_NAMESPACE = UUID("ab09fd8e-480d-5937-a238-b4fb9720437e")
+_DISCOVERY_DATASET_NAMESPACE = UUID("ab09fd8e-480d-5937-a238-b4fb9720437e")
 _CANDIDATE_FREEZE_NAMESPACE = UUID("d463e47c-c8f8-5843-a059-7520dab589ea")
-_POPULATION_FREEZE_SEAL = object()
+_G1_MANIFEST_NAMESPACE = UUID("795ace21-a597-5bbd-9c4d-4daeffcf3028")
+_DISCOVERY_RESULT_NAMESPACE = UUID("2db93faf-c704-5612-9747-96a9bde00c65")
+_G1_SLOT_NAMESPACE = UUID("e5307e4c-77a1-5d38-9d4c-3b94cfa5379f")
+_G1_RESULT_NAMESPACE = UUID("8a04eb07-0a78-5a06-8a1a-62e572ecaf1b")
+_G1_SLOT_SEAL = object()
+_G1_MANIFEST_SEAL = object()
+_G1_RESULT_SEAL = object()
+_DISCOVERY_RESULT_SEAL = object()
 _CANDIDATE_FREEZE_SEAL = object()
 _DATASET_SEAL = object()
 _FIVE_MINUTE_SEAL = object()
@@ -720,39 +730,127 @@ def _validate_derived_five_minute_bars(
 
 
 @dataclass(frozen=True, slots=True, init=False)
-class DiscoveryPopulationFreeze:
-    """Immutable proof that the complete discovery trial population was frozen."""
+class FrozenTrialSlot:
+    """One ordered hypothesis committed before official evaluation."""
+
+    manifest_id: UUID
+    slot_id: UUID
+    ordinal: int
+    family: StrategyFamily
+    semantic_fingerprint: str
+    program_id: UUID | None
+    invalid_reference: InvalidTrialReference | None
+    _program: IntradayProgram | None = field(repr=False, compare=False)
+    _authority_seal: object = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        manifest_id: UUID,
+        slot_id: UUID,
+        ordinal: int,
+        family: StrategyFamily,
+        semantic_fingerprint: str,
+        program_id: UUID | None,
+        invalid_reference: InvalidTrialReference | None,
+        program: IntradayProgram | None,
+        *,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _G1_SLOT_SEAL:
+            raise InformationFirewallError(
+                "G1 trial slots must come from the frozen population authority"
+            )
+        for name, value in (
+            ("manifest_id", manifest_id),
+            ("slot_id", slot_id),
+            ("ordinal", ordinal),
+            ("family", family),
+            ("semantic_fingerprint", semantic_fingerprint),
+            ("program_id", program_id),
+            ("invalid_reference", invalid_reference),
+            ("_program", program),
+        ):
+            object.__setattr__(self, name, value)
+        object.__setattr__(self, "_authority_seal", _seal)
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class G1PopulationManifest:
+    """The ordered, immutable G1 proposal population frozen before results."""
+
+    manifest_id: UUID
+    slots: tuple[FrozenTrialSlot, ...]
+    _authority_seal: object = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        manifest_id: UUID,
+        slots: tuple[FrozenTrialSlot, ...],
+        *,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _G1_MANIFEST_SEAL:
+            raise InformationFirewallError(
+                "G1 manifests must come from the pre-evaluation freeze authority"
+            )
+        object.__setattr__(self, "manifest_id", manifest_id)
+        object.__setattr__(self, "slots", slots)
+        object.__setattr__(self, "_authority_seal", _seal)
+
+    def to_bytes(self) -> bytes:
+        return _canonical_json(
+            {
+                "schema": G1_POPULATION_SCHEMA,
+                "manifest_id": str(self.manifest_id),
+                "slots": [
+                    {
+                        "ordinal": slot.ordinal,
+                        "slot_id": str(slot.slot_id),
+                        "family": slot.family.value,
+                        "semantic_fingerprint": slot.semantic_fingerprint,
+                        "program_id": str(slot.program_id) if slot.program_id else None,
+                        "proposal": _slot_material(slot),
+                    }
+                    for slot in self.slots
+                ],
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class DiscoveryResultFreeze:
+    """Post-evaluation authority bound to a complete manifest and ledger."""
 
     freeze_id: UUID
+    population_manifest_id: UUID
     discovery_dataset_id: UUID
     ledger_id: UUID
-    trial_ids: tuple[UUID, ...]
-    semantic_fingerprints: tuple[str, ...]
-    program_ids: tuple[UUID, ...]
+    slot_ids: tuple[UUID, ...]
+    result_ids: tuple[UUID, ...]
     _authority_seal: object = field(repr=False, compare=False)
 
     def __init__(
         self,
         freeze_id: UUID,
+        population_manifest_id: UUID,
         discovery_dataset_id: UUID,
         ledger_id: UUID,
-        trial_ids: tuple[UUID, ...],
-        semantic_fingerprints: tuple[str, ...],
-        program_ids: tuple[UUID, ...],
+        slot_ids: tuple[UUID, ...],
+        result_ids: tuple[UUID, ...],
         *,
         _seal: object = None,
     ) -> None:
-        if _seal is not _POPULATION_FREEZE_SEAL:
+        if _seal is not _DISCOVERY_RESULT_SEAL:
             raise InformationFirewallError(
-                "discovery population freezes must come from the freeze authority"
+                "discovery result freezes require completed G1 evaluation"
             )
         for name, value in (
             ("freeze_id", freeze_id),
+            ("population_manifest_id", population_manifest_id),
             ("discovery_dataset_id", discovery_dataset_id),
             ("ledger_id", ledger_id),
-            ("trial_ids", trial_ids),
-            ("semantic_fingerprints", semantic_fingerprints),
-            ("program_ids", program_ids),
+            ("slot_ids", slot_ids),
+            ("result_ids", result_ids),
         ):
             object.__setattr__(self, name, value)
         object.__setattr__(self, "_authority_seal", _seal)
@@ -760,10 +858,11 @@ class DiscoveryPopulationFreeze:
 
 @dataclass(frozen=True, slots=True, init=False)
 class CandidateFreeze:
-    """Immutable validation authorization bound to one frozen G1 population."""
+    """Immutable validation authorization bound to completed discovery results."""
 
     freeze_id: UUID
-    population_freeze_id: UUID
+    population_manifest_id: UUID
+    discovery_result_freeze_id: UUID
     discovery_dataset_id: UUID
     ledger_id: UUID
     candidate_program_ids: tuple[UUID, ...]
@@ -773,7 +872,8 @@ class CandidateFreeze:
     def __init__(
         self,
         freeze_id: UUID,
-        population_freeze_id: UUID,
+        population_manifest_id: UUID,
+        discovery_result_freeze_id: UUID,
         discovery_dataset_id: UUID,
         ledger_id: UUID,
         candidate_program_ids: tuple[UUID, ...],
@@ -787,7 +887,8 @@ class CandidateFreeze:
             )
         for name, value in (
             ("freeze_id", freeze_id),
-            ("population_freeze_id", population_freeze_id),
+            ("population_manifest_id", population_manifest_id),
+            ("discovery_result_freeze_id", discovery_result_freeze_id),
             ("discovery_dataset_id", discovery_dataset_id),
             ("ledger_id", ledger_id),
             ("candidate_program_ids", candidate_program_ids),
@@ -871,7 +972,8 @@ def _candidate_freeze_is_valid(value: CandidateFreeze | None) -> bool:
     ):
         return False
     material = {
-        "population_freeze_id": str(value.population_freeze_id),
+        "population_manifest_id": str(value.population_manifest_id),
+        "discovery_result_freeze_id": str(value.discovery_result_freeze_id),
         "discovery_dataset_id": str(value.discovery_dataset_id),
         "ledger_id": str(value.ledger_id),
         "candidate_program_ids": [str(item) for item in value.candidate_program_ids],
@@ -1267,7 +1369,11 @@ def replay_program(
     cost_case: CostCase | CostModel = CostCase.STRESS,
     initial_equity: Decimal = Decimal("1"),
 ) -> ReplayResult:
-    """Replay a typed program over supplied offline bars with session-flat rules."""
+    """Low-level deterministic replay helper, not G1 campaign authority.
+
+    Official G1 results must use ``evaluate_frozen_trial`` with the exact next
+    slot from its pre-evaluation manifest-bound ledger.
+    """
 
     if type(program) not in (
         NoiseAreaVwapMomentumProgram,
@@ -1635,6 +1741,17 @@ class InvalidTrialReference:
     caller_semantic_fingerprint: str
     diagnostic_code: str
 
+    def __post_init__(self) -> None:
+        if type(self.family) is not StrategyFamily:
+            raise TypeError("invalid trial family must be a StrategyFamily")
+        if (
+            type(self.caller_semantic_fingerprint) is not str
+            or not self.caller_semantic_fingerprint.strip()
+        ):
+            raise ValueError("invalid trial semantic fingerprint must be nonempty")
+        if type(self.diagnostic_code) is not str or not self.diagnostic_code.strip():
+            raise ValueError("invalid trial diagnostic code must be nonempty")
+
     @property
     def program_id(self) -> None:
         return None
@@ -1651,48 +1768,391 @@ type TrialProgram = IntradayProgram | InvalidTrialReference
 class TrialRecord:
     trial_ordinal: int
     trial_id: UUID
+    slot_id: UUID
+    discovery_dataset_id: UUID
+    source_symbol: str
     family: StrategyFamily
     program_id: UUID | None
     semantic_fingerprint: str
+    result_id: UUID
+    evaluation_id: UUID
+    replay_id: UUID | None
     disposition: TrialDisposition
     diagnostic_code: str | None
 
 
-class TrialLedger:
-    """Append-only complete G1 trial history, including every rejected trial."""
+def _is_intraday_program(value: object) -> bool:
+    return type(value) in (
+        NoiseAreaVwapMomentumProgram,
+        VwapTrendReversalProgram,
+        OpeningRangeBreakoutReversalProgram,
+    )
 
-    __slots__ = ("_records",)
+
+def _proposal_material(proposal: TrialProgram) -> dict[str, object]:
+    if _is_intraday_program(proposal):
+        program = proposal
+        return {
+            "kind": "TYPED_PROGRAM",
+            "family": program.family.value,
+            "semantic_fingerprint": program_fingerprint(program),
+            "program_id": str(program_id(program)),
+        }
+    if type(proposal) is InvalidTrialReference:
+        return {
+            "kind": "INVALID_ATTEMPT",
+            "family": proposal.family.value,
+            "semantic_fingerprint": proposal.semantic_fingerprint,
+            "program_id": None,
+            "diagnostic_code": proposal.diagnostic_code,
+        }
+    raise UnsupportedProgramError(
+        "G1 proposals must be typed programs or explicit invalid references"
+    )
+
+
+def _slot_material(slot: FrozenTrialSlot) -> dict[str, object]:
+    if slot.invalid_reference is not None:
+        proposal: TrialProgram = slot.invalid_reference
+    elif slot._program is not None:
+        proposal = slot._program
+    else:
+        raise InformationFirewallError("frozen G1 slot lost its proposal binding")
+    return _proposal_material(proposal)
+
+
+def _manifest_is_valid(manifest: G1PopulationManifest | None) -> bool:
+    if not (
+        type(manifest) is G1PopulationManifest
+        and manifest._authority_seal is _G1_MANIFEST_SEAL
+        and isinstance(manifest.slots, tuple)
+        and 1 <= len(manifest.slots) <= G1_TOTAL_TRIAL_LIMIT
+    ):
+        return False
+    proposal_material: list[dict[str, object]] = []
+    counts = {family: 0 for family in StrategyFamily}
+    for ordinal, slot in enumerate(manifest.slots, 1):
+        if not (
+            type(slot) is FrozenTrialSlot
+            and slot._authority_seal is _G1_SLOT_SEAL
+            and slot.manifest_id == manifest.manifest_id
+            and slot.ordinal == ordinal
+        ):
+            return False
+        try:
+            material = _slot_material(slot)
+        except (Arch150Error, TypeError, ValueError):
+            return False
+        if (
+            slot.family.value != material["family"]
+            or slot.semantic_fingerprint != material["semantic_fingerprint"]
+            or (str(slot.program_id) if slot.program_id else None)
+            != material["program_id"]
+        ):
+            return False
+        expected_slot_id = uuid5(
+            _G1_SLOT_NAMESPACE,
+            _canonical_json(
+                {
+                    "schema": G1_POPULATION_SCHEMA,
+                    "manifest_id": str(manifest.manifest_id),
+                    "ordinal": ordinal,
+                    "proposal": material,
+                }
+            ).decode(),
+        )
+        if slot.slot_id != expected_slot_id:
+            return False
+        counts[slot.family] += 1
+        proposal_material.append(material)
+    if any(count > G1_FAMILY_TRIAL_LIMIT for count in counts.values()):
+        return False
+    expected_manifest_id = uuid5(
+        _G1_MANIFEST_NAMESPACE,
+        _canonical_json(
+            {"schema": G1_POPULATION_SCHEMA, "proposals": proposal_material}
+        ).decode(),
+    )
+    return manifest.manifest_id == expected_manifest_id
+
+
+def freeze_g1_population(proposals: Iterable[TrialProgram]) -> G1PopulationManifest:
+    """Freeze the ordered bounded G1 proposal population before evaluation."""
+
+    materialized = tuple(proposals)
+    if not materialized:
+        raise TrialBudgetExceeded("G1 population must contain at least one proposal")
+    if len(materialized) > G1_TOTAL_TRIAL_LIMIT:
+        raise TrialBudgetExceeded("G1 total trial budget is 24")
+    counts = {family: 0 for family in StrategyFamily}
+    proposal_material: list[dict[str, object]] = []
+    for proposal in materialized:
+        item = _proposal_material(proposal)
+        family = StrategyFamily(item["family"])
+        counts[family] += 1
+        if counts[family] > G1_FAMILY_TRIAL_LIMIT:
+            raise TrialBudgetExceeded("G1 family trial budget is 8")
+        proposal_material.append(item)
+    manifest_id = uuid5(
+        _G1_MANIFEST_NAMESPACE,
+        _canonical_json(
+            {"schema": G1_POPULATION_SCHEMA, "proposals": proposal_material}
+        ).decode(),
+    )
+    slots: list[FrozenTrialSlot] = []
+    for ordinal, (proposal, material) in enumerate(
+        zip(materialized, proposal_material, strict=True), 1
+    ):
+        slot_id = uuid5(
+            _G1_SLOT_NAMESPACE,
+            _canonical_json(
+                {
+                    "schema": G1_POPULATION_SCHEMA,
+                    "manifest_id": str(manifest_id),
+                    "ordinal": ordinal,
+                    "proposal": material,
+                }
+            ).decode(),
+        )
+        if type(proposal) is InvalidTrialReference:
+            family = proposal.family
+            fingerprint = proposal.semantic_fingerprint
+            identifier = None
+            invalid_reference = proposal
+            program = None
+        else:
+            program = proposal
+            family = program.family
+            fingerprint = program_fingerprint(program)
+            identifier = program_id(program)
+            invalid_reference = None
+        slots.append(
+            FrozenTrialSlot(
+                manifest_id,
+                slot_id,
+                ordinal,
+                family,
+                fingerprint,
+                identifier,
+                invalid_reference,
+                program,
+                _seal=_G1_SLOT_SEAL,
+            )
+        )
+    manifest = G1PopulationManifest(manifest_id, tuple(slots), _seal=_G1_MANIFEST_SEAL)
+    if not _manifest_is_valid(manifest):
+        raise InformationFirewallError("G1 population manifest failed validation")
+    return manifest
+
+
+def _evaluation_identity_material(
+    manifest_id: UUID,
+    slot_id: UUID,
+    discovery_dataset_id: UUID,
+    source_symbol: str,
+    replay_id: UUID | None,
+    fixed_disposition: TrialDisposition | None,
+    diagnostic_code: str | None,
+) -> dict[str, object]:
+    return {
+        "schema": G1_RESULT_SCHEMA,
+        "manifest_id": str(manifest_id),
+        "slot_id": str(slot_id),
+        "discovery_dataset_id": str(discovery_dataset_id),
+        "source_symbol": source_symbol,
+        "replay_id": str(replay_id) if replay_id else None,
+        "fixed_disposition": (
+            fixed_disposition.value if fixed_disposition is not None else None
+        ),
+        "diagnostic_code": diagnostic_code,
+    }
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class G1TrialEvaluation:
+    """Official result for exactly one currently authorized frozen slot."""
+
+    manifest_id: UUID
+    slot_id: UUID
+    discovery_dataset_id: UUID
+    source_symbol: str
+    evaluation_id: UUID
+    replay_result: ReplayResult | None
+    fixed_disposition: TrialDisposition | None
+    diagnostic_code: str | None
+    _authority_seal: object = field(repr=False, compare=False)
 
     def __init__(
         self,
+        manifest_id: UUID,
+        slot_id: UUID,
+        discovery_dataset_id: UUID,
+        source_symbol: str,
+        evaluation_id: UUID,
+        replay_result: ReplayResult | None,
+        fixed_disposition: TrialDisposition | None,
+        diagnostic_code: str | None,
+        *,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _G1_RESULT_SEAL:
+            raise InformationFirewallError(
+                "G1 evaluations must come from the frozen-slot evaluator"
+            )
+        for name, value in (
+            ("manifest_id", manifest_id),
+            ("slot_id", slot_id),
+            ("discovery_dataset_id", discovery_dataset_id),
+            ("source_symbol", source_symbol),
+            ("evaluation_id", evaluation_id),
+            ("replay_result", replay_result),
+            ("fixed_disposition", fixed_disposition),
+            ("diagnostic_code", diagnostic_code),
+        ):
+            object.__setattr__(self, name, value)
+        object.__setattr__(self, "_authority_seal", _seal)
+
+
+def _evaluation_is_valid(evaluation: G1TrialEvaluation, slot: FrozenTrialSlot) -> bool:
+    if not (
+        type(evaluation) is G1TrialEvaluation
+        and evaluation._authority_seal is _G1_RESULT_SEAL
+        and evaluation.manifest_id == slot.manifest_id
+        and evaluation.slot_id == slot.slot_id
+    ):
+        return False
+    replay = evaluation.replay_result
+    if replay is not None and (
+        type(replay) is not ReplayResult
+        or slot.program_id is None
+        or replay.program_id != slot.program_id
+    ):
+        return False
+    if evaluation.fixed_disposition is None:
+        if replay is None or not replay.trades:
+            return False
+        if evaluation.diagnostic_code is not None:
+            return False
+    elif evaluation.fixed_disposition is TrialDisposition.INVALID:
+        if (
+            slot.invalid_reference is None
+            or evaluation.replay_result is not None
+            or evaluation.diagnostic_code != slot.invalid_reference.diagnostic_code
+        ):
+            return False
+    elif evaluation.fixed_disposition is TrialDisposition.DUPLICATE:
+        if (
+            slot.program_id is None
+            or evaluation.diagnostic_code != "DUPLICATE_SEMANTIC_PROGRAM"
+        ):
+            return False
+    elif evaluation.fixed_disposition is TrialDisposition.ZERO_TRADE:
+        if replay is None or replay.trades or evaluation.diagnostic_code is not None:
+            return False
+    elif evaluation.fixed_disposition is TrialDisposition.FAILED:
+        if replay is not None or evaluation.diagnostic_code is None:
+            return False
+    else:
+        return False
+    expected = uuid5(
+        _G1_RESULT_NAMESPACE,
+        _canonical_json(
+            _evaluation_identity_material(
+                evaluation.manifest_id,
+                evaluation.slot_id,
+                evaluation.discovery_dataset_id,
+                evaluation.source_symbol,
+                replay.replay_id if replay is not None else None,
+                evaluation.fixed_disposition,
+                evaluation.diagnostic_code,
+            )
+        ).decode(),
+    )
+    return evaluation.evaluation_id == expected
+
+
+def _make_g1_evaluation(
+    slot: FrozenTrialSlot,
+    discovery_dataset_id: UUID,
+    source_symbol: str,
+    replay_result: ReplayResult | None,
+    fixed_disposition: TrialDisposition | None,
+    diagnostic_code: str | None,
+) -> G1TrialEvaluation:
+    material = _evaluation_identity_material(
+        slot.manifest_id,
+        slot.slot_id,
+        discovery_dataset_id,
+        source_symbol,
+        replay_result.replay_id if replay_result is not None else None,
+        fixed_disposition,
+        diagnostic_code,
+    )
+    return G1TrialEvaluation(
+        slot.manifest_id,
+        slot.slot_id,
+        discovery_dataset_id,
+        source_symbol,
+        uuid5(_G1_RESULT_NAMESPACE, _canonical_json(material).decode()),
+        replay_result,
+        fixed_disposition,
+        diagnostic_code,
+        _seal=_G1_RESULT_SEAL,
+    )
+
+
+class TrialLedger:
+    """Immutable terminal results for one exact pre-evaluation G1 manifest."""
+
+    __slots__ = ("_manifest", "_records")
+
+    def __init__(
+        self,
+        manifest: G1PopulationManifest,
         records: Iterable[TrialRecord] = (),
         *,
         _seal: object = None,
     ) -> None:
         materialized = tuple(records)
+        if not _manifest_is_valid(manifest):
+            raise InformationFirewallError("trial ledger needs a frozen G1 manifest")
         if materialized and _seal is not _TRIAL_LEDGER_SEAL:
             raise InformationFirewallError(
-                "nonempty trial ledgers must be produced by append-only consumption"
+                "nonempty trial ledgers must come from frozen-slot consumption"
             )
-        if len(materialized) > G1_TOTAL_TRIAL_LIMIT:
-            raise TrialBudgetExceeded("G1 total trial budget is 24")
-        seen_ids: set[UUID] = set()
-        family_counts: dict[StrategyFamily, int] = defaultdict(int)
-        for expected, record in enumerate(materialized, 1):
-            if record.trial_ordinal != expected or record.trial_id in seen_ids:
-                raise Arch150Error(
-                    "trial ledger ordinals and identities must be unique"
+        if len(materialized) > len(manifest.slots):
+            raise TrialBudgetExceeded("ledger cannot exceed its frozen G1 slots")
+        for ordinal, record in enumerate(materialized, 1):
+            slot = manifest.slots[ordinal - 1]
+            if (
+                type(record) is not TrialRecord
+                or record.trial_ordinal != ordinal
+                or record.slot_id != slot.slot_id
+                or record.family is not slot.family
+                or record.program_id != slot.program_id
+                or record.semantic_fingerprint != slot.semantic_fingerprint
+            ):
+                raise InformationFirewallError(
+                    "trial ledger records must consume manifest slots in order"
                 )
-            seen_ids.add(record.trial_id)
-            family_counts[record.family] += 1
-            if family_counts[record.family] > G1_FAMILY_TRIAL_LIMIT:
-                raise TrialBudgetExceeded("G1 family trial budget is 8")
-        self._records = materialized
+            if materialized and (
+                record.discovery_dataset_id != materialized[0].discovery_dataset_id
+                or record.source_symbol != materialized[0].source_symbol
+            ):
+                raise InformationFirewallError(
+                    "all G1 results must use one discovery dataset and source symbol"
+                )
+        object.__setattr__(self, "_manifest", manifest)
+        object.__setattr__(self, "_records", materialized)
 
     def __setattr__(self, name: str, value: object) -> None:
         if hasattr(self, name):
             raise AttributeError("trial ledger records are immutable")
         object.__setattr__(self, name, value)
+
+    @property
+    def manifest(self) -> G1PopulationManifest:
+        return self._manifest
 
     @property
     def records(self) -> tuple[TrialRecord, ...]:
@@ -1703,6 +2163,28 @@ class TrialLedger:
         return len(self._records)
 
     @property
+    def is_complete(self) -> bool:
+        return self.consumed_trial_count == len(self._manifest.slots)
+
+    @property
+    def discovery_dataset_id(self) -> UUID | None:
+        if not self._records:
+            return None
+        return self._records[0].discovery_dataset_id
+
+    @property
+    def source_symbol(self) -> str | None:
+        if not self._records:
+            return None
+        return self._records[0].source_symbol
+
+    @property
+    def next_slot(self) -> FrozenTrialSlot | None:
+        if self.is_complete:
+            return None
+        return self._manifest.slots[self.consumed_trial_count]
+
+    @property
     def family_counts(self) -> Mapping[StrategyFamily, int]:
         counts = {family: 0 for family in StrategyFamily}
         for record in self._records:
@@ -1711,81 +2193,141 @@ class TrialLedger:
 
     @property
     def ledger_id(self) -> UUID:
-        material = [
-            {
-                "ordinal": record.trial_ordinal,
-                "trial_id": str(record.trial_id),
-                "family": record.family.value,
-                "program_id": str(record.program_id) if record.program_id else None,
-                "semantic_fingerprint": record.semantic_fingerprint,
-                "disposition": record.disposition.value,
-                "diagnostic_code": record.diagnostic_code,
-            }
-            for record in self._records
-        ]
+        material = {
+            "schema": TRIAL_LEDGER_SCHEMA,
+            "population_manifest_id": str(self._manifest.manifest_id),
+            "slot_ids": [str(slot.slot_id) for slot in self._manifest.slots],
+            "records": [
+                {
+                    "ordinal": record.trial_ordinal,
+                    "trial_id": str(record.trial_id),
+                    "slot_id": str(record.slot_id),
+                    "discovery_dataset_id": str(record.discovery_dataset_id),
+                    "source_symbol": record.source_symbol,
+                    "result_id": str(record.result_id),
+                    "evaluation_id": str(record.evaluation_id),
+                    "replay_id": str(record.replay_id) if record.replay_id else None,
+                    "disposition": record.disposition.value,
+                    "diagnostic_code": record.diagnostic_code,
+                }
+                for record in self._records
+            ],
+        }
         return uuid5(_TRIAL_NAMESPACE, _canonical_json(material).decode())
 
     def consume(
         self,
-        program: TrialProgram,
-        disposition: TrialDisposition,
-        *,
-        diagnostic_code: str | None = None,
+        evaluation: G1TrialEvaluation,
+        disposition: TrialDisposition | None = None,
     ) -> TrialLedger:
-        if self.consumed_trial_count >= G1_TOTAL_TRIAL_LIMIT:
-            raise TrialBudgetExceeded("G1 total trial budget is 24")
-        if type(program) is InvalidTrialReference:
-            family = program.family
-            semantic = program.semantic_fingerprint
-            identifier = None
-        elif type(program) in (
-            NoiseAreaVwapMomentumProgram,
-            VwapTrendReversalProgram,
-            OpeningRangeBreakoutReversalProgram,
-        ):
-            family = program.family
-            semantic = program_fingerprint(program)
-            identifier = program_id(program)
-        else:
-            raise UnsupportedProgramError(
-                "invalid trials need a typed family reference"
+        slot = self.next_slot
+        if slot is None:
+            raise TrialBudgetExceeded("all frozen G1 proposal slots are consumed")
+        if not _evaluation_is_valid(evaluation, slot):
+            raise InformationFirewallError(
+                "trial result is not authorized for the next frozen population slot"
             )
-        if any(record.semantic_fingerprint == semantic for record in self._records):
-            disposition = TrialDisposition.DUPLICATE
-            diagnostic_code = diagnostic_code or "DUPLICATE_SEMANTIC_PROGRAM"
-        family_count = self.family_counts[family]
-        if family_count >= G1_FAMILY_TRIAL_LIMIT:
-            raise TrialBudgetExceeded("family trial budget is 8")
-        ordinal = self.consumed_trial_count + 1
+        if self._records and (
+            evaluation.discovery_dataset_id != self.discovery_dataset_id
+            or evaluation.source_symbol != self.source_symbol
+        ):
+            raise InformationFirewallError(
+                "all G1 results must use one discovery dataset and source symbol"
+            )
+        fixed = evaluation.fixed_disposition
+        if fixed is not None:
+            if disposition is not None and disposition is not fixed:
+                raise InformationFirewallError(
+                    "fixed G1 evaluation disposition cannot be changed"
+                )
+            terminal_disposition = fixed
+        else:
+            if type(disposition) is not TrialDisposition or disposition not in (
+                TrialDisposition.ECONOMICALLY_REJECTED,
+                TrialDisposition.SHORTLISTED,
+            ):
+                raise InformationFirewallError(
+                    "a nonzero replay must be classified as rejected or shortlisted"
+                )
+            terminal_disposition = disposition
+        diagnostic_code = evaluation.diagnostic_code
+        replay_id = (
+            evaluation.replay_result.replay_id
+            if evaluation.replay_result is not None
+            else None
+        )
+        result_material = {
+            "schema": G1_RESULT_SCHEMA,
+            "manifest_id": str(self._manifest.manifest_id),
+            "slot_id": str(slot.slot_id),
+            "discovery_dataset_id": str(evaluation.discovery_dataset_id),
+            "source_symbol": evaluation.source_symbol,
+            "evaluation_id": str(evaluation.evaluation_id),
+            "replay_id": str(replay_id) if replay_id else None,
+            "disposition": terminal_disposition.value,
+            "diagnostic_code": diagnostic_code,
+        }
+        result_id = uuid5(
+            _G1_RESULT_NAMESPACE, _canonical_json(result_material).decode()
+        )
         trial_id = uuid5(
             _TRIAL_NAMESPACE,
-            f"{TRIAL_LEDGER_SCHEMA}:{ordinal}:{family.value}:{semantic}:{disposition.value}",
+            _canonical_json(
+                {
+                    "schema": TRIAL_LEDGER_SCHEMA,
+                    "manifest_id": str(self._manifest.manifest_id),
+                    "ordinal": slot.ordinal,
+                    "slot_id": str(slot.slot_id),
+                    "result_id": str(result_id),
+                }
+            ).decode(),
         )
         record = TrialRecord(
-            ordinal,
+            slot.ordinal,
             trial_id,
-            family,
-            identifier,
-            semantic,
-            disposition,
+            slot.slot_id,
+            evaluation.discovery_dataset_id,
+            evaluation.source_symbol,
+            slot.family,
+            slot.program_id,
+            slot.semantic_fingerprint,
+            result_id,
+            evaluation.evaluation_id,
+            replay_id,
+            terminal_disposition,
             diagnostic_code,
         )
-        return TrialLedger((*self._records, record), _seal=_TRIAL_LEDGER_SEAL)
+        return TrialLedger(
+            self._manifest,
+            (*self._records, record),
+            _seal=_TRIAL_LEDGER_SEAL,
+        )
 
     def to_bytes(self) -> bytes:
         return _canonical_json(
             {
                 "schema": TRIAL_LEDGER_SCHEMA,
+                "population_manifest_id": str(self._manifest.manifest_id),
+                "slot_ids": [str(slot.slot_id) for slot in self._manifest.slots],
                 "ledger_id": str(self.ledger_id),
+                "is_complete": self.is_complete,
                 "records": [
                     {
                         "trial_ordinal": record.trial_ordinal,
                         "trial_id": str(record.trial_id),
+                        "slot_id": str(record.slot_id),
+                        "discovery_dataset_id": str(record.discovery_dataset_id),
+                        "source_symbol": record.source_symbol,
                         "family": record.family.value,
                         "program_id": (
                             str(record.program_id) if record.program_id else None
                         ),
                         "semantic_fingerprint": record.semantic_fingerprint,
+                        "result_id": str(record.result_id),
+                        "evaluation_id": str(record.evaluation_id),
+                        "replay_id": (
+                            str(record.replay_id) if record.replay_id else None
+                        ),
                         "disposition": record.disposition.value,
                         "diagnostic_code": record.diagnostic_code,
                     }
@@ -1795,89 +2337,220 @@ class TrialLedger:
         )
 
 
-def _population_freeze_material(
-    discovery_dataset: ResearchDataset, ledger: TrialLedger
-) -> dict[str, object]:
+def evaluate_frozen_trial(
+    ledger: TrialLedger,
+    slot: FrozenTrialSlot,
+    discovery_dataset: ResearchDataset,
+    *,
+    source_symbol: str = "SPY",
+    cost_case: CostCase | CostModel = CostCase.STRESS,
+    initial_equity: Decimal = Decimal("1"),
+) -> G1TrialEvaluation:
+    """Evaluate only the next manifest slot through official G1 campaign authority."""
+
+    if type(ledger) is not TrialLedger or not _manifest_is_valid(ledger.manifest):
+        raise InformationFirewallError("G1 evaluation requires a bound trial ledger")
+    if (
+        type(discovery_dataset) is not ResearchDataset
+        or discovery_dataset._authority_seal is not _DATASET_SEAL
+        or discovery_dataset.stage is not ResearchStage.DISCOVERY
+    ):
+        raise InformationFirewallError(
+            "official G1 evaluation requires an opened discovery dataset"
+        )
+    if type(source_symbol) is not str or source_symbol not in INITIAL_UNIVERSE:
+        raise InformationFirewallError(
+            "G1 source symbol must be in the frozen universe"
+        )
+    discovery_dataset_id = _discovery_dataset_id(discovery_dataset)
+    if ledger.discovery_dataset_id is not None and (
+        ledger.discovery_dataset_id != discovery_dataset_id
+        or ledger.source_symbol != source_symbol
+    ):
+        raise InformationFirewallError(
+            "all G1 results must use one discovery dataset and source symbol"
+        )
+    next_slot = ledger.next_slot
+    if next_slot is None:
+        raise TrialBudgetExceeded("all frozen G1 proposal slots are consumed")
+    if (
+        type(slot) is not FrozenTrialSlot
+        or slot._authority_seal is not _G1_SLOT_SEAL
+        or slot.manifest_id != ledger.manifest.manifest_id
+        or slot.slot_id != next_slot.slot_id
+    ):
+        raise InformationFirewallError(
+            "G1 evaluation requires the exact next frozen population slot"
+        )
+    if slot.invalid_reference is not None:
+        return _make_g1_evaluation(
+            slot,
+            discovery_dataset_id,
+            source_symbol,
+            None,
+            TrialDisposition.INVALID,
+            slot.invalid_reference.diagnostic_code,
+        )
+    if slot._program is None or slot.program_id is None:
+        raise InformationFirewallError("frozen typed program binding is incomplete")
+    if any(
+        record.semantic_fingerprint == slot.semantic_fingerprint
+        and record.program_id is not None
+        for record in ledger.records
+    ):
+        return _make_g1_evaluation(
+            slot,
+            discovery_dataset_id,
+            source_symbol,
+            None,
+            TrialDisposition.DUPLICATE,
+            "DUPLICATE_SEMANTIC_PROGRAM",
+        )
+    bars = discovery_dataset.bars.by_symbol[source_symbol]
+    try:
+        replay = replay_program(
+            slot._program,
+            bars,
+            cost_case=cost_case,
+            initial_equity=initial_equity,
+        )
+    except (Arch150Error, ValueError) as exc:
+        return _make_g1_evaluation(
+            slot,
+            discovery_dataset_id,
+            source_symbol,
+            None,
+            TrialDisposition.FAILED,
+            f"REPLAY_{type(exc).__name__.upper()}",
+        )
+    if not replay.trades:
+        return _make_g1_evaluation(
+            slot,
+            discovery_dataset_id,
+            source_symbol,
+            replay,
+            TrialDisposition.ZERO_TRADE,
+            None,
+        )
+    return _make_g1_evaluation(
+        slot, discovery_dataset_id, source_symbol, replay, None, None
+    )
+
+
+def _discovery_dataset_id(discovery_dataset: ResearchDataset) -> UUID:
     discovery_material = {
         "stage": discovery_dataset.stage.value,
         "start": discovery_dataset.start.isoformat(),
         "end_exclusive": discovery_dataset.end_exclusive.isoformat(),
         "input_digest": discovery_dataset.bars.input_digest,
     }
-    discovery_dataset_id = uuid5(
-        _POPULATION_FREEZE_NAMESPACE, _canonical_json(discovery_material).decode()
+    return uuid5(
+        _DISCOVERY_DATASET_NAMESPACE,
+        _canonical_json(discovery_material).decode(),
     )
+
+
+def _discovery_result_material(
+    population_manifest_id: UUID,
+    discovery_dataset_id: UUID,
+    ledger_id: UUID,
+    slot_ids: tuple[UUID, ...],
+    result_ids: tuple[UUID, ...],
+) -> dict[str, object]:
     return {
+        "schema": DISCOVERY_RESULT_SCHEMA,
+        "population_manifest_id": str(population_manifest_id),
         "discovery_dataset_id": str(discovery_dataset_id),
-        "ledger_id": str(ledger.ledger_id),
-        "trial_ids": [str(record.trial_id) for record in ledger.records],
-        "semantic_fingerprints": [
-            record.semantic_fingerprint for record in ledger.records
-        ],
-        "program_ids": [
-            str(record.program_id) for record in ledger.records if record.program_id
-        ],
+        "ledger_id": str(ledger_id),
+        "slot_ids": [str(item) for item in slot_ids],
+        "result_ids": [str(item) for item in result_ids],
     }
 
 
-def freeze_discovery_population(
-    discovery_dataset: ResearchDataset, ledger: TrialLedger
-) -> DiscoveryPopulationFreeze:
-    """Freeze the complete 24-trial G1 discovery population immutably."""
+def _discovery_result_freeze_is_valid(
+    value: DiscoveryResultFreeze, ledger: TrialLedger
+) -> bool:
+    if not (
+        type(value) is DiscoveryResultFreeze
+        and value._authority_seal is _DISCOVERY_RESULT_SEAL
+        and type(ledger) is TrialLedger
+        and ledger.is_complete
+        and value.population_manifest_id == ledger.manifest.manifest_id
+        and value.discovery_dataset_id == ledger.discovery_dataset_id
+        and value.ledger_id == ledger.ledger_id
+        and value.slot_ids == tuple(slot.slot_id for slot in ledger.manifest.slots)
+        and value.result_ids == tuple(record.result_id for record in ledger.records)
+        and len(value.slot_ids) == len(value.result_ids)
+    ):
+        return False
+    expected = uuid5(
+        _DISCOVERY_RESULT_NAMESPACE,
+        _canonical_json(
+            _discovery_result_material(
+                value.population_manifest_id,
+                value.discovery_dataset_id,
+                value.ledger_id,
+                value.slot_ids,
+                value.result_ids,
+            )
+        ).decode(),
+    )
+    return value.freeze_id == expected
+
+
+def finalize_discovery_population(
+    discovery_dataset: ResearchDataset,
+    ledger: TrialLedger,
+) -> DiscoveryResultFreeze:
+    """Bind completed G1 results to their frozen manifest and discovery input."""
 
     if (
         type(discovery_dataset) is not ResearchDataset
         or discovery_dataset._authority_seal is not _DATASET_SEAL
         or discovery_dataset.stage is not ResearchStage.DISCOVERY
         or type(ledger) is not TrialLedger
-        or ledger.consumed_trial_count != G1_TOTAL_TRIAL_LIMIT
+        or not ledger.is_complete
     ):
         raise InformationFirewallError(
-            "discovery population freeze requires an opened discovery dataset "
-            "and all 24 G1 trials"
+            "discovery finalization requires an opened discovery dataset and one "
+            "terminal result for every frozen G1 proposal"
         )
-    if any(count != G1_FAMILY_TRIAL_LIMIT for count in ledger.family_counts.values()):
+    discovery_dataset_id = _discovery_dataset_id(discovery_dataset)
+    if ledger.discovery_dataset_id != discovery_dataset_id:
         raise InformationFirewallError(
-            "discovery population freeze requires eight trials per family"
+            "completed G1 results are bound to a different discovery dataset"
         )
-    material = _population_freeze_material(discovery_dataset, ledger)
-    freeze_id = uuid5(_POPULATION_FREEZE_NAMESPACE, _canonical_json(material).decode())
-    discovery_dataset_id = UUID(material["discovery_dataset_id"])
-    return DiscoveryPopulationFreeze(
-        freeze_id,
+    slot_ids = tuple(slot.slot_id for slot in ledger.manifest.slots)
+    result_ids = tuple(record.result_id for record in ledger.records)
+    material = _discovery_result_material(
+        ledger.manifest.manifest_id,
         discovery_dataset_id,
         ledger.ledger_id,
-        tuple(record.trial_id for record in ledger.records),
-        tuple(record.semantic_fingerprint for record in ledger.records),
-        tuple(record.program_id for record in ledger.records if record.program_id),
-        _seal=_POPULATION_FREEZE_SEAL,
+        slot_ids,
+        result_ids,
+    )
+    freeze_id = uuid5(_DISCOVERY_RESULT_NAMESPACE, _canonical_json(material).decode())
+    return DiscoveryResultFreeze(
+        freeze_id,
+        ledger.manifest.manifest_id,
+        discovery_dataset_id,
+        ledger.ledger_id,
+        slot_ids,
+        result_ids,
+        _seal=_DISCOVERY_RESULT_SEAL,
     )
 
 
 def freeze_candidate_population(
-    population_freeze: DiscoveryPopulationFreeze,
+    discovery_result_freeze: DiscoveryResultFreeze,
     ledger: TrialLedger,
     candidates: Iterable[IntradayProgram],
 ) -> CandidateFreeze:
-    """Freeze shortlisted typed candidates against the exact frozen G1 ledger."""
+    """Freeze eligible shortlisted typed candidates after all discovery results."""
 
-    if (
-        type(population_freeze) is not DiscoveryPopulationFreeze
-        or population_freeze._authority_seal is not _POPULATION_FREEZE_SEAL
-        or type(ledger) is not TrialLedger
-    ):
-        raise InformationFirewallError("candidate freeze needs frozen G1 authority")
-    if (
-        population_freeze.ledger_id != ledger.ledger_id
-        or population_freeze.trial_ids
-        != tuple(record.trial_id for record in ledger.records)
-        or population_freeze.semantic_fingerprints
-        != tuple(record.semantic_fingerprint for record in ledger.records)
-        or population_freeze.program_ids
-        != tuple(record.program_id for record in ledger.records if record.program_id)
-    ):
+    if not _discovery_result_freeze_is_valid(discovery_result_freeze, ledger):
         raise InformationFirewallError(
-            "population freeze does not bind the supplied trial ledger"
+            "candidate freeze requires the completed exact G1 result ledger"
         )
     shortlisted = {
         (record.program_id, record.semantic_fingerprint)
@@ -1888,18 +2561,14 @@ def freeze_candidate_population(
     materialized = tuple(candidates)
     candidate_material: list[tuple[UUID, str]] = []
     for program in materialized:
-        if type(program) not in (
-            NoiseAreaVwapMomentumProgram,
-            VwapTrendReversalProgram,
-            OpeningRangeBreakoutReversalProgram,
-        ):
+        if not _is_intraday_program(program):
             raise InformationFirewallError(
                 "candidate freeze accepts only the closed typed grammar"
             )
         identity = (program_id(program), program_fingerprint(program))
         if identity not in shortlisted:
             raise InformationFirewallError(
-                "candidate was not shortlisted in the frozen discovery ledger"
+                "candidate was not shortlisted in the completed discovery ledger"
             )
         candidate_material.append(identity)
     if not candidate_material or len(set(candidate_material)) != len(
@@ -1911,8 +2580,9 @@ def freeze_candidate_population(
     candidate_ids = tuple(item[0] for item in candidate_material)
     fingerprints = tuple(item[1] for item in candidate_material)
     identity_material = {
-        "population_freeze_id": str(population_freeze.freeze_id),
-        "discovery_dataset_id": str(population_freeze.discovery_dataset_id),
+        "population_manifest_id": str(discovery_result_freeze.population_manifest_id),
+        "discovery_result_freeze_id": str(discovery_result_freeze.freeze_id),
+        "discovery_dataset_id": str(discovery_result_freeze.discovery_dataset_id),
         "ledger_id": str(ledger.ledger_id),
         "candidate_program_ids": [str(item) for item in candidate_ids],
         "candidate_fingerprints": list(fingerprints),
@@ -1922,8 +2592,9 @@ def freeze_candidate_population(
     )
     return CandidateFreeze(
         freeze_id,
-        population_freeze.freeze_id,
-        population_freeze.discovery_dataset_id,
+        discovery_result_freeze.population_manifest_id,
+        discovery_result_freeze.freeze_id,
+        discovery_result_freeze.discovery_dataset_id,
         ledger.ledger_id,
         candidate_ids,
         fingerprints,
@@ -1933,31 +2604,64 @@ def freeze_candidate_population(
 
 @dataclass(frozen=True, slots=True)
 class SelectionBiasInput:
+    population_manifest_id: UUID
+    discovery_result_freeze_id: UUID
+    discovery_dataset_id: UUID
     ledger_id: UUID
     consumed_trial_count: int
+    slot_ids: tuple[UUID, ...]
     trial_ids: tuple[UUID, ...]
-    program_ids: tuple[UUID, ...]
+    result_ids: tuple[UUID, ...]
+    program_ids: tuple[UUID | None, ...]
+    semantic_fingerprints: tuple[str, ...]
+    dispositions: tuple[TrialDisposition, ...]
+    diagnostic_codes: tuple[str | None, ...]
     metric_schema: str
 
     def to_bytes(self) -> bytes:
         return _canonical_json(
             {
                 "schema": SELECTION_BIAS_SCHEMA,
+                "population_manifest_id": str(self.population_manifest_id),
+                "discovery_result_freeze_id": str(self.discovery_result_freeze_id),
+                "discovery_dataset_id": str(self.discovery_dataset_id),
                 "ledger_id": str(self.ledger_id),
                 "consumed_trial_count": self.consumed_trial_count,
+                "slot_ids": [str(item) for item in self.slot_ids],
                 "trial_ids": [str(item) for item in self.trial_ids],
-                "program_ids": [str(item) for item in self.program_ids],
+                "result_ids": [str(item) for item in self.result_ids],
+                "program_ids": [
+                    str(item) if item else None for item in self.program_ids
+                ],
+                "semantic_fingerprints": list(self.semantic_fingerprints),
+                "dispositions": [item.value for item in self.dispositions],
+                "diagnostic_codes": list(self.diagnostic_codes),
                 "metric_schema": self.metric_schema,
             }
         )
 
 
-def selection_bias_input(ledger: TrialLedger) -> SelectionBiasInput:
+def selection_bias_input(
+    discovery_result_freeze: DiscoveryResultFreeze,
+    ledger: TrialLedger,
+) -> SelectionBiasInput:
+    if not _discovery_result_freeze_is_valid(discovery_result_freeze, ledger):
+        raise InformationFirewallError(
+            "selection-bias input requires the completed bound G1 result ledger"
+        )
     return SelectionBiasInput(
+        ledger.manifest.manifest_id,
+        discovery_result_freeze.freeze_id,
+        discovery_result_freeze.discovery_dataset_id,
         ledger.ledger_id,
         ledger.consumed_trial_count,
+        tuple(slot.slot_id for slot in ledger.manifest.slots),
         tuple(record.trial_id for record in ledger.records),
-        tuple(record.program_id for record in ledger.records if record.program_id),
+        tuple(record.result_id for record in ledger.records),
+        tuple(record.program_id for record in ledger.records),
+        tuple(record.semantic_fingerprint for record in ledger.records),
+        tuple(record.disposition for record in ledger.records),
+        tuple(record.diagnostic_code for record in ledger.records),
         "arch150-validation-ranking-metrics/v1",
     )
 

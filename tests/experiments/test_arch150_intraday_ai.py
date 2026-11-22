@@ -28,11 +28,13 @@ from trading_bot.experiments.arch150_intraday_ai import (
     BarResolution,
     CandidateFreeze,
     CostCase,
-    DiscoveryPopulationFreeze,
+    DiscoveryResultFreeze,
     FrequencyDiagnostics,
+    G1PopulationManifest,
     IncompleteFiveMinuteAggregation,
     InformationFirewallError,
     IntradayBar,
+    InvalidTrialReference,
     NoiseAreaVwapMomentumProgram,
     OpeningRangeBreakoutReversalProgram,
     OpeningRangeDirection,
@@ -48,9 +50,11 @@ from trading_bot.experiments.arch150_intraday_ai import (
     VwapStrategyMode,
     VwapTrendReversalProgram,
     aggregate_five_minute_bars,
+    evaluate_frozen_trial,
+    finalize_discovery_population,
     foundation_help,
     freeze_candidate_population,
-    freeze_discovery_population,
+    freeze_g1_population,
     open_discovery_dataset,
     open_holdout_dataset,
     open_recent_extension_dataset,
@@ -108,49 +112,50 @@ def _universe_bars(day: date) -> list[IntradayBar]:
     return [_bar(symbol, day, 0) for symbol in INITIAL_UNIVERSE]
 
 
+def _discovery_dataset(spy_bars: list[IntradayBar] | None = None) -> ResearchDataset:
+    if spy_bars is None:
+        spy_bars = [_bar("SPY", date(2020, 1, 2), 0)]
+    day = spy_bars[0].session_date
+    return open_discovery_dataset((*spy_bars, _bar("QQQ", day, 0)))
+
+
 def _frozen_candidates(
     *, start_noise_band_bps: int = 1
-) -> tuple[TrialLedger, DiscoveryPopulationFreeze, CandidateFreeze]:
-    ledger = TrialLedger()
-    candidates = []
-    for family in StrategyFamily:
-        for ordinal in range(G1_FAMILY_TRIAL_LIMIT):
-            if family is StrategyFamily.NOISE_AREA_VWAP_MOMENTUM:
-                program = NoiseAreaVwapMomentumProgram(
-                    lookback_sessions=1,
-                    noise_band_bps=Decimal(ordinal + start_noise_band_bps),
-                    confirmation_bars=1,
-                )
-            elif family is StrategyFamily.VWAP_TREND_REVERSAL:
-                program = VwapTrendReversalProgram(
-                    displacement_bps=Decimal(ordinal + 1),
-                    confirmation_bars=1,
-                    max_hold_minutes=30,
-                    cooldown_bars=ordinal,
-                )
-            else:
-                program = OpeningRangeBreakoutReversalProgram(
-                    opening_range_minutes=(5, 15, 30)[ordinal % 3],
-                    direction=(
-                        OpeningRangeDirection.CONTINUATION
-                        if ordinal % 2 == 0
-                        else OpeningRangeDirection.REVERSAL
-                    ),
-                    entry_delay_bars=ordinal,
-                    max_hold_minutes=30,
-                )
-            disposition = (
-                TrialDisposition.SHORTLISTED
-                if ordinal == 0
-                else TrialDisposition.ZERO_TRADE
-            )
-            ledger = ledger.consume(program, disposition)
-            if ordinal == 0:
-                candidates.append(program)
-    discovery = open_discovery_dataset(_universe_bars(date(2020, 1, 2)))
-    population = freeze_discovery_population(discovery, ledger)
-    frozen_candidates = freeze_candidate_population(population, ledger, candidates)
-    return ledger, population, frozen_candidates
+) -> tuple[TrialLedger, G1PopulationManifest, DiscoveryResultFreeze, CandidateFreeze]:
+    programs = (
+        NoiseAreaVwapMomentumProgram(
+            lookback_sessions=1,
+            noise_band_bps=Decimal(start_noise_band_bps),
+            confirmation_bars=1,
+        ),
+        VwapTrendReversalProgram(
+            displacement_bps=Decimal(5),
+            confirmation_bars=1,
+            max_hold_minutes=1,
+            cooldown_bars=0,
+        ),
+        OpeningRangeBreakoutReversalProgram(
+            opening_range_minutes=5,
+            direction=OpeningRangeDirection.CONTINUATION,
+            entry_delay_bars=0,
+            max_hold_minutes=5,
+        ),
+    )
+    spy_bars = _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
+    discovery = _discovery_dataset(spy_bars)
+    manifest = freeze_g1_population(programs)
+    ledger = TrialLedger(manifest)
+    for slot in manifest.slots:
+        evaluation = evaluate_frozen_trial(ledger, slot, discovery)
+        disposition = (
+            TrialDisposition.SHORTLISTED
+            if evaluation.replay_result is not None and evaluation.replay_result.trades
+            else None
+        )
+        ledger = ledger.consume(evaluation, disposition)
+    finalized = finalize_discovery_population(discovery, ledger)
+    frozen_candidates = freeze_candidate_population(finalized, ledger, (programs[1],))
+    return ledger, manifest, finalized, frozen_candidates
 
 
 def test_closed_program_serialization_and_semantic_parameters() -> None:
@@ -288,43 +293,40 @@ def test_validation_requires_an_immutable_candidate_freeze_after_full_population
     bars = _universe_bars(date(2022, 1, 3))
     with pytest.raises(InformationFirewallError, match="candidate-freeze"):
         open_validation_dataset(bars)
-    ledger, population, candidates = _frozen_candidates()
-    assert ledger.consumed_trial_count == 24
-    assert tuple(ledger.family_counts.values()) == (8, 8, 8)
-    assert candidates.discovery_dataset_id == population.discovery_dataset_id
+    ledger, manifest, finalized, candidates = _frozen_candidates()
+    assert len(manifest.slots) == 3
+    assert ledger.is_complete
+    assert ledger.consumed_trial_count == len(manifest.slots)
+    assert tuple(ledger.family_counts.values()) == (1, 1, 1)
+    assert candidates.population_manifest_id == manifest.manifest_id
+    assert candidates.discovery_result_freeze_id == finalized.freeze_id
+    assert candidates.discovery_dataset_id == finalized.discovery_dataset_id
     assert candidates.ledger_id == ledger.ledger_id
-    with pytest.raises(InformationFirewallError, match="append-only consumption"):
-        TrialLedger(ledger.records)
+    with pytest.raises(InformationFirewallError, match="frozen G1 manifest"):
+        TrialLedger(ledger.records)  # type: ignore[call-arg]
+    with pytest.raises(InformationFirewallError, match="frozen-slot consumption"):
+        TrialLedger(manifest, ledger.records)
     with pytest.raises(AttributeError, match="immutable"):
         ledger._records = ()
     validation = open_validation_dataset(bars, candidates)
     assert validation.stage is ResearchStage.VALIDATION
     assert validation.candidate_freeze == candidates
-    assert validation.candidate_program_ids == tuple(
-        program_id(program)
-        for program in (
-            NoiseAreaVwapMomentumProgram(
-                lookback_sessions=1, noise_band_bps=Decimal(1), confirmation_bars=1
-            ),
+    assert validation.candidate_program_ids == (
+        program_id(
             VwapTrendReversalProgram(
-                displacement_bps=Decimal(1),
+                displacement_bps=Decimal(5),
                 confirmation_bars=1,
-                max_hold_minutes=30,
+                max_hold_minutes=1,
                 cooldown_bars=0,
-            ),
-            OpeningRangeBreakoutReversalProgram(
-                opening_range_minutes=5,
-                direction=OpeningRangeDirection.CONTINUATION,
-                entry_delay_bars=0,
-                max_hold_minutes=30,
-            ),
-        )
+            )
+        ),
     )
     with pytest.raises(InformationFirewallError):
         CandidateFreeze(
             candidates.freeze_id,
-            population.freeze_id,
-            population.discovery_dataset_id,
+            manifest.manifest_id,
+            finalized.freeze_id,
+            finalized.discovery_dataset_id,
             ledger.ledger_id,
             candidates.candidate_program_ids,
             candidates.candidate_fingerprints,
@@ -332,16 +334,21 @@ def test_validation_requires_an_immutable_candidate_freeze_after_full_population
 
 
 def test_freeze_artifact_cannot_be_rebound_to_another_trial_population() -> None:
-    ledger, population, _ = _frozen_candidates()
-    other_ledger, other_population, _ = _frozen_candidates(start_noise_band_bps=30)
+    ledger, manifest, population, _ = _frozen_candidates()
+    other_ledger, other_manifest, other_population, _ = _frozen_candidates(
+        start_noise_band_bps=30
+    )
     other_program = NoiseAreaVwapMomentumProgram(
         lookback_sessions=1,
         noise_band_bps=Decimal("30"),
         confirmation_bars=1,
     )
     assert population.ledger_id == ledger.ledger_id
+    assert manifest.manifest_id != other_manifest.manifest_id
     assert other_population.freeze_id != population.freeze_id
-    with pytest.raises(InformationFirewallError, match="supplied trial ledger"):
+    with pytest.raises(
+        InformationFirewallError, match="completed exact G1 result ledger"
+    ):
         freeze_candidate_population(population, other_ledger, (other_program,))
 
 
@@ -367,7 +374,7 @@ def test_public_dataset_construction_and_later_stages_cannot_bypass_firewall() -
         open_holdout_dataset(_universe_bars(HOLDOUT_START))
     with pytest.raises(InformationFirewallError):
         open_recent_extension_dataset(_universe_bars(RECENT_EXTENSION_START))
-    _, _, freeze = _frozen_candidates()
+    _, _, _, freeze = _frozen_candidates()
     for opener in (
         open_discovery_dataset,
         lambda bars: open_validation_dataset(bars, freeze),
@@ -668,63 +675,277 @@ def test_frequency_advancement_is_stress_only_for_all_promotion_policies() -> No
         )
 
 
-def test_trial_budget_counts_semantic_duplicates_and_stays_at_24_and_8() -> None:
-    programs = (
-        NoiseAreaVwapMomentumProgram(),
-        VwapTrendReversalProgram(),
-        OpeningRangeBreakoutReversalProgram(),
+def test_g1_manifest_freezes_ordered_proposals_before_any_result() -> None:
+    first = NoiseAreaVwapMomentumProgram()
+    second = VwapTrendReversalProgram()
+    proposals = (first, second, first)
+    manifest = freeze_g1_population(proposals)
+    same_manifest = freeze_g1_population(proposals)
+    reordered = freeze_g1_population((second, first, first))
+    ledger = TrialLedger(manifest)
+
+    assert isinstance(manifest, G1PopulationManifest)
+    assert len(manifest.slots) == 3 < G1_TOTAL_TRIAL_LIMIT
+    assert manifest.manifest_id == same_manifest.manifest_id
+    assert manifest.manifest_id != reordered.manifest_id
+    assert tuple(slot.ordinal for slot in manifest.slots) == (1, 2, 3)
+    assert manifest.slots[0].slot_id != manifest.slots[2].slot_id
+    assert manifest.slots[0].program_id == manifest.slots[2].program_id
+    assert b'"disposition"' not in manifest.to_bytes()
+    assert ledger.records == ()
+    assert ledger.manifest.manifest_id == manifest.manifest_id
+    assert not hasattr(manifest.slots[0], "disposition")
+    with pytest.raises(AttributeError):
+        manifest.slots[0].program_id = program_id(second)  # type: ignore[misc]
+    with pytest.raises(TrialBudgetExceeded, match="at least one"):
+        freeze_g1_population(())
+
+
+def test_g1_manifest_enforces_total_and_family_ceilings() -> None:
+    family_a = tuple(
+        NoiseAreaVwapMomentumProgram(noise_band_bps=Decimal(index + 1))
+        for index in range(G1_FAMILY_TRIAL_LIMIT + 1)
     )
-    ledger = TrialLedger()
-    for program in programs:
-        for ordinal in range(G1_FAMILY_TRIAL_LIMIT):
-            candidate = program
-            if ordinal:
-                if type(program) is NoiseAreaVwapMomentumProgram:
-                    candidate = replace(program, noise_band_bps=Decimal(ordinal + 10))
-                elif type(program) is VwapTrendReversalProgram:
-                    candidate = replace(program, displacement_bps=Decimal(ordinal + 10))
-                else:
-                    candidate = replace(program, entry_delay_bars=ordinal)
-            ledger = ledger.consume(candidate, TrialDisposition.ZERO_TRADE)
-    assert ledger.consumed_trial_count == G1_TOTAL_TRIAL_LIMIT == 24
-    assert tuple(ledger.family_counts.values()) == (8, 8, 8)
-    duplicate_program = NoiseAreaVwapMomentumProgram()
-    duplicate_ledger = TrialLedger().consume(
-        duplicate_program, TrialDisposition.SHORTLISTED
-    )
-    duplicate_ledger = duplicate_ledger.consume(
-        duplicate_program, TrialDisposition.SHORTLISTED
-    )
-    assert duplicate_ledger.records[1].disposition is TrialDisposition.DUPLICATE
-    assert duplicate_ledger.consumed_trial_count == 2
-    for band in range(11, 17):
-        duplicate_ledger = duplicate_ledger.consume(
-            replace(duplicate_program, noise_band_bps=Decimal(band)),
-            TrialDisposition.FAILED,
+    with pytest.raises(TrialBudgetExceeded, match="family trial budget"):
+        freeze_g1_population(family_a)
+    over_total = (
+        tuple(
+            NoiseAreaVwapMomentumProgram(noise_band_bps=Decimal(index + 1))
+            for index in range(G1_FAMILY_TRIAL_LIMIT)
         )
-    assert duplicate_ledger.family_counts[StrategyFamily.NOISE_AREA_VWAP_MOMENTUM] == 8
-    with pytest.raises(TrialBudgetExceeded):
-        duplicate_ledger.consume(
-            replace(duplicate_program, noise_band_bps=Decimal("99")),
-            TrialDisposition.FAILED,
+        + tuple(
+            VwapTrendReversalProgram(displacement_bps=Decimal(index + 1))
+            for index in range(G1_FAMILY_TRIAL_LIMIT)
         )
-    with pytest.raises(TrialBudgetExceeded):
+        + tuple(
+            OpeningRangeBreakoutReversalProgram(
+                opening_range_minutes=5,
+                entry_delay_bars=index,
+            )
+            for index in range(G1_FAMILY_TRIAL_LIMIT)
+        )
+        + (VwapTrendReversalProgram(displacement_bps=Decimal(99)),)
+    )
+    with pytest.raises(TrialBudgetExceeded, match="total trial budget"):
+        freeze_g1_population(over_total)
+
+
+def test_g1_evaluation_requires_exact_next_slot_and_cannot_be_consumed_twice() -> None:
+    first_program = VwapTrendReversalProgram(
+        displacement_bps=Decimal(5),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    second_program = OpeningRangeBreakoutReversalProgram(
+        opening_range_minutes=5, entry_delay_bars=0, max_hold_minutes=5
+    )
+    manifest = freeze_g1_population((first_program, second_program))
+    ledger = TrialLedger(manifest)
+    trend_bars = _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
+    discovery = _discovery_dataset(trend_bars)
+
+    with pytest.raises(InformationFirewallError, match="exact next frozen"):
+        evaluate_frozen_trial(ledger, manifest.slots[1], discovery)
+    with pytest.raises(InformationFirewallError, match="opened discovery dataset"):
+        evaluate_frozen_trial(ledger, manifest.slots[0], trend_bars)  # type: ignore[arg-type]
+    first_result = evaluate_frozen_trial(ledger, manifest.slots[0], discovery)
+    assert first_result.replay_result is not None
+    assert first_result.replay_result.trades
+    with pytest.raises(InformationFirewallError, match="not authorized"):
+        ledger.consume(first_program, TrialDisposition.SHORTLISTED)  # type: ignore[arg-type]
+
+    ledger_after_first = ledger.consume(
+        first_result, TrialDisposition.ECONOMICALLY_REJECTED
+    )
+    with pytest.raises(InformationFirewallError, match="exact next frozen"):
+        evaluate_frozen_trial(ledger_after_first, manifest.slots[0], discovery)
+    with pytest.raises(InformationFirewallError, match="next frozen population slot"):
+        ledger_after_first.consume(first_result)
+    second_result = evaluate_frozen_trial(
+        ledger_after_first,
+        manifest.slots[1],
+        discovery,
+    )
+    completed = ledger_after_first.consume(second_result)
+    assert completed.is_complete
+    assert len(completed.records) == len(manifest.slots)
+    with pytest.raises(TrialBudgetExceeded, match="all frozen"):
+        evaluate_frozen_trial(completed, manifest.slots[1], discovery)
+
+
+def test_invalid_and_duplicate_proposals_consume_their_frozen_slots() -> None:
+    program = VwapTrendReversalProgram()
+    invalid = InvalidTrialReference(
+        StrategyFamily.OPENING_RANGE_BREAKOUT_REVERSAL,
+        "caller-invalid-hypothesis-v1",
+        "PROGRAM_PARSE_REJECTED",
+    )
+    manifest = freeze_g1_population((program, program, invalid))
+    assert manifest.slots[0].slot_id != manifest.slots[1].slot_id
+    assert manifest.slots[0].program_id == manifest.slots[1].program_id
+    ledger = TrialLedger(manifest)
+    bars = _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
+    discovery = _discovery_dataset(bars)
+    first = evaluate_frozen_trial(ledger, manifest.slots[0], discovery)
+    ledger = ledger.consume(first, TrialDisposition.SHORTLISTED)
+    duplicate = evaluate_frozen_trial(ledger, manifest.slots[1], discovery)
+    assert duplicate.fixed_disposition is TrialDisposition.DUPLICATE
+    ledger = ledger.consume(duplicate)
+    invalid_result = evaluate_frozen_trial(ledger, manifest.slots[2], discovery)
+    assert invalid_result.fixed_disposition is TrialDisposition.INVALID
+    ledger = ledger.consume(invalid_result)
+    assert tuple(record.disposition for record in ledger.records) == (
+        TrialDisposition.SHORTLISTED,
+        TrialDisposition.DUPLICATE,
+        TrialDisposition.INVALID,
+    )
+    assert ledger.records[1].slot_id == manifest.slots[1].slot_id
+    assert ledger.records[2].slot_id == manifest.slots[2].slot_id
+
+
+def test_frozen_slot_and_ledger_cannot_be_rebound_or_accept_absent_programs() -> None:
+    program = VwapTrendReversalProgram()
+    manifest = freeze_g1_population((program,))
+    other_manifest = freeze_g1_population(
+        (replace(program, displacement_bps=Decimal(30)),)
+    )
+    ledger = TrialLedger(manifest)
+    discovery = _discovery_dataset(_flat(date(2020, 1, 2)))
+    with pytest.raises(InformationFirewallError, match="exact next frozen"):
+        evaluate_frozen_trial(ledger, other_manifest.slots[0], discovery)
+    with pytest.raises(InformationFirewallError, match="not authorized"):
         ledger.consume(
-            NoiseAreaVwapMomentumProgram(lookback_sessions=2), TrialDisposition.FAILED
+            VwapTrendReversalProgram(displacement_bps=Decimal(31)),
+            TrialDisposition.FAILED,
+        )  # type: ignore[arg-type]
+
+
+def test_completed_discovery_freeze_gates_candidates_and_validation() -> None:
+    manifest = freeze_g1_population(
+        (
+            VwapTrendReversalProgram(
+                displacement_bps=Decimal(5),
+                confirmation_bars=1,
+                max_hold_minutes=1,
+                cooldown_bars=0,
+            ),
+            NoiseAreaVwapMomentumProgram(),
         )
+    )
+    ledger = TrialLedger(manifest)
+    trend_bars = _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
+    discovery = _discovery_dataset(trend_bars)
+    with pytest.raises(InformationFirewallError, match="every frozen G1 proposal"):
+        finalize_discovery_population(discovery, ledger)
+    with pytest.raises(
+        InformationFirewallError, match="completed exact G1 result ledger"
+    ):
+        freeze_candidate_population(None, ledger, ())  # type: ignore[arg-type]
+
+    candidate = manifest.slots[0]._program
+    assert candidate is not None
+    first = evaluate_frozen_trial(ledger, manifest.slots[0], discovery)
+    ledger = ledger.consume(first, TrialDisposition.SHORTLISTED)
+    second = evaluate_frozen_trial(ledger, manifest.slots[1], discovery)
+    ledger = ledger.consume(second)
+    with pytest.raises(InformationFirewallError, match="different discovery dataset"):
+        finalize_discovery_population(
+            _discovery_dataset(_flat(date(2020, 1, 2))), ledger
+        )
+    finalized = finalize_discovery_population(discovery, ledger)
+    freeze = freeze_candidate_population(finalized, ledger, (candidate,))
+    assert freeze.population_manifest_id == manifest.manifest_id
+    assert freeze.ledger_id == ledger.ledger_id
+    with pytest.raises(InformationFirewallError, match="not shortlisted"):
+        freeze_candidate_population(
+            finalized,
+            ledger,
+            (NoiseAreaVwapMomentumProgram(),),
+        )
+    with pytest.raises(InformationFirewallError, match="candidate-freeze"):
+        open_validation_dataset(_universe_bars(date(2022, 1, 3)))
+    validation = open_validation_dataset(_universe_bars(date(2022, 1, 3)), freeze)
+    assert validation
+    with pytest.raises(InformationFirewallError, match="opened discovery dataset"):
+        evaluate_frozen_trial(ledger, manifest.slots[0], validation)
+
+
+def test_selection_bias_binds_every_completed_frozen_attempt() -> None:
+    duplicate = VwapTrendReversalProgram(
+        displacement_bps=Decimal(5),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    invalid = InvalidTrialReference(
+        StrategyFamily.NOISE_AREA_VWAP_MOMENTUM,
+        "invalid-attempt-v1",
+        "INVALID_TYPED_PROPOSAL",
+    )
+    failed = OpeningRangeBreakoutReversalProgram(
+        opening_range_minutes=5, entry_delay_bars=0, max_hold_minutes=5
+    )
+    zero_trade = NoiseAreaVwapMomentumProgram()
+    proposals = (duplicate, duplicate, invalid, failed, zero_trade)
+    manifest = freeze_g1_population(proposals)
+    ledger = TrialLedger(manifest)
+    discovery = _discovery_dataset(
+        _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
+    )
+    for slot in manifest.slots:
+        evaluation = evaluate_frozen_trial(
+            ledger,
+            slot,
+            discovery,
+            initial_equity=Decimal("-1") if slot.ordinal == 4 else Decimal("1"),
+        )
+        disposition = (
+            TrialDisposition.ECONOMICALLY_REJECTED if slot.ordinal == 1 else None
+        )
+        ledger = ledger.consume(evaluation, disposition)
+    assert tuple(record.disposition for record in ledger.records) == (
+        TrialDisposition.ECONOMICALLY_REJECTED,
+        TrialDisposition.DUPLICATE,
+        TrialDisposition.INVALID,
+        TrialDisposition.FAILED,
+        TrialDisposition.ZERO_TRADE,
+    )
+    finalized = finalize_discovery_population(discovery, ledger)
+    bias = selection_bias_input(finalized, ledger)
+    assert bias.consumed_trial_count == len(manifest.slots) == 5
+    assert bias.population_manifest_id == manifest.manifest_id
+    assert bias.discovery_result_freeze_id == finalized.freeze_id
+    assert bias.slot_ids == tuple(slot.slot_id for slot in manifest.slots)
+    assert bias.trial_ids == tuple(record.trial_id for record in ledger.records)
+    assert bias.result_ids == tuple(record.result_id for record in ledger.records)
+    assert bias.program_ids[0] == bias.program_ids[1]
+    assert bias.program_ids[2] is None
+    assert TrialDisposition.FAILED in bias.dispositions
+    assert TrialDisposition.DUPLICATE in bias.dispositions
+    assert TrialDisposition.INVALID in bias.dispositions
+    assert TrialDisposition.ZERO_TRADE in bias.dispositions
+    assert b"population_manifest_id" in bias.to_bytes()
 
 
 def test_selection_bias_and_effect_free_arch150_surface_leave_arch149_untouched() -> (
     None
 ):
-    ledger = TrialLedger().consume(
-        NoiseAreaVwapMomentumProgram(), TrialDisposition.ZERO_TRADE
+    manifest = freeze_g1_population((NoiseAreaVwapMomentumProgram(),))
+    ledger = TrialLedger(manifest)
+    discovery = _discovery_dataset(_flat(date(2020, 1, 2)))
+    zero_trade = evaluate_frozen_trial(
+        ledger,
+        manifest.slots[0],
+        discovery,
     )
-    bias = selection_bias_input(ledger)
+    ledger = ledger.consume(zero_trade)
+    finalized = finalize_discovery_population(discovery, ledger)
+    bias = selection_bias_input(finalized, ledger)
     assert bias.consumed_trial_count == 1
     assert bias.trial_ids == (ledger.records[0].trial_id,)
     assert bias.ledger_id == ledger.ledger_id
-    assert b"arch150-selection-bias-input/v1" in bias.to_bytes()
+    assert b"arch150-selection-bias-input/v2" in bias.to_bytes()
     assert foundation_help().startswith("Architecture 150 foundation")
     assert (
         FOUNDATION_EFFECT_COUNTERS.provider_calls,

@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION + D1 SOURCE ACCEPTED/INTEGRATED; FIRST REAL D1 ACQUISITION CONSUMED/BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY; OFFLINE SPARSE-CUSTODY REQUALIFICATION NEXT**.
+Status: **FOUNDATION + D1 + D1R SOURCE ACCEPTED/INTEGRATED; FIRST REAL D1 ACQUISITION CONSUMED/BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY; REAL OFFLINE D1R REQUALIFICATION NEXT**.
 
 Normative design:
 
@@ -119,12 +119,19 @@ The attempt is immutable. Do not reacquire, resume, regenerate or overwrite it.
 
 ### D1R offline sparse-custody requalification
 
-The next checkpoint is source-only/fake-only implementation of an offline
-requalifier bound to the exact consumed attempt above. It may later be invoked
-once against the preserved raw pages after source acceptance; that invocation
-performs no credential or network access.
+D1R source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at:
 
-The source checkpoint must:
+- HEAD: `fd0eb9073d55cbb5b1dba2f0fb35ce00317855c1`;
+- tree: `bec66738a1796a0300b1dd5bbd503675203eb506`;
+- direct parent: `f376f10840ab40723af6393b9918fab67702a073`;
+- feature mapped FULL: `45012246733`, attempt 1, terminal SUCCESS with
+  source-static, active-tests, source-gates and all seven canonical FULL lanes
+  passing;
+- develop run: `45015293875`, attempt 1, terminal SUCCESS with
+  `DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`,
+  `IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL.
+
+The accepted source checkpoint:
 
 - pin the consumed attempt ID, source identity, artifact hashes, page counts,
   raw counts, request descriptors and null-token exhaustion;
@@ -141,6 +148,13 @@ The source checkpoint must:
 - write fresh create-once requalification artifacts outside the consumed
   attempt and outside repositories/worktrees;
 - expose no strategy replay or P&L path.
+
+The accepted source has not yet been invoked against the real consumed attempt.
+The next boundary is one offline invocation against the exact preserved
+`a8d5975b-a3e9-4917-a8a8-2809e191fa20` attempt. That invocation may read the
+retained raw pages and create a fresh write-once sparse-custody output, but it
+must perform zero credential, network/provider, Robinhood, broker, order,
+strategy-P&L, holdout, extension, or production-state effects.
 
 The requalification result can establish custody suitability only. It cannot
 freeze/evaluate G1. A separate accepted sparse-replay source checkpoint remains

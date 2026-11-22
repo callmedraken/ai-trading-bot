@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 D1 real acquisition consumed/blocked; offline sparse-custody requalification next
+## Current milestone: Architecture 150 D1R source accepted/integrated; real offline sparse-custody requalification next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -248,11 +248,22 @@ remains the blocked dense identity. Custody evidence identity is
 No normalized file was produced. 2024+, strategy P&L, holdout/extension,
 Robinhood, broker, order and production effects were zero.
 
-Do not retry or resume provider acquisition. The immediate continuation is a
-source-only offline sparse-custody requalifier over this exact preserved
-attempt. It must make zero credential/network calls and cannot open strategy
-P&L. After independent sparse-custody acceptance, a separate source-only
-sparse-replay checkpoint must be accepted before G1 is frozen/evaluated.
+Do not retry or resume provider acquisition. D1R offline sparse-custody source
+is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`fd0eb9073d55cbb5b1dba2f0fb35ce00317855c1` / tree
+`bec66738a1796a0300b1dd5bbd503675203eb506`, direct parent
+`f376f10840ab40723af6393b9918fab67702a073`. Feature mapped FULL
+`45012246733`, attempt 1, is terminal SUCCESS with all seven canonical FULL
+lanes passing. Develop run `45015293875`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`,
+`IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL.
+
+The immediate continuation is one real **offline** D1R invocation over this
+exact preserved attempt. It may read the immutable raw pages and write a fresh
+create-once sparse-custody output, but it must make zero credential/network
+calls and cannot open strategy P&L. After independent sparse-custody acceptance,
+a separate source-only sparse-replay checkpoint must be accepted before G1 is
+frozen/evaluated.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,

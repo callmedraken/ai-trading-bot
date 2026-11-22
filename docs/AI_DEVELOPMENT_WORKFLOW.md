@@ -775,7 +775,25 @@ After every accepted checkpoint, ChatGPT must automatically:
 6. enforce the exact reviewed approval boundary for production/provider effects,
    provisioning, scheduler mutation, merge/rebase/amend/force-push, PR metadata
    or review-thread changes, broker/live effects, or another explicitly
-   protected action. For a reviewed bounded local command, the user's decision
+   protected action.
+
+### Short closeout CI polling exception
+
+ChatGPT may poll a short, low-risk docs-only or mechanical closeout CI run to
+terminal when doing so permits seamless automatic continuation into the next
+already-reviewed safe step. This exception is intentionally narrow: it covers
+coordination/documentation closeouts and similarly bounded bookkeeping gates
+that do not introduce executable-source, strategy, provider, broker, production,
+security, or authority changes.
+
+Substantive implementation/publication certification retains the stricter
+handoff rule: after the one ordinary push, inspect the mapped run once; if it is
+nonterminal, report `CI_PENDING=<run-id>` and stop that implementation session.
+Do not use a delegated agent merely to wait or poll substantive CI. A later
+ChatGPT review turn may check that run again. Never rerun unchanged source just
+to obtain a different result.
+
+For a reviewed bounded local command, the user's decision
    to execute it supplies approval for that exact boundary under the standing
    rule above; no additional authorization-only message is required. Keep all
    prerequisites, interlocks and STOP/reconciliation conditions intact.

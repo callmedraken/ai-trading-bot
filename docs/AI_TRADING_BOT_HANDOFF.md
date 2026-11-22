@@ -372,7 +372,8 @@ RHC2 remains `CONSUMED / PASS / NO RETRY`. RHC3 retained account-wide-all-agents
 
 `RHC4_C2_CLOSEOUT_C1_DOCS_HYGIENE_DEFECT` preserves direct docs run `44239165344`, attempt 1, terminal FAILURE. Its only source-static defect was one new blank line at EOF in each newly added L43-Q1 document; canonical FULL/active tests were skipped. The run is immutable evidence and is not rerun unchanged.
 
-For future Windows/Git operator commands, follow the normative sections of `docs/AI_DEVELOPMENT_WORKFLOW.md` rather than reconstructing the rules from memory:
+For future Windows/Git operator commands, follow the normative sections of `docs/AI_DEVELOPMENT_WORKFLOW.md` rather than reconstructing the rules from memory. The standing CI cadence now allows ChatGPT to poll short docs-only/mechanical closeouts to terminal for seamless continuation; substantive implementation CI still uses one mapped check and `CI_PENDING=<run-id>` when nonterminal, with no waiting/polling agent.
+
 - discover or re-prove the exact worktree; never derive it from a branch name;
 - normalize filesystem identity with `Resolve-Path`;
 - use porcelain/status arrays for tracked/index cleanliness and explicitly account for untracked state when the contract requires it;

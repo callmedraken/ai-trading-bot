@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 D1R source accepted/integrated; real offline sparse-custody requalification next
+## Current milestone - Architecture 150 first real D1R invocation consumed/blocked; output-boundary correction next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -235,11 +235,17 @@ FAST-FORWARD INTEGRATED at HEAD
 `f376f10840ab40723af6393b9918fab67702a073`. Feature mapped FULL
 `45012246733`, attempt 1, is terminal SUCCESS. Develop run `45015293875`,
 attempt 1, is terminal SUCCESS with exact feature-certification reuse,
-`IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL. The next
-milestone is the one real offline D1R invocation against the preserved raw
-pages; it performs zero provider/credential effects. No strategy P&L opens until
-that custody evidence is independently accepted and a separate sparse-replay
-source checkpoint is accepted.
+`IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL. The first real offline D1R invocation is now CONSUMED / BLOCKED /
+`OUTPUT_CREATE_FAILED` / NO AUTOMATIC RETRY. It exited 21 before creating the
+fresh output directory and produced no sparse artifacts; all preserved D1 input
+hashes/page counts remained unchanged and all new external/strategy effects
+were zero. The sanitized observation does not prove the exact OS exception.
+Source review identified a bounded output-path boundary defect class: the
+validator canonicalizes only for checking while the writer uses the original
+Path, control characters are not rejected, and there is no CLI path boundary to
+avoid Windows Python-literal escaping. The next milestone is a source-only
+synthetic correction of that boundary. No real D1R rerun and no strategy P&L
+are authorized until the correction is independently accepted/integrated.
 
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,

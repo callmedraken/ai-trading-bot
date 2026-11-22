@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION + D1 + D1R SOURCE ACCEPTED/INTEGRATED; FIRST REAL D1 ACQUISITION CONSUMED/BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY; REAL OFFLINE D1R REQUALIFICATION NEXT**.
+Status: **FOUNDATION + D1 + D1R SOURCE ACCEPTED/INTEGRATED; D1 ACQUISITION CONSUMED/BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY; FIRST REAL D1R OFFLINE INVOCATION CONSUMED/BLOCKED / OUTPUT_CREATE_FAILED / NO AUTOMATIC RETRY; OUTPUT-BOUNDARY CORRECTION NEXT**.
 
 Normative design:
 
@@ -149,16 +149,32 @@ The accepted source checkpoint:
   attempt and outside repositories/worktrees;
 - expose no strategy replay or P&L path.
 
-The accepted source has not yet been invoked against the real consumed attempt.
-The next boundary is one offline invocation against the exact preserved
-`a8d5975b-a3e9-4917-a8a8-2809e191fa20` attempt. That invocation may read the
-retained raw pages and create a fresh write-once sparse-custody output, but it
-must perform zero credential, network/provider, Robinhood, broker, order,
-strategy-P&L, holdout, extension, or production-state effects.
+The first real D1R offline invocation is now consumed:
 
-The requalification result can establish custody suitability only. It cannot
-freeze/evaluate G1. A separate accepted sparse-replay source checkpoint remains
-required before any real discovery P&L is opened.
+- requested output:
+  `F:\AI\temp\arch150-d1r-offline-requalification-e8040deb-1fb6-4a4d-9ac6-05f5c4f6349d`;
+- outcome: `CONSUMED / BLOCKED / OUTPUT_CREATE_FAILED / NO AUTOMATIC RETRY`;
+- Python exit code: 21;
+- no sparse classification or output artifacts were produced;
+- the requested output directory does not exist and there is no partial output;
+- all retained D1 top-level artifact hashes and raw page filename counts remained
+  unchanged;
+- new credential/provider/Robinhood/broker/order/strategy-P&L/holdout/extension
+  effects: zero.
+
+The sanitized observation does not prove the exact host exception and must not
+be retried unchanged. Exact-source review identified a bounded output-boundary
+defect class that must be corrected before any later invocation: D1R validates a
+normalized absolute output path but writes using the caller's original Path
+object, does not explicitly reject control characters, and exposes no CLI path
+boundary to avoid Python string-literal escaping on Windows. This is a
+source-only correction checkpoint; it must use synthetic tests and perform no
+read of the real consumed D1 attempt.
+
+The requalification result, if a later separately reviewed invocation succeeds,
+can establish custody suitability only. It cannot freeze/evaluate G1. A
+separate accepted sparse-replay source checkpoint remains required before any
+real discovery P&L is opened.
 
 ## Initial implementation scope
 

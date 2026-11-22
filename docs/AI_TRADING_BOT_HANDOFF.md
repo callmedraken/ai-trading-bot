@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 D1R source accepted/integrated; real offline sparse-custody requalification next
+## Current milestone: Architecture 150 first real D1R invocation consumed/blocked; output-boundary correction next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -258,12 +258,22 @@ lanes passing. Develop run `45015293875`, attempt 1, is terminal SUCCESS with
 `DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`,
 `IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL.
 
-The immediate continuation is one real **offline** D1R invocation over this
-exact preserved attempt. It may read the immutable raw pages and write a fresh
-create-once sparse-custody output, but it must make zero credential/network
-calls and cannot open strategy P&L. After independent sparse-custody acceptance,
-a separate source-only sparse-replay checkpoint must be accepted before G1 is
-frozen/evaluated.
+The first real **offline** D1R invocation is now CONSUMED / BLOCKED /
+`OUTPUT_CREATE_FAILED` / NO AUTOMATIC RETRY. Requested output was
+`F:\AI\temp\arch150-d1r-offline-requalification-e8040deb-1fb6-4a4d-9ac6-05f5c4f6349d`;
+the process exited 21, the directory was not created, and there is no partial
+output. The retained D1 artifact hashes and SPY/QQQ raw filename counts remained
+unchanged. New credential/network/provider/Robinhood/broker/order/strategy-P&L/
+holdout/extension effects were all zero.
+
+Do not invoke D1R again unchanged. The sanitized failure does not prove the
+underlying OS exception. Exact-source review identified a bounded correction
+surface: canonicalize and return the validated production output Path for the
+writer, reject Windows-incompatible control characters before any create
+attempt, and expose a simple CLI/operator path boundary so an F:\ path is not
+embedded in Python source text. The correction is source-only/fake-only; it may
+not read the real consumed attempt. After that correction is accepted/integrated,
+a later real offline invocation requires a new explicit review boundary.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,

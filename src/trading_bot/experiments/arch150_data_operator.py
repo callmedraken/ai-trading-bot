@@ -237,14 +237,21 @@ def _run_one_shot(
     adapters: OperatorAdapters,
     *,
     output_root: Path,
+    _test_output_root_validator: Callable[[Path], None] | None = None,
 ) -> AcquisitionOutcome:
+    """Run an injected one-shot attempt; production omits the test validator."""
+
     initial = _source_admission(expected, adapters)
     if not initial.passed:
         return _blocked(initial.failure_code or "SOURCE_ADMISSION_FAILED")
     try:
         attempt_id = adapters.attempt_id_factory()
         attempt_path = _create_attempt_directory(
-            attempt_id, expected, initial.facts, output_root=output_root
+            attempt_id,
+            expected,
+            initial.facts,
+            output_root=output_root,
+            output_root_validator=_test_output_root_validator,
         )
     except Arch150OperatorError as error:
         return _blocked(error.code)
@@ -741,6 +748,7 @@ def _create_attempt_directory(
     facts: SourceFacts | None,
     *,
     output_root: Path,
+    output_root_validator: Callable[[Path], None] | None = None,
 ) -> Path:
     try:
         parsed = UUID(attempt_id)
@@ -748,7 +756,12 @@ def _create_attempt_directory(
         raise Arch150OperatorError("ATTEMPT_UUID_INVALID") from None
     if str(parsed) != attempt_id:
         raise Arch150OperatorError("ATTEMPT_UUID_INVALID")
-    _validate_output_root(output_root)
+    validator = (
+        _validate_output_root
+        if output_root_validator is None
+        else output_root_validator
+    )
+    validator(output_root)
     try:
         output_root.mkdir(parents=True, exist_ok=True)
         _check_non_reparse_ancestors(output_root)

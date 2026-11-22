@@ -64,6 +64,18 @@ def _adapters(
     )
 
 
+def _disposable_root_validator(expected_root):
+    """Permit only this pytest-owned directory, regardless of its drive."""
+
+    resolved_root = expected_root.resolve(strict=True)
+
+    def validate(path):
+        if not path.is_absolute() or path.resolve(strict=True) != resolved_root:
+            raise AssertionError("fake output must stay inside pytest tmp_path")
+
+    return validate
+
+
 class _FakeScope:
     def __init__(self) -> None:
         self.closed = False
@@ -152,6 +164,7 @@ def test_bad_interlock_and_source_mismatch_stop_before_effect_adapters(tmp_path)
             operator.ExpectedSource(EXPECTED_HEAD, EXPECTED_TREE),
             mismatch,
             output_root=tmp_path,
+            _test_output_root_validator=_disposable_root_validator(tmp_path),
         )
         assert blocked.failure_code == "SOURCE_IDENTITY_MISMATCH"
     assert calls == {"credentials": 0, "transport": 0, "attempt_id": 0}
@@ -179,6 +192,7 @@ def test_source_head_tree_and_authority_are_checked_before_fake_credentials(tmp_
         operator.ExpectedSource(EXPECTED_HEAD, EXPECTED_TREE),
         adapters,
         output_root=tmp_path,
+        _test_output_root_validator=_disposable_root_validator(tmp_path),
     )
     assert outcome.failure_code == "SOURCE_IDENTITY_MISMATCH"
     assert outcome.credential_read_attempt_count == 0
@@ -213,6 +227,7 @@ def test_fake_pagination_pacing_and_immutable_raw_page_accounting(tmp_path):
         operator.ExpectedSource(EXPECTED_HEAD, EXPECTED_TREE),
         adapters,
         output_root=tmp_path,
+        _test_output_root_validator=_disposable_root_validator(tmp_path),
     )
 
     assert outcome.classification == "BLOCKED"
@@ -283,11 +298,52 @@ def test_fake_request_failure_is_not_retried_and_qqq_is_not_started(tmp_path):
         operator.ExpectedSource(EXPECTED_HEAD, EXPECTED_TREE),
         adapters,
         output_root=tmp_path,
+        _test_output_root_validator=_disposable_root_validator(tmp_path),
     )
     assert outcome.failure_code == "PROVIDER_REQUEST_FAILED"
     assert outcome.provider_request_attempt_count == 1
     assert requests["count"] == 1
     assert not (outcome.attempt_directory / "raw" / "QQQ").exists()
+
+
+def test_fake_runner_accepts_only_its_bounded_disposable_root(tmp_path):
+    adapters = _adapters(
+        credential_reader=lambda: _FakeScope(),
+        transport_factory=lambda: _FakeTransport(()),
+    )
+    outcome = operator._run_one_shot(
+        operator.ExpectedSource(EXPECTED_HEAD, EXPECTED_TREE),
+        adapters,
+        output_root=tmp_path,
+        _test_output_root_validator=_disposable_root_validator(tmp_path),
+    )
+
+    assert outcome.failure_code == "PROVIDER_REQUEST_FAILED"
+    assert outcome.attempt_directory is not None
+    assert outcome.attempt_directory.parent == tmp_path
+
+
+def test_internal_runner_defaults_to_strict_non_f_output_validation(tmp_path):
+    outcome = operator._run_one_shot(
+        operator.ExpectedSource(EXPECTED_HEAD, EXPECTED_TREE),
+        _adapters(),
+        output_root=type(tmp_path)("D:/outside-arch150-data"),
+    )
+
+    assert outcome.failure_code == "OUTPUT_ROOT_MUST_BE_ON_F"
+    assert outcome.credential_read_attempt_count == 0
+    assert outcome.provider_request_attempt_count == 0
+
+
+def test_public_acquisition_entry_cannot_accept_fake_root_validator(tmp_path):
+    with pytest.raises(TypeError, match="_test_output_root_validator"):
+        operator.acquire_arch150_intraday_data(
+            interlock=operator.ACQUISITION_INTERLOCK,
+            expected_head=EXPECTED_HEAD,
+            expected_tree=EXPECTED_TREE,
+            adapters=_adapters(),
+            _test_output_root_validator=_disposable_root_validator(tmp_path),
+        )
 
 
 def test_output_root_cannot_be_inside_repository_or_worktree(tmp_path):

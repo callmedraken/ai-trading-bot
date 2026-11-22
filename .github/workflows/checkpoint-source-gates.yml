@@ -36,6 +36,7 @@ env:
               arch148-intraday-momentum-research `
               arch149-monthly-defensive-rotation-research `
               arch150-intraday-ai-research-foundation `
+              arch150-intraday-data-custody-source `
               arch-ai-strategy-discovery-foundation `
               arch-ai-strategy-discovery-g1-engine `
               arch146-a-historical-research-dataset-enforcement `
@@ -153,12 +154,17 @@ jobs:
         run: |
           $Code = @'
           import os
+          import subprocess
           from scripts import checkpoint_runner as runner
 
+          changed_paths = subprocess.check_output(
+              ("git", "diff", "--name-only", "HEAD^", "HEAD", "--"), text=True
+          ).splitlines()
           checkpoint = runner.resolve_ci_checkpoint(
               runner._checkpoint_specs(),
               os.environ.get("GITHUB_REF_NAME", ""),
               os.environ.get("GITHUB_EVENT_NAME", ""),
+              changed_paths=changed_paths,
           )
           route = "ACTIVE" if checkpoint is not None else "FULL"
           certification_profile = runner.resolve_ci_certification_profile(checkpoint)

@@ -384,6 +384,49 @@ def test_arch150_intraday_ai_checkpoint_is_source_only_and_mapped():
     assert runner._arch150_intraday_ai_authority_check(repo) == ()
 
 
+def test_arch150_d1_data_custody_route_is_source_only_and_diff_selected():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME]
+
+    assert runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE == (
+        "arch150-intraday-data-custody-source"
+    )
+    assert spec.remote_branch == runner.ARCH150_INTRADAY_AI_BRANCH
+    assert spec.tests == runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_TESTS
+    assert spec.ruff_paths == runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_RUFF
+    assert (
+        spec.authority_check is runner._arch150_d1_intraday_data_custody_authority_check
+    )
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert (
+        runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(
+            runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME
+        )
+        == 1
+    )
+    assert (
+        runner.CI_CERTIFICATION_PROFILES[
+            runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME
+        ]
+        == "full"
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH150_INTRADAY_AI_BRANCH,
+            "push",
+            changed_paths=runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS,
+        )
+        == runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME
+    )
+    assert (
+        runner.resolve_ci_checkpoint(specs, runner.ARCH150_INTRADAY_AI_BRANCH, "push")
+        == runner.ARCH150_INTRADAY_AI_NAME
+    )
+    assert runner._arch150_d1_intraday_data_custody_authority_check(repo) == ()
+
+
 def test_arch150_intraday_ai_help_is_effect_free(monkeypatch, capsys):
     def forbidden(*args, **kwargs):
         pytest.fail("source-only help dispatched an external effect")

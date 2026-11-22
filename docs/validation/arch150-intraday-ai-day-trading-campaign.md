@@ -31,6 +31,47 @@ Worktree:
 
 Source-only/fake-only.
 
+## D1 data-custody source checkpoint
+
+Route:
+
+`arch150-intraday-data-custody-source`
+
+The source route is separate from the accepted strategy-foundation route and
+shares its feature branch. CI selects the route from the exact pushed-commit
+path set; mixed foundation and D1 changes fall back to broad FULL routing.
+
+The D1 contract fixes one-symbol requests for SPY then QQQ, `1Min`, the
+`[2016-01-01, 2024-01-01)` request window, `adjustment=all`, SIP, USD, ascending
+sort, `asof=-`, limit 10,000, exhaustive `next_page_token` pagination, 4,096
+pages per symbol / 8,192 requests total, and at least 0.5 seconds between
+provider request starts after the first. Each response body is stored
+byte-for-byte and read back before page parsing. Raw off-session rows remain in
+custody; normalized rows require exact published XNYS one-minute slots, with
+early closes respected and no fill, interpolation, or duplicate removal.
+
+Versioned schemas:
+
+- `arch150-intraday-custody-dataset/v1`
+- `arch150-intraday-data-partition/v1`
+- `arch150-intraday-data-custody-evidence/v1`
+- `arch150-intraday-raw-page/v1`
+- `arch150-intraday-provider-request/v1`
+
+The future interlocked operator writes under
+`F:\AI\research-data\arch150-intraday-data-custody`, outside repositories and
+worktrees. Its successful state means only that the data custody package is
+ready for independent review. It does not open validation for strategy use,
+freeze G1, authorize holdout/extension access, or authorize trading. A failed
+attempt is immutable and has no automatic retry.
+
+For this source checkpoint, the operator is tested only with injected fake
+source facts, credentials, clock, transport, and storage. No credential read,
+provider/network request, market-data acquisition, strategy replay, P&L, holdout,
+extension, broker, order, or production effect is performed. The D1 mapped FULL
+run and exact-source review remain the acceptance gates before any separately
+reviewed real acquisition.
+
 ## Initial implementation scope
 
 Implement:

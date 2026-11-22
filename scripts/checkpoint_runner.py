@@ -18,7 +18,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -463,6 +463,40 @@ ARCH150_INTRADAY_AI_RUFF: Final = (
     "tests/runtime/checkpoint_runner/test_core.py",
     "tests/experiments/test_arch150_intraday_ai.py",
 )
+ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE: Final = "arch150-intraday-data-custody-source"
+ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME: Final = (
+    ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE
+)
+ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_BRANCH: Final = ARCH150_INTRADAY_AI_BRANCH
+ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/experiments/test_arch150_intraday_data.py",
+    "tests/experiments/test_arch150_data_operator.py",
+)
+ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "scripts/checkpoint_runner.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "src/trading_bot/experiments/arch150_intraday_data.py",
+    "src/trading_bot/experiments/arch150_data_operator.py",
+    "tests/experiments/test_arch150_intraday_data.py",
+    "tests/experiments/test_arch150_data_operator.py",
+)
+ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS: Final = (
+    "src/trading_bot/experiments/arch150_intraday_data.py",
+    "src/trading_bot/experiments/arch150_data_operator.py",
+    "tests/experiments/test_arch150_intraday_data.py",
+    "tests/experiments/test_arch150_data_operator.py",
+)
+ARCH150_INTRADAY_AI_PATHS: Final = (
+    "src/trading_bot/experiments/arch150_intraday_ai.py",
+    "tests/experiments/test_arch150_intraday_ai.py",
+)
 AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: Final = "arch-ai-strategy-discovery-g1-engine"
 AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH: Final = (
     "feature/research-ai-strategy-discovery-g1-engine-current"
@@ -787,6 +821,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH148_INTRADAY_MOMENTUM_NAME,
     ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
     ARCH150_INTRADAY_AI_NAME,
+    ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
@@ -804,6 +839,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH148_INTRADAY_MOMENTUM_NAME: "full",
     ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME: "full",
     ARCH150_INTRADAY_AI_NAME: "full",
+    ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME: "full",
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
     ARCH147_P5A_NAME: "full",
@@ -1009,14 +1045,35 @@ def resolve_ci_checkpoint(
     specs: Mapping[str, CheckpointSpec],
     branch: str,
     event_name: str,
+    *,
+    changed_paths: Iterable[str] | None = None,
 ) -> str | None:
-    """Use exactly one registered active branch on push; otherwise fail broad."""
+    """Resolve a registered push route, selecting shared Arch150 branch by diff."""
     if event_name != "push" or type(branch) is not str or not branch:
         return None
     if branch == "feature/test-suite-current-authority-historical-decoupling-current":
         name = ARCH134_READONLY_DIAGNOSTIC_NAME
         return name if name in specs and specs[name].execute is None else None
     matches = [spec.name for spec in specs.values() if spec.remote_branch == branch]
+    if branch == ARCH150_INTRADAY_AI_BRANCH and set(matches) == {
+        ARCH150_INTRADAY_AI_NAME,
+        ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
+    }:
+        if changed_paths is None:
+            # Preserve the established three-argument foundation contract for
+            # callers that only need the shared branch's FULL profile.
+            return ARCH150_INTRADAY_AI_NAME
+        changed = set(changed_paths)
+        foundation_changed = bool(changed & set(ARCH150_INTRADAY_AI_PATHS))
+        d1_changed = bool(changed & set(ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS))
+        if foundation_changed == d1_changed:
+            return None
+        selected = (
+            ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME
+            if d1_changed
+            else ARCH150_INTRADAY_AI_NAME
+        )
+        return selected if selected in specs else None
     if len(matches) != 1 or matches[0] not in (
         *CURRENT_ACTIVE_CI_CHECKPOINTS,
         ACTIVE_CI_CHECKPOINTS[0],
@@ -26853,7 +26910,18 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         _arch150_intraday_ai_authority_check,
         preflight=None,
         execute=None,
+        remote_branch=ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_BRANCH,
+    )
+    values[ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME] = CheckpointSpec(
+        ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
+        "Source-only Architecture 150 SPY/QQQ 1-minute data custody boundary",
+        ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_TESTS,
+        ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_RUFF,
+        _arch150_d1_intraday_data_custody_authority_check,
+        preflight=None,
+        execute=None,
         remote_branch=ARCH150_INTRADAY_AI_BRANCH,
+        remote_head_env=None,
     )
     values[AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME] = CheckpointSpec(
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
@@ -27513,6 +27581,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH148_INTRADAY_MOMENTUM_NAME,
         ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
         ARCH150_INTRADAY_AI_NAME,
+        ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -27555,6 +27624,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH148_INTRADAY_MOMENTUM_NAME,
         ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
         ARCH150_INTRADAY_AI_NAME,
+        ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -28706,6 +28776,84 @@ def _arch150_intraday_ai_authority_check(repo_root: Path) -> tuple[str, ...]:
         workflow
     ):
         failures.append("Architecture 150 active CI projection drift")
+    return tuple(failures)
+
+
+def _arch150_d1_intraday_data_custody_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Register the D1 source-only custody route on Arch150's shared branch."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_TESTS
+        or spec.ruff_paths != ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_RUFF
+        or spec.authority_check is not _arch150_d1_intraday_data_custody_authority_check
+        or spec.remote_branch != ARCH150_INTRADAY_AI_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME)
+        != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(
+            ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME
+        )
+        != 1
+        or ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH150_INTRADAY_AI_BRANCH,
+            "push",
+            changed_paths=ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS,
+        )
+        != ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH150_INTRADAY_AI_BRANCH,
+            "push",
+            changed_paths=ARCH150_INTRADAY_AI_PATHS,
+        )
+        != ARCH150_INTRADAY_AI_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH150_INTRADAY_AI_BRANCH,
+            "push",
+            changed_paths=(
+                *ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS,
+                *ARCH150_INTRADAY_AI_PATHS,
+            ),
+        )
+        is not None
+    ):
+        failures.append("Architecture 150 D1 source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("Architecture 150 D1 tests are not FULL-owned")
+    required_paths = (
+        *ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS,
+        "scripts/checkpoint_runner.py",
+        "tests/runtime/checkpoint_runner/test_core.py",
+        "tests/runtime/checkpoint_runner/test_source_authority.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+        "docs/validation/arch150-intraday-ai-day-trading-campaign.md",
+    )
+    for relative in required_paths:
+        if not (repo_root / relative).is_file():
+            failures.append("Architecture 150 D1 route is missing " + relative)
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    row = f"              {ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME} {chr(96)}\n"
+    if (
+        workflow.count(row) != 1
+        or 'git", "diff", "--name-only", "HEAD^", "HEAD"' not in workflow
+        or "changed_paths=changed_paths" not in workflow
+        or not _arch147_current_batch_workflow_is_reviewed(workflow)
+    ):
+        failures.append("Architecture 150 D1 active CI projection drift")
     return tuple(failures)
 
 

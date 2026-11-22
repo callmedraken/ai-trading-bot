@@ -475,6 +475,7 @@ ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_TESTS: Final = (
     "tests/runtime/checkpoint_runner/test_ci.py",
     "tests/experiments/test_arch150_intraday_data.py",
     "tests/experiments/test_arch150_data_operator.py",
+    "tests/experiments/test_arch150_d1_requalify.py",
 )
 ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_RUFF: Final = (
     *COMMON_RUFF_PATHS,
@@ -486,12 +487,16 @@ ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_RUFF: Final = (
     "src/trading_bot/experiments/arch150_data_operator.py",
     "tests/experiments/test_arch150_intraday_data.py",
     "tests/experiments/test_arch150_data_operator.py",
+    "src/trading_bot/experiments/arch150_d1_requalify.py",
+    "tests/experiments/test_arch150_d1_requalify.py",
 )
 ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS: Final = (
     "src/trading_bot/experiments/arch150_intraday_data.py",
     "src/trading_bot/experiments/arch150_data_operator.py",
     "tests/experiments/test_arch150_intraday_data.py",
     "tests/experiments/test_arch150_data_operator.py",
+    "src/trading_bot/experiments/arch150_d1_requalify.py",
+    "tests/experiments/test_arch150_d1_requalify.py",
 )
 ARCH150_INTRADAY_AI_PATHS: Final = (
     "src/trading_bot/experiments/arch150_intraday_ai.py",

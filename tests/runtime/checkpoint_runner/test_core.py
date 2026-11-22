@@ -395,6 +395,13 @@ def test_arch150_d1_data_custody_route_is_source_only_and_diff_selected():
     assert spec.remote_branch == runner.ARCH150_INTRADAY_AI_BRANCH
     assert spec.tests == runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_TESTS
     assert spec.ruff_paths == runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_RUFF
+    assert "tests/experiments/test_arch150_d1_requalify.py" in spec.tests
+    assert "src/trading_bot/experiments/arch150_d1_requalify.py" in spec.ruff_paths
+    assert "tests/experiments/test_arch150_d1_requalify.py" in spec.ruff_paths
+    assert {
+        "src/trading_bot/experiments/arch150_d1_requalify.py",
+        "tests/experiments/test_arch150_d1_requalify.py",
+    } <= set(runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS)
     assert (
         spec.authority_check is runner._arch150_d1_intraday_data_custody_authority_check
     )
@@ -417,6 +424,15 @@ def test_arch150_d1_data_custody_route_is_source_only_and_diff_selected():
             runner.ARCH150_INTRADAY_AI_BRANCH,
             "push",
             changed_paths=runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_PATHS,
+        )
+        == runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH150_INTRADAY_AI_BRANCH,
+            "push",
+            changed_paths=("src/trading_bot/experiments/arch150_d1_requalify.py",),
         )
         == runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME
     )

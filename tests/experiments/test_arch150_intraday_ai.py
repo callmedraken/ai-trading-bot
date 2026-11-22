@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import ast
-from datetime import date, datetime, timedelta
-from decimal import Decimal
+from dataclasses import replace
+from datetime import date, datetime, time, timedelta
+from decimal import Context, Decimal, localcontext
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -23,22 +25,32 @@ from trading_bot.experiments.arch150_intraday_ai import (
     RECENT_EXTENSION_START,
     STRESS_COST,
     VALIDATION_FREQUENCY_POLICY,
+    BarResolution,
+    CandidateFreeze,
     CostCase,
+    DiscoveryPopulationFreeze,
     FrequencyDiagnostics,
+    IncompleteFiveMinuteAggregation,
     InformationFirewallError,
     IntradayBar,
     NoiseAreaVwapMomentumProgram,
     OpeningRangeBreakoutReversalProgram,
     OpeningRangeDirection,
+    ResearchDataset,
     ResearchStage,
     StrategyFamily,
+    TradeDirection,
+    TrialBudgetExceeded,
     TrialDisposition,
     TrialLedger,
     UnsupportedProgramError,
+    VwapReferenceSide,
+    VwapStrategyMode,
     VwapTrendReversalProgram,
     aggregate_five_minute_bars,
-    compute_frequency_diagnostics,
     foundation_help,
+    freeze_candidate_population,
+    freeze_discovery_population,
     open_discovery_dataset,
     open_holdout_dataset,
     open_recent_extension_dataset,
@@ -51,39 +63,104 @@ from trading_bot.experiments.arch150_intraday_ai import (
     replay_program,
     selection_bias_input,
     validate_1_minute_bars,
-    validate_universe_minute_bars,
 )
+
+_NY = ZoneInfo("America/New_York")
 
 
 def _bar(
     symbol: str,
     day: date,
-    minute: int,
+    offset_minutes: int,
     close: str = "100",
     *,
     volume: int = 100,
+    high: str | None = None,
+    low: str | None = None,
+    seconds: int = 0,
+    resolution: BarResolution = BarResolution.ONE_MINUTE,
 ) -> IntradayBar:
-    local = datetime(day.year, day.month, day.day, 9, 30) + timedelta(minutes=minute)
-    from zoneinfo import ZoneInfo
-
-    timestamp = local.replace(tzinfo=ZoneInfo("America/New_York"))
+    local = datetime.combine(day, time(9, 30), _NY) + timedelta(
+        minutes=offset_minutes, seconds=seconds
+    )
     price = Decimal(close)
-    return IntradayBar(symbol, timestamp, price, price, price, price, volume)
+    return IntradayBar(
+        symbol,
+        local,
+        price,
+        Decimal(high) if high is not None else price,
+        Decimal(low) if low is not None else price,
+        price,
+        volume,
+        resolution,
+    )
 
 
-def _session_bars(day: date, symbol: str = "SPY") -> list[IntradayBar]:
-    closes = ["100", "99", "101", "101.5", "102", "103", "104"]
-    return [_bar(symbol, day, index, close) for index, close in enumerate(closes)]
+def _prices(day: date, values: list[str], symbol: str = "SPY") -> list[IntradayBar]:
+    return [_bar(symbol, day, index, value) for index, value in enumerate(values)]
+
+
+def _flat(day: date, count: int = 12, price: str = "100") -> list[IntradayBar]:
+    return _prices(day, [price] * count)
 
 
 def _universe_bars(day: date) -> list[IntradayBar]:
     return [_bar(symbol, day, 0) for symbol in INITIAL_UNIVERSE]
 
 
-def test_closed_typed_program_families_have_stable_semantic_identities() -> None:
+def _frozen_candidates(
+    *, start_noise_band_bps: int = 1
+) -> tuple[TrialLedger, DiscoveryPopulationFreeze, CandidateFreeze]:
+    ledger = TrialLedger()
+    candidates = []
+    for family in StrategyFamily:
+        for ordinal in range(G1_FAMILY_TRIAL_LIMIT):
+            if family is StrategyFamily.NOISE_AREA_VWAP_MOMENTUM:
+                program = NoiseAreaVwapMomentumProgram(
+                    lookback_sessions=1,
+                    noise_band_bps=Decimal(ordinal + start_noise_band_bps),
+                    confirmation_bars=1,
+                )
+            elif family is StrategyFamily.VWAP_TREND_REVERSAL:
+                program = VwapTrendReversalProgram(
+                    displacement_bps=Decimal(ordinal + 1),
+                    confirmation_bars=1,
+                    max_hold_minutes=30,
+                    cooldown_bars=ordinal,
+                )
+            else:
+                program = OpeningRangeBreakoutReversalProgram(
+                    opening_range_minutes=(5, 15, 30)[ordinal % 3],
+                    direction=(
+                        OpeningRangeDirection.CONTINUATION
+                        if ordinal % 2 == 0
+                        else OpeningRangeDirection.REVERSAL
+                    ),
+                    entry_delay_bars=ordinal,
+                    max_hold_minutes=30,
+                )
+            disposition = (
+                TrialDisposition.SHORTLISTED
+                if ordinal == 0
+                else TrialDisposition.ZERO_TRADE
+            )
+            ledger = ledger.consume(program, disposition)
+            if ordinal == 0:
+                candidates.append(program)
+    discovery = open_discovery_dataset(_universe_bars(date(2020, 1, 2)))
+    population = freeze_discovery_population(discovery, ledger)
+    frozen_candidates = freeze_candidate_population(population, ledger, candidates)
+    return ledger, population, frozen_candidates
+
+
+def test_closed_program_serialization_and_semantic_parameters() -> None:
     programs = (
         NoiseAreaVwapMomentumProgram(noise_band_bps=Decimal("10.0")),
-        VwapTrendReversalProgram(displacement_bps=Decimal("25.00")),
+        VwapTrendReversalProgram(
+            displacement_bps=Decimal("25.00"),
+            mode=VwapStrategyMode.BOUNDED_REVERSAL,
+            reference_side=VwapReferenceSide.BELOW,
+        ),
         OpeningRangeBreakoutReversalProgram(direction=OpeningRangeDirection.REVERSAL),
     )
     assert tuple(program.family for program in programs) == tuple(StrategyFamily)
@@ -91,10 +168,29 @@ def test_closed_typed_program_families_have_stable_semantic_identities() -> None
         NoiseAreaVwapMomentumProgram(noise_band_bps=Decimal("10"))
     )
     assert program_id(programs[1]) == program_id(
-        VwapTrendReversalProgram(displacement_bps=Decimal("25"))
+        VwapTrendReversalProgram(
+            displacement_bps=Decimal("25"),
+            mode=VwapStrategyMode.BOUNDED_REVERSAL,
+            reference_side=VwapReferenceSide.BELOW,
+        )
     )
     assert all(
         program_from_bytes(program_to_bytes(program)) == program for program in programs
+    )
+    assert (
+        len(
+            {
+                program_fingerprint(
+                    VwapTrendReversalProgram(
+                        mode=mode,
+                        reference_side=side,
+                    )
+                )
+                for mode in VwapStrategyMode
+                for side in VwapReferenceSide
+            }
+        )
+        == 4
     )
 
 
@@ -107,139 +203,445 @@ def test_arbitrary_and_arch148_opening_drive_programs_are_not_representable() ->
             b'"family":"CUSTOM","source":"open("}'
         )
     with pytest.raises(ValueError):
-        OpeningRangeBreakoutReversalProgram(max_hold_bars=61)
+        OpeningRangeBreakoutReversalProgram(max_hold_minutes=61)
     with pytest.raises(UnsupportedProgramError):
         program_from_bytes(
             b'{"schema":"arch150-typed-intraday-program/v1",'
             b'"family":"OPENING_RANGE_BREAKOUT_REVERSAL",'
             b'"opening_range_minutes":30,"direction":"CONTINUATION",'
-            b'"entry_delay_bars":1,"max_hold_bars":30,'
+            b'"entry_delay_bars":1,"max_hold_minutes":30,'
             b'"exit_window":"LAST_HALF_HOUR"}'
         )
 
 
-def test_universe_order_and_minute_validation_reject_malformed_input() -> None:
-    assert INITIAL_UNIVERSE == ("SPY", "QQQ")
-    validated = validate_universe_minute_bars(_universe_bars(date(2020, 1, 2)))
-    assert tuple(validated.by_symbol) == INITIAL_UNIVERSE
-    bars = _session_bars(date(2020, 1, 2))
+def test_one_minute_validation_uses_published_xnys_boundaries() -> None:
+    normal = date(2022, 1, 3)
+    holiday = date(2022, 1, 17)
+    weekend = date(2022, 1, 8)
+    early_close = date(2023, 11, 24)
+    assert validate_1_minute_bars([_bar("SPY", normal, 0)]).bars
+    assert validate_1_minute_bars([_bar("SPY", early_close, 209)]).bars
+    for invalid in (
+        _bar("SPY", holiday, 0),
+        _bar("SPY", weekend, 0),
+        _bar("SPY", normal, -1),
+        _bar("SPY", normal, 390),
+        _bar("SPY", early_close, 210),
+        _bar("SPY", normal, 0, seconds=30),
+    ):
+        with pytest.raises(ValueError):
+            validate_1_minute_bars([invalid])
     with pytest.raises(ValueError, match="strictly chronological"):
-        validate_1_minute_bars([bars[0], bars[2], bars[1]])
-    with pytest.raises(ValueError, match="strictly chronological"):
-        validate_1_minute_bars([bars[0], bars[0]])
-    with pytest.raises(ValueError, match="regular XNYS"):
-        validate_1_minute_bars([_bar("SPY", date(2020, 1, 2), -1)])
+        validate_1_minute_bars(
+            [_bar("SPY", normal, 0), _bar("SPY", normal, 2), _bar("SPY", normal, 1)]
+        )
+    with pytest.raises(ValueError, match="resolution"):
+        validate_1_minute_bars(
+            [_bar("SPY", normal, 0, resolution=BarResolution.FIVE_MINUTE)]
+        )
 
 
-def test_five_minute_aggregation_is_deterministic_and_session_bounded() -> None:
-    bars = [
-        _bar("SPY", date(2020, 1, 2), index, str(100 + index)) for index in range(10)
+def test_aggregation_uses_elapsed_session_minutes_across_ten_oclock() -> None:
+    day = date(2022, 1, 3)
+    source = [_bar("SPY", day, offset, str(100 + offset)) for offset in range(25, 40)]
+    aggregated = aggregate_five_minute_bars(validate_1_minute_bars(source))
+    assert len(aggregated) == 3
+    assert [bar.local_timestamp.time() for bar in aggregated] == [
+        time(9, 55),
+        time(10, 0),
+        time(10, 5),
     ]
-    aggregated = aggregate_five_minute_bars(validate_1_minute_bars(bars))
-    assert len(aggregated) == 2
-    assert aggregated[0].open == Decimal("100")
-    assert aggregated[0].close == Decimal("104")
+    assert aggregated[0].open == Decimal("125")
+    assert aggregated[0].close == Decimal("129")
     assert aggregated[0].volume == 500
-    assert aggregated == aggregate_five_minute_bars(validate_1_minute_bars(bars))
+    assert all(bar.resolution is BarResolution.FIVE_MINUTE for bar in aggregated)
+    assert aggregate_five_minute_bars(validate_1_minute_bars(source)) == aggregated
+    with pytest.raises(ValueError, match="resolution"):
+        validate_1_minute_bars(aggregated)
 
 
-def test_information_firewall_allows_only_discovery_and_validation_windows() -> None:
+def test_aggregation_fails_closed_for_partial_or_nonconsecutive_minutes() -> None:
+    day = date(2022, 1, 3)
+    missing = [_bar("SPY", day, offset) for offset in range(25, 40) if offset != 27]
+    partial = [_bar("SPY", day, offset) for offset in (25, 26, 27, 28)]
+    for source in (missing, partial):
+        with pytest.raises(IncompleteFiveMinuteAggregation):
+            aggregate_five_minute_bars(validate_1_minute_bars(source))
+
+
+def test_aggregation_stays_inside_an_early_close_session() -> None:
+    early_close = date(2023, 11, 24)
+    source = [_bar("SPY", early_close, offset) for offset in range(210)]
+    aggregated = aggregate_five_minute_bars(validate_1_minute_bars(source))
+    assert len(aggregated) == 42
+    assert aggregated.sessions == (early_close,)
+    assert aggregated[0].local_timestamp.time() == time(9, 30)
+    assert aggregated[-1].local_timestamp.time() == time(12, 55)
+    assert aggregated[-1].timestamp + timedelta(minutes=5) == datetime.combine(
+        early_close, time(13, 0), _NY
+    ).astimezone(aggregated[-1].timestamp.tzinfo)
+
+
+def test_validation_requires_an_immutable_candidate_freeze_after_full_population() -> (
+    None
+):
+    bars = _universe_bars(date(2022, 1, 3))
+    with pytest.raises(InformationFirewallError, match="candidate-freeze"):
+        open_validation_dataset(bars)
+    ledger, population, candidates = _frozen_candidates()
+    assert ledger.consumed_trial_count == 24
+    assert tuple(ledger.family_counts.values()) == (8, 8, 8)
+    assert candidates.discovery_dataset_id == population.discovery_dataset_id
+    assert candidates.ledger_id == ledger.ledger_id
+    with pytest.raises(InformationFirewallError, match="append-only consumption"):
+        TrialLedger(ledger.records)
+    with pytest.raises(AttributeError, match="immutable"):
+        ledger._records = ()
+    validation = open_validation_dataset(bars, candidates)
+    assert validation.stage is ResearchStage.VALIDATION
+    assert validation.candidate_freeze == candidates
+    assert validation.candidate_program_ids == tuple(
+        program_id(program)
+        for program in (
+            NoiseAreaVwapMomentumProgram(
+                lookback_sessions=1, noise_band_bps=Decimal(1), confirmation_bars=1
+            ),
+            VwapTrendReversalProgram(
+                displacement_bps=Decimal(1),
+                confirmation_bars=1,
+                max_hold_minutes=30,
+                cooldown_bars=0,
+            ),
+            OpeningRangeBreakoutReversalProgram(
+                opening_range_minutes=5,
+                direction=OpeningRangeDirection.CONTINUATION,
+                entry_delay_bars=0,
+                max_hold_minutes=30,
+            ),
+        )
+    )
+    with pytest.raises(InformationFirewallError):
+        CandidateFreeze(
+            candidates.freeze_id,
+            population.freeze_id,
+            population.discovery_dataset_id,
+            ledger.ledger_id,
+            candidates.candidate_program_ids,
+            candidates.candidate_fingerprints,
+        )
+
+
+def test_freeze_artifact_cannot_be_rebound_to_another_trial_population() -> None:
+    ledger, population, _ = _frozen_candidates()
+    other_ledger, other_population, _ = _frozen_candidates(start_noise_band_bps=30)
+    other_program = NoiseAreaVwapMomentumProgram(
+        lookback_sessions=1,
+        noise_band_bps=Decimal("30"),
+        confirmation_bars=1,
+    )
+    assert population.ledger_id == ledger.ledger_id
+    assert other_population.freeze_id != population.freeze_id
+    with pytest.raises(InformationFirewallError, match="supplied trial ledger"):
+        freeze_candidate_population(population, other_ledger, (other_program,))
+
+
+def test_public_dataset_construction_and_later_stages_cannot_bypass_firewall() -> None:
     discovery = open_discovery_dataset(_universe_bars(date(2020, 1, 2)))
     assert discovery.stage is ResearchStage.DISCOVERY
     assert (discovery.start, discovery.end_exclusive) == (
         DISCOVERY_START,
         DISCOVERY_END,
     )
-    validation = open_validation_dataset(_universe_bars(date(2022, 1, 3)))
-    assert validation.stage is ResearchStage.VALIDATION
-    assert validation.start == date(2021, 1, 1)
+    with pytest.raises(TypeError):
+        discovery.bars.by_symbol["SPY"] = discovery.bars.by_symbol["QQQ"]
+    with pytest.raises(InformationFirewallError, match="stage authority"):
+        ResearchDataset(
+            ResearchStage.VALIDATION,
+            discovery.bars,
+            date(2021, 1, 1),
+            date(2024, 1, 1),
+        )
     with pytest.raises(InformationFirewallError):
         open_discovery_dataset(_universe_bars(date(2021, 1, 4)))
     with pytest.raises(InformationFirewallError):
         open_holdout_dataset(_universe_bars(HOLDOUT_START))
     with pytest.raises(InformationFirewallError):
         open_recent_extension_dataset(_universe_bars(RECENT_EXTENSION_START))
+    _, _, freeze = _frozen_candidates()
+    for opener in (
+        open_discovery_dataset,
+        lambda bars: open_validation_dataset(bars, freeze),
+    ):
+        with pytest.raises(InformationFirewallError):
+            opener(_universe_bars(date(2026, 11, 2)))
     with pytest.raises(InformationFirewallError):
-        open_validation_dataset(_universe_bars(date(2026, 11, 2)))
+        ResearchDataset(
+            ResearchStage.HOLDOUT,
+            discovery.bars,
+            HOLDOUT_START,
+            date(2026, 1, 1),
+        )
 
 
-def test_cost_cases_and_session_flat_replay_are_deterministic() -> None:
-    program = NoiseAreaVwapMomentumProgram(max_hold_bars=60)
-    bars = validate_1_minute_bars(_session_bars(date(2022, 1, 3)))
-    zero = replay_program(program, bars, cost_case=CostCase.ZERO)
-    base = replay_program(program, bars, cost_case=BASE_COST.case)
-    stress = replay_program(program, bars, cost_case=STRESS_COST.case)
+def test_family_a_uses_prior_session_noise_vwap_confirmation_and_elapsed_hold() -> None:
+    day_one = date(2022, 1, 3)
+    day_two = date(2022, 1, 4)
+    current = date(2022, 1, 5)
+    noisy_prior = _prices(day_one, ["100", "120", "100", "100"] + ["100"] * 8)
+    quiet_prior = _flat(day_two)
+    current_bars = _prices(current, ["100", "100", "100", "102.5"] + ["102.5"] * 8)
+    input_bars = noisy_prior + quiet_prior + current_bars
+    lookback_one = NoiseAreaVwapMomentumProgram(
+        lookback_sessions=1,
+        noise_band_bps=Decimal("5"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+    )
+    lookback_two = replace(lookback_one, lookback_sessions=2)
+    low_floor = replay_program(lookback_one, input_bars)
+    wide_floor = replay_program(
+        replace(lookback_one, noise_band_bps=Decimal("250")), input_bars
+    )
+    two_confirmations = replay_program(
+        replace(lookback_one, confirmation_bars=2), input_bars
+    )
+    current_trades = tuple(
+        trade for trade in low_floor.trades if trade.session == current
+    )
+    assert current_trades and current_trades[0].direction is TradeDirection.LONG
+    assert not any(
+        trade.session == current
+        for trade in replay_program(lookback_two, input_bars).trades
+    )
+    assert not any(trade.session == current for trade in wide_floor.trades)
+    confirmed = tuple(
+        trade for trade in two_confirmations.trades if trade.session == current
+    )
+    assert confirmed and confirmed[0].entry.timestamp - current_trades[
+        0
+    ].entry.timestamp == timedelta(minutes=1)
+    longer_hold = replay_program(replace(lookback_one, max_hold_minutes=3), input_bars)
+    longer = next(trade for trade in longer_hold.trades if trade.session == current)
+    assert longer.exit.timestamp - longer.entry.timestamp == timedelta(minutes=3)
+
+
+def test_family_a_noise_is_lagged_and_supports_downside_momentum() -> None:
+    first = date(2022, 1, 3)
+    second = date(2022, 1, 4)
+    signal_day = date(2022, 1, 5)
+    future = date(2022, 1, 6)
+    previous = _flat(first) + _flat(second)
+    down = _prices(signal_day, ["100", "100", "100", "97.5"] + ["97.5"] * 8)
+    program = NoiseAreaVwapMomentumProgram(
+        lookback_sessions=2,
+        noise_band_bps=Decimal("5"),
+        confirmation_bars=1,
+        max_hold_minutes=2,
+    )
+    before = replay_program(program, previous + down)
+    with_future = replay_program(
+        program,
+        previous + down + _prices(future, ["100", "100", "100", "200"] + ["200"] * 8),
+    )
+    first_day_trades = tuple(
+        trade for trade in before.trades if trade.session == signal_day
+    )
+    future_day_trades = tuple(
+        trade for trade in with_future.trades if trade.session == signal_day
+    )
+    assert first_day_trades and first_day_trades[0].direction is TradeDirection.SHORT
+    assert first_day_trades == future_day_trades
+
+
+def test_family_b_modes_sides_threshold_confirmation_and_hold_have_behavior() -> None:
+    up_day = date(2022, 1, 3)
+    down_day = date(2022, 1, 4)
+    up = _prices(
+        up_day,
+        [str(Decimal("100") + Decimal(index) / Decimal("100")) for index in range(20)],
+    )
+    down = _prices(
+        down_day,
+        [str(Decimal("120") - Decimal(index) / Decimal("100")) for index in range(20)],
+    )
+    base = VwapTrendReversalProgram(
+        displacement_bps=Decimal("5"),
+        mode=VwapStrategyMode.CONTINUATION,
+        reference_side=VwapReferenceSide.ABOVE,
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    long_trades = replay_program(base, up).trades
+    assert long_trades and long_trades[0].direction is TradeDirection.LONG
+    assert not replay_program(replace(base, displacement_bps=Decimal("500")), up).trades
+    confirmed = replay_program(replace(base, confirmation_bars=2), up).trades
+    assert confirmed and confirmed[0].entry.timestamp > long_trades[0].entry.timestamp
+    longer = replay_program(replace(base, max_hold_minutes=3), up).trades
+    assert longer[0].exit.timestamp - longer[0].entry.timestamp == timedelta(minutes=3)
+    reversal = replay_program(
+        replace(base, mode=VwapStrategyMode.BOUNDED_REVERSAL), up
+    ).trades
+    assert reversal and reversal[0].direction is TradeDirection.SHORT
+    below_short = replay_program(
+        replace(base, reference_side=VwapReferenceSide.BELOW), down
+    ).trades
+    assert below_short and below_short[0].direction is TradeDirection.SHORT
+    below_reversal = replay_program(
+        replace(
+            base,
+            mode=VwapStrategyMode.BOUNDED_REVERSAL,
+            reference_side=VwapReferenceSide.BELOW,
+        ),
+        down,
+    ).trades
+    assert below_reversal and below_reversal[0].direction is TradeDirection.LONG
+
+
+def test_family_b_cooldown_enforces_sequential_nonoverlapping_reentry() -> None:
+    day = date(2022, 1, 3)
+    bars = _prices(day, [str(100 + index) for index in range(30)])
+    base = VwapTrendReversalProgram(
+        displacement_bps=Decimal("5"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    no_cooldown = replay_program(base, bars).trades
+    cooldown = replay_program(replace(base, cooldown_bars=2), bars).trades
+    assert len(no_cooldown) >= 4
+    assert len(cooldown) < len(no_cooldown)
+    assert cooldown[1].entry.timestamp - cooldown[0].entry.timestamp == (
+        no_cooldown[1].entry.timestamp
+        - no_cooldown[0].entry.timestamp
+        + timedelta(minutes=2)
+    )
+    assert all(
+        left.exit.timestamp <= right.entry.timestamp
+        for left, right in zip(no_cooldown, no_cooldown[1:], strict=False)
+    )
+    assert all(trade.session == day for trade in no_cooldown)
+
+
+def test_family_c_range_delay_direction_and_hold_are_behavioral() -> None:
+    day = date(2022, 1, 3)
+    bars = [_bar("SPY", day, offset, "100") for offset in range(45)]
+    bars[5:] = [_bar("SPY", day, offset, "103") for offset in range(5, 45)]
+    bars[10] = _bar("SPY", day, 10, "100", high="104")
+    bars[15] = _bar("SPY", day, 15, "100")
+    short_range = OpeningRangeBreakoutReversalProgram(
+        opening_range_minutes=5,
+        direction=OpeningRangeDirection.CONTINUATION,
+        entry_delay_bars=0,
+        max_hold_minutes=1,
+    )
+    long_range = replace(short_range, opening_range_minutes=15)
+    short_range_trades = replay_program(short_range, bars).trades
+    assert short_range_trades and short_range_trades[0].direction is TradeDirection.LONG
+    assert not replay_program(long_range, bars).trades
+    delayed = replay_program(replace(short_range, entry_delay_bars=2), bars).trades
+    assert delayed and delayed[0].entry.timestamp - short_range_trades[
+        0
+    ].entry.timestamp == timedelta(minutes=2)
+    reversal = replay_program(
+        replace(short_range, direction=OpeningRangeDirection.REVERSAL), bars
+    ).trades
+    assert reversal and reversal[0].direction is TradeDirection.SHORT
+    longer = replay_program(replace(short_range, max_hold_minutes=3), bars).trades
+    assert longer[0].exit.timestamp - longer[0].entry.timestamp == timedelta(minutes=3)
+
+
+def test_five_minute_view_preserves_opening_range_and_hold_minutes() -> None:
+    day = date(2022, 1, 3)
+    source = [
+        _bar("SPY", day, offset, "100" if offset < 30 else "102")
+        for offset in range(70)
+    ]
+    minute_stream = validate_1_minute_bars(source)
+    five_minute_stream = aggregate_five_minute_bars(minute_stream)
+    program = OpeningRangeBreakoutReversalProgram(
+        opening_range_minutes=30,
+        direction=OpeningRangeDirection.CONTINUATION,
+        entry_delay_bars=0,
+        max_hold_minutes=10,
+    )
+    one_minute_trade = replay_program(program, minute_stream).trades[0]
+    five_minute_trade = replay_program(program, five_minute_stream).trades[0]
+    assert one_minute_trade.entry.timestamp - _bar(
+        "SPY", day, 0
+    ).timestamp >= timedelta(minutes=30)
+    assert five_minute_trade.entry.timestamp - _bar(
+        "SPY", day, 0
+    ).timestamp >= timedelta(minutes=30)
+    assert (
+        one_minute_trade.exit.timestamp - one_minute_trade.entry.timestamp
+        == timedelta(minutes=10)
+    )
+    assert (
+        five_minute_trade.exit.timestamp - five_minute_trade.entry.timestamp
+        == timedelta(minutes=10)
+    )
+
+
+def test_long_and_short_fills_use_adverse_stress_slippage() -> None:
+    up = _prices(date(2022, 1, 3), [str(100 + index) for index in range(8)])
+    down = _prices(date(2022, 1, 4), [str(108 - index) for index in range(8)])
+    long_program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("5"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    short_program = replace(
+        long_program,
+        reference_side=VwapReferenceSide.BELOW,
+    )
+    long_trade = replay_program(long_program, up, cost_case=CostCase.STRESS).trades[0]
+    short_trade = replay_program(short_program, down, cost_case=CostCase.STRESS).trades[
+        0
+    ]
+    assert long_trade.entry.side.value == "BUY" and long_trade.exit.side.value == "SELL"
+    assert (
+        short_trade.entry.side.value == "SELL" and short_trade.exit.side.value == "BUY"
+    )
+    assert long_trade.entry.execution_price > long_trade.entry.reference_price
+    assert long_trade.exit.execution_price < long_trade.exit.reference_price
+    assert short_trade.entry.execution_price < short_trade.entry.reference_price
+    assert short_trade.exit.execution_price > short_trade.exit.reference_price
+    assert (
+        long_trade.entry.slippage_bps == short_trade.entry.slippage_bps == Decimal("5")
+    )
     assert BASE_COST.adverse_slippage_bps == Decimal("2")
     assert STRESS_COST.adverse_slippage_bps == Decimal("5")
-    assert zero.cost_case.value == "ZERO"
-    assert not zero.zero_friction_can_qualify
-    assert all(trade.entry.side.value == "BUY" for trade in stress.trades)
-    assert all(trade.exit.side.value == "SELL" for trade in stress.trades)
-    assert all(
-        trade.entry.timestamp.date() == trade.exit.timestamp.date()
-        for trade in stress.trades
-    )
-    assert stress.maximum_gross_exposure <= Decimal("1")
-    assert stress == replay_program(program, bars, cost_case=STRESS_COST.case)
-    assert stress.net_pnl <= base.net_pnl
 
 
-def test_trial_budget_counts_invalid_duplicate_zero_trade_and_failure_trials() -> None:
-    ledger = TrialLedger()
-    family_programs = (
-        NoiseAreaVwapMomentumProgram(),
-        VwapTrendReversalProgram(),
-        OpeningRangeBreakoutReversalProgram(),
+def test_running_equity_limits_next_session_gross_exposure() -> None:
+    loss_day = date(2022, 1, 3)
+    next_day = date(2022, 1, 4)
+    bars = _prices(loss_day, ["100", "110", "110", "90", "90"])
+    bars += _prices(next_day, ["100", "110", "110", "110"])
+    program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("5"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
     )
-    dispositions = (
-        TrialDisposition.INVALID,
-        TrialDisposition.DUPLICATE,
-        TrialDisposition.ZERO_TRADE,
-        TrialDisposition.FAILED,
-        TrialDisposition.ECONOMICALLY_REJECTED,
-        TrialDisposition.SHORTLISTED,
-    )
-    for family_index, program in enumerate(family_programs):
-        for ordinal in range(G1_FAMILY_TRIAL_LIMIT):
-            ledger = ledger.consume(
-                program,
-                dispositions[(ordinal + family_index) % len(dispositions)],
-                diagnostic_code="SYNTHETIC",
-            )
-    assert ledger.consumed_trial_count == G1_TOTAL_TRIAL_LIMIT
-    assert all(
-        value == G1_FAMILY_TRIAL_LIMIT for value in ledger.family_counts.values()
-    )
-    assert ledger.records[1].disposition is TrialDisposition.DUPLICATE
-    with pytest.raises(ValueError):
-        ledger.consume(family_programs[0], TrialDisposition.FAILED)
+    result = replay_program(program, bars, initial_equity=Decimal("100"))
+    first = next(trade for trade in result.trades if trade.session == loss_day)
+    second = next(trade for trade in result.trades if trade.session == next_day)
+    assert first.net_pnl < 0
+    assert second.equity_before == first.equity_after < first.equity_before
+    assert second.gross_exposure_fraction <= Decimal("1")
+    with localcontext(Context(prec=80)):
+        assert (
+            second.entry.execution_price * second.entry.quantity <= second.equity_before
+        )
+    with localcontext(Context(prec=80)):
+        assert result.final_equity == result.initial_equity + result.net_pnl
+    assert result.maximum_gross_exposure <= Decimal("1")
 
 
-def test_selection_bias_input_retains_the_complete_consumed_ledger() -> None:
-    ledger = TrialLedger().consume(
-        NoiseAreaVwapMomentumProgram(), TrialDisposition.ZERO_TRADE
-    )
-    bias = selection_bias_input(ledger)
-    assert bias.consumed_trial_count == 1
-    assert bias.trial_ids == (ledger.records[0].trial_id,)
-    assert bias.ledger_id == ledger.ledger_id
-    assert b"arch150-selection-bias-input/v1" in bias.to_bytes()
-
-
-def test_frequency_boundaries_and_later_stage_policies_are_separate() -> None:
-    replay = replay_program(
-        NoiseAreaVwapMomentumProgram(),
-        validate_1_minute_bars(_session_bars(date(2022, 1, 3))),
-        cost_case=CostCase.STRESS,
-    )
-    calculated = compute_frequency_diagnostics(
-        replay.trades,
-        validation_years=(2022,),
-        regular_sessions=2,
-        cost_case=CostCase.STRESS,
-    )
-    assert calculated.annual_completed_round_trips[0][1] == len(replay.trades)
-    assert calculated.active_session_fraction == Decimal("0.5")
+def test_frequency_advancement_is_stress_only_for_all_promotion_policies() -> None:
     exact = FrequencyDiagnostics(
         CostCase.STRESS,
         (2021, 2022, 2023),
@@ -252,50 +654,94 @@ def test_frequency_boundaries_and_later_stage_policies_are_separate() -> None:
         Decimal("3"),
         Decimal("3"),
     )
-    assert passes_frequency_gate(exact, VALIDATION_FREQUENCY_POLICY)
-    assert not passes_frequency_gate(
-        FrequencyDiagnostics(
-            exact.cost_case,
-            exact.validation_years,
-            exact.annual_completed_round_trips,
-            exact.regular_sessions,
-            exact.active_sessions,
-            exact.trades_per_active_session_values,
-            Decimal("99.99"),
-            exact.active_session_fraction,
-            exact.trades_per_active_session,
-            exact.median_trades_per_active_session,
-        ),
+    for policy in (
         VALIDATION_FREQUENCY_POLICY,
-    )
-    assert not passes_frequency_gate(
-        FrequencyDiagnostics(
-            CostCase.ZERO,
-            exact.validation_years,
-            exact.annual_completed_round_trips,
-            exact.regular_sessions,
-            exact.active_sessions,
-            exact.trades_per_active_session_values,
-            exact.average_completed_round_trips_per_validation_year,
-            exact.active_session_fraction,
-            exact.trades_per_active_session,
-            exact.median_trades_per_active_session,
-        ),
-        VALIDATION_FREQUENCY_POLICY,
-    )
-    assert HOLDOUT_FREQUENCY_POLICY.minimum_active_session_fraction == Decimal("0.30")
-    assert EXTENSION_FREQUENCY_POLICY.minimum_active_session_fraction == Decimal("0.30")
+        HOLDOUT_FREQUENCY_POLICY,
+        EXTENSION_FREQUENCY_POLICY,
+    ):
+        assert passes_frequency_gate(exact, policy)
+        assert not passes_frequency_gate(
+            replace(exact, cost_case=CostCase.BASE), policy
+        )
+        assert not passes_frequency_gate(
+            replace(exact, cost_case=CostCase.ZERO), policy
+        )
 
 
-def test_effect_free_surface_and_arch149_source_remain_outside_this_module() -> None:
-    assert FOUNDATION_EFFECT_COUNTERS.provider_calls == 0
+def test_trial_budget_counts_semantic_duplicates_and_stays_at_24_and_8() -> None:
+    programs = (
+        NoiseAreaVwapMomentumProgram(),
+        VwapTrendReversalProgram(),
+        OpeningRangeBreakoutReversalProgram(),
+    )
+    ledger = TrialLedger()
+    for program in programs:
+        for ordinal in range(G1_FAMILY_TRIAL_LIMIT):
+            candidate = program
+            if ordinal:
+                if type(program) is NoiseAreaVwapMomentumProgram:
+                    candidate = replace(program, noise_band_bps=Decimal(ordinal + 10))
+                elif type(program) is VwapTrendReversalProgram:
+                    candidate = replace(program, displacement_bps=Decimal(ordinal + 10))
+                else:
+                    candidate = replace(program, entry_delay_bars=ordinal)
+            ledger = ledger.consume(candidate, TrialDisposition.ZERO_TRADE)
+    assert ledger.consumed_trial_count == G1_TOTAL_TRIAL_LIMIT == 24
+    assert tuple(ledger.family_counts.values()) == (8, 8, 8)
+    duplicate_program = NoiseAreaVwapMomentumProgram()
+    duplicate_ledger = TrialLedger().consume(
+        duplicate_program, TrialDisposition.SHORTLISTED
+    )
+    duplicate_ledger = duplicate_ledger.consume(
+        duplicate_program, TrialDisposition.SHORTLISTED
+    )
+    assert duplicate_ledger.records[1].disposition is TrialDisposition.DUPLICATE
+    assert duplicate_ledger.consumed_trial_count == 2
+    for band in range(11, 17):
+        duplicate_ledger = duplicate_ledger.consume(
+            replace(duplicate_program, noise_band_bps=Decimal(band)),
+            TrialDisposition.FAILED,
+        )
+    assert duplicate_ledger.family_counts[StrategyFamily.NOISE_AREA_VWAP_MOMENTUM] == 8
+    with pytest.raises(TrialBudgetExceeded):
+        duplicate_ledger.consume(
+            replace(duplicate_program, noise_band_bps=Decimal("99")),
+            TrialDisposition.FAILED,
+        )
+    with pytest.raises(TrialBudgetExceeded):
+        ledger.consume(
+            NoiseAreaVwapMomentumProgram(lookback_sessions=2), TrialDisposition.FAILED
+        )
+
+
+def test_selection_bias_and_effect_free_arch150_surface_leave_arch149_untouched() -> (
+    None
+):
+    ledger = TrialLedger().consume(
+        NoiseAreaVwapMomentumProgram(), TrialDisposition.ZERO_TRADE
+    )
+    bias = selection_bias_input(ledger)
+    assert bias.consumed_trial_count == 1
+    assert bias.trial_ids == (ledger.records[0].trial_id,)
+    assert bias.ledger_id == ledger.ledger_id
+    assert b"arch150-selection-bias-input/v1" in bias.to_bytes()
     assert foundation_help().startswith("Architecture 150 foundation")
-    source = ast.parse(
+    assert (
+        FOUNDATION_EFFECT_COUNTERS.provider_calls,
+        FOUNDATION_EFFECT_COUNTERS.credential_reads,
+        FOUNDATION_EFFECT_COUNTERS.robinhood_calls,
+        FOUNDATION_EFFECT_COUNTERS.broker_effects,
+        FOUNDATION_EFFECT_COUNTERS.order_effects,
+        FOUNDATION_EFFECT_COUNTERS.production_mutations,
+        FOUNDATION_EFFECT_COUNTERS.final_holdout_opens,
+    ) == (0, 0, 0, 0, 0, 0, 0)
+
+    source_path = (
         Path(__file__)
         .parents[2]
         .joinpath("src/trading_bot/experiments/arch150_intraday_ai.py")
-        .read_text(encoding="utf-8")
     )
+    source = ast.parse(source_path.read_text(encoding="utf-8"))
     imports = {
         node.module or alias.name
         for node in ast.walk(source)
@@ -308,6 +754,6 @@ def test_effect_free_surface_and_arch149_source_remain_outside_this_module() -> 
         for alias in node.names
     }
     assert not any(
-        name.startswith(("alpaca", "robinhood", "requests", "openai"))
+        name.startswith(("alpaca", "robinhood", "requests", "openai", "arch149"))
         for name in imports
     )

@@ -1,6 +1,6 @@
 # Architecture 150 — Intraday AI day-trading research campaign
 
-Status: **DESIGN FROZEN; SOURCE NOT IMPLEMENTED**.
+Status: **DESIGN FROZEN; FOUNDATION + D1 SOURCE IMPLEMENTED/ACCEPTED; FIRST REAL D1 ACQUISITION CONSUMED/BLOCKED ON DENSE MINUTE COMPLETENESS; OFFLINE SPARSE-CUSTODY RECOVERY FROZEN NEXT**.
 
 ## Product goal
 
@@ -61,6 +61,64 @@ Primary source resolution:
 A 5-minute derived view may be built deterministically from accepted 1-minute
 bars. No independent 5-minute provider acquisition is needed for the same
 interval when exact aggregation is possible.
+
+### Sparse minute-bar semantics after the consumed D1 acquisition
+
+The first real D1 acquisition is immutable and consumed. Both SPY and QQQ
+pagination streams exhausted successfully, but the original dense custody rule
+blocked because Alpaca emitted no bar for a small number of scheduled XNYS
+minutes. A second provider acquisition is forbidden.
+
+Architecture 150 therefore treats the next step as an **offline custody
+requalification**, not a retry and not a strategy run. The requalifier may read
+only the preserved D1 raw pages/evidence and must perform zero credential,
+provider, broker, order, holdout, extension, or strategy-P&L effects.
+
+The sparse custody contract is frozen before detailed missing-timestamp
+inspection:
+
+- a missing scheduled minute remains an explicit absent observation; never
+  forward-fill, backfill, interpolate, synthesize OHLCV, or substitute another
+  symbol;
+- every observed regular-session bar must still be exact-symbol, exact-minute,
+  unique, strictly ordered, on the accepted published XNYS schedule, and within
+  the frozen 2016-2023 boundary;
+- pagination must be exhausted for both symbols and every preserved raw-page
+  byte/hash/request descriptor must revalidate before sparse custody can be
+  READY;
+- sparse custody records the exact scheduled-slot count, observed count,
+  missing count and missing-timestamp digest per symbol, plus common/union
+  missing sets and per-session gap diagnostics;
+- the original dense D1 dataset remains BLOCKED and immutable. Sparse
+  requalification creates a new identity/schema and never rewrites the original
+  attempt or claims that its dense qualification passed;
+- no numeric missing-count threshold is selected after seeing the result.
+  Sparse custody is a truthful representation of provider bars, not a
+  completeness waiver.
+
+Real strategy P&L remains closed after sparse custody. Before the frozen G1
+population can be evaluated, a separate source-only sparse-replay checkpoint
+must make the accepted deterministic replay semantics explicit:
+
+- no bar-dependent decision or fill occurs at an absent minute;
+- confirmation that requires consecutive bars cannot bridge a missing scheduled
+  minute;
+- VWAP uses only observed eligible-trade bars/volume and receives no synthetic
+  price or volume contribution for an absent minute;
+- a derived 5-minute bar exists only when all five aligned 1-minute source bars
+  exist; otherwise that 5-minute decision point is unavailable;
+- elapsed-time hold limits use wall-clock/session time, so an absent minute
+  still consumes elapsed holding time;
+- an existing position is not retroactively erased because a later minute is
+  absent. The replay must remain causal and may evaluate it again only on the
+  next observed eligible-trade bar;
+- frequency denominators remain the full published XNYS session population for
+  the stage, so sparse data cannot inflate activity ratios by deleting hard
+  sessions from the denominator.
+
+The sparse-replay checkpoint is synthetic/source-only. It must be accepted
+before the complete G1 population is frozen and before any real discovery P&L
+is opened.
 
 ## Historical research chronology
 

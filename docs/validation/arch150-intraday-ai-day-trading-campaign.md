@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION + D1 DATA-CUSTODY SOURCE/CERTIFICATION ACCEPTED AND FAST-FORWARD INTEGRATED; REAL DATA NOT YET OPENED**.
+Status: **FOUNDATION + D1 SOURCE ACCEPTED/INTEGRATED; FIRST REAL D1 ACQUISITION CONSUMED/BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY; OFFLINE SPARSE-CUSTODY REQUALIFICATION NEXT**.
 
 Normative design:
 
@@ -82,12 +82,69 @@ freeze G1, authorize holdout/extension access, or authorize trading. A failed
 attempt is immutable and has no automatic retry.
 
 For this source checkpoint, the operator was tested only with injected fake
-source facts, credentials, clock, transport, and storage. No credential read,
-provider/network request, market-data acquisition, strategy replay, P&L, holdout,
-extension, broker, order, or production effect occurred. D1 source review,
-feature FULL, fast-forward integration and develop certification reuse are now
-accepted. The next boundary is the separately reviewed one-shot real acquisition
-of only the frozen 2016-2023 SPY/QQQ discovery+validation data.
+source facts, credentials, clock, transport, and storage. D1 source review,
+feature FULL, fast-forward integration and develop certification reuse were
+accepted before the protected effect.
+
+### Consumed real D1 acquisition
+
+The one authorized real attempt is permanently consumed:
+
+- attempt ID: `a8d5975b-a3e9-4917-a8a8-2809e191fa20`;
+- retained root:
+  `F:\AI\research-data\arch150-intraday-data-custody\arch150-d1-a8d5975b-a3e9-4917-a8a8-2809e191fa20`;
+- effect-time source: `50c5ed6204e909534778b07534fee7217117e47e` /
+  tree `f53588f74266b3ef054ca49f9ea5c8a29e24d630`;
+- outcome: `CONSUMED / BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY`;
+- credential reads: 1;
+- provider requests/pages: 306;
+- SPY: 158 pages, 1,577,355 raw bars, 781,876 observed regular slots,
+  104 missing scheduled slots, 0 duplicates, 0 malformed;
+- QQQ: 148 pages, 1,474,748 raw bars, 781,865 observed regular slots,
+  115 missing scheduled slots, 0 duplicates, 0 malformed;
+- both streams: `NULL_TOKEN_EXHAUSTED`;
+- dataset identity:
+  `6085afed-b870-59d7-9c0d-407db940777b`;
+- blocked dataset SHA-256:
+  `70bf65d5b5c8726285215ed8337ae06bfaac8371cdb07b5dfd625ed800a96e23`;
+- custody evidence identity:
+  `c0276e43-7533-5af4-9dbe-bb7e9095e693`;
+- byte-level `custody-evidence.json` SHA-256:
+  `b83ced21f58cc1aa4731b2e72c1cf8cba4fb7d24378b0f206b303583bc658267`;
+- normalized dataset: not produced;
+- 2024+ access, strategy P&L, holdout, extension, Robinhood, broker, order and
+  production-state effects: all zero.
+
+The attempt is immutable. Do not reacquire, resume, regenerate or overwrite it.
+
+### D1R offline sparse-custody requalification
+
+The next checkpoint is source-only/fake-only implementation of an offline
+requalifier bound to the exact consumed attempt above. It may later be invoked
+once against the preserved raw pages after source acceptance; that invocation
+performs no credential or network access.
+
+The source checkpoint must:
+
+- pin the consumed attempt ID, source identity, artifact hashes, page counts,
+  raw counts, request descriptors and null-token exhaustion;
+- re-read every raw page read-only and verify byte/hash identity before parsing;
+- reuse the accepted D1 parser and published XNYS schedule;
+- reject any wrong symbol, duplicate, reordered, malformed, off-grid
+  regular-session bar, page/token-chain mismatch, artifact drift, reparse/path
+  alias or unexpected attempt content;
+- build a new versioned sparse custody dataset/evidence identity without
+  mutating the original dense dataset;
+- record per-symbol scheduled/observed/missing counts and missing digests,
+  common/union missing sets, affected-session diagnostics, discovery/validation
+  partition facts, and all zero-effect counters;
+- write fresh create-once requalification artifacts outside the consumed
+  attempt and outside repositories/worktrees;
+- expose no strategy replay or P&L path.
+
+The requalification result can establish custody suitability only. It cannot
+freeze/evaluate G1. A separate accepted sparse-replay source checkpoint remains
+required before any real discovery P&L is opened.
 
 ## Initial implementation scope
 

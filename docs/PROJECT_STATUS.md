@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 D1 data-custody source accepted/integrated; real discovery+validation acquisition next
+## Current milestone - Architecture 150 D1 real acquisition consumed/blocked; offline sparse-custody requalification next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -220,10 +220,18 @@ SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
 preserved terminal-red portability evidence; corrective feature FULL
 `44995353037`, attempt 1, is terminal SUCCESS. Develop run `44997145175`,
 attempt 1, is terminal SUCCESS with exact feature-certification reuse and no
-duplicate FULL. No Architecture-150 real market data has been opened. The next
-milestone is the separately reviewed one-shot acquisition/custody of only
-SPY/QQQ 1-minute discovery+validation data for `[2016-01-01, 2024-01-01)`;
-2024+ data remains outside the authorized boundary.
+duplicate FULL. The first Architecture-150 real acquisition is now CONSUMED / BLOCKED /
+`MISSING_EXPECTED_SLOT` / NO RETRY at
+`F:\AI\research-data\arch150-intraday-data-custody\arch150-d1-a8d5975b-a3e9-4917-a8a8-2809e191fa20`.
+Both streams exhausted: SPY 158 pages / 1,577,355 raw / 781,876 regular /
+104 missing; QQQ 148 pages / 1,474,748 raw / 781,865 regular / 115 missing.
+Credential reads were 1 and provider requests 306; all strategy/holdout/2024+/
+Robinhood/broker/order/production effects were zero. The attempt is immutable
+and cannot be retried. Current Alpaca bar semantics permit absent minute bars
+when no qualifying trade exists, so the next milestone is an offline,
+zero-provider sparse-custody requalification of the preserved raw pages.
+No strategy P&L opens until a separate sparse-replay source checkpoint is
+accepted.
 
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,

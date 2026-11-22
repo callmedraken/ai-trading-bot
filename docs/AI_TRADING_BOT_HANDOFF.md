@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 D1 data-custody source accepted/integrated; real discovery+validation acquisition next
+## Current milestone: Architecture 150 D1 real acquisition consumed/blocked; offline sparse-custody requalification next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -227,11 +227,32 @@ portability. Corrective feature FULL `44995353037`, attempt 1, is terminal
 SUCCESS with all seven FULL lanes, active-tests and source-gates passing.
 Develop run `44997145175`, attempt 1, is terminal SUCCESS with
 `DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`; no duplicate
-FULL ran. No real Architecture-150 market data has been acquired or opened. The
-immediate continuation is the separately reviewed one-shot acquisition/custody
-of only SPY/QQQ 1-minute discovery+validation data for
-`[2016-01-01, 2024-01-01)`. Do not acquire or open 2024-2025 holdout data or
-Jan-Oct 2026 extension data at this stage.
+FULL ran. The later docs reconciliation is
+`50c5ed6204e909534778b07534fee7217117e47e` / tree
+`f53588f74266b3ef054ca49f9ea5c8a29e24d630`; feature synchronization run
+`45001962063`, attempt 1, is terminal SUCCESS.
+
+The one real D1 acquisition is now CONSUMED / BLOCKED /
+`MISSING_EXPECTED_SLOT` / NO RETRY. Attempt
+`a8d5975b-a3e9-4917-a8a8-2809e191fa20` is preserved under
+`F:\AI\research-data\arch150-intraday-data-custody\arch150-d1-a8d5975b-a3e9-4917-a8a8-2809e191fa20`.
+It consumed one credential read and 306 provider requests. SPY exhausted 158
+pages with 781,876 regular bars and 104 missing scheduled minutes; QQQ exhausted
+148 pages with 781,865 regular bars and 115 missing scheduled minutes.
+Duplicates/malformed bars were zero. Dataset
+`6085afed-b870-59d7-9c0d-407db940777b` /
+`70bf65d5b5c8726285215ed8337ae06bfaac8371cdb07b5dfd625ed800a96e23`
+remains the blocked dense identity. Custody evidence identity is
+`c0276e43-7533-5af4-9dbe-bb7e9095e693`; the retained evidence file SHA-256 is
+`b83ced21f58cc1aa4731b2e72c1cf8cba4fb7d24378b0f206b303583bc658267`.
+No normalized file was produced. 2024+, strategy P&L, holdout/extension,
+Robinhood, broker, order and production effects were zero.
+
+Do not retry or resume provider acquisition. The immediate continuation is a
+source-only offline sparse-custody requalifier over this exact preserved
+attempt. It must make zero credential/network calls and cannot open strategy
+P&L. After independent sparse-custody acceptance, a separate source-only
+sparse-replay checkpoint must be accepted before G1 is frozen/evaluated.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,

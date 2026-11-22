@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 foundation accepted/integrated; discovery+validation data custody next
+## Current milestone - Architecture 150 D1 data-custody source accepted/integrated; real discovery+validation acquisition next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -210,14 +210,20 @@ per-fill costs, full trial-ledger selection-bias correction, an untouched
 2024-2025 historical holdout, and a fixed Jan-Oct 2026 recent-regime extension.
 This uses completed historical periods available now and does not require
 waiting for calendar year-end. The Architecture-150 foundation is
-SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD `df504d166690ed7e6d2b67b5376565926b76baed` /
-tree `9431111706710406baf336a7fd6a16f00a8db36a`. Feature mapped FULL run `44975857710`, attempt 1, is
-terminal SUCCESS with all seven canonical FULL lanes passing. Develop run
-`44981797946`, attempt 1, is terminal SUCCESS with exact feature-certification
-reuse; active/FULL/certification execution was skipped, so no duplicate FULL ran.
-No Architecture-150 real market data has been opened. The next milestone is
-custody of only SPY/QQQ 1-minute discovery+validation data for
-`[2016-01-01, 2024-01-01)`; 2024+ data remains outside the authorized boundary.
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`df504d166690ed7e6d2b67b5376565926b76baed` / tree
+`9431111706710406baf336a7fd6a16f00a8db36a`. D1 data-custody source is also
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`55f3bd8ae91c73c15e073c5a13e848f24c919bb9` / tree
+`23daa9536fbf73f9c706e5e2661f6b3623dba1d3`. Its original publication
+`a5bc7ec6bde787490ced14457d7b9bc83ed6e9f4` / run `44990894674` remains
+preserved terminal-red portability evidence; corrective feature FULL
+`44995353037`, attempt 1, is terminal SUCCESS. Develop run `44997145175`,
+attempt 1, is terminal SUCCESS with exact feature-certification reuse and no
+duplicate FULL. No Architecture-150 real market data has been opened. The next
+milestone is the separately reviewed one-shot acquisition/custody of only
+SPY/QQQ 1-minute discovery+validation data for `[2016-01-01, 2024-01-01)`;
+2024+ data remains outside the authorized boundary.
 
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,

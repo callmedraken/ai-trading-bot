@@ -437,22 +437,33 @@ cannot bypass general admission. It does not reset,
 rebase, merge, repair or rewrite source history, and it does not execute
 protected effects or canonical FULL/ROBINHOOD certification.
 
-Pre-edit admission checks the exact base, branch, origin, remote identity and
-clean worktree/index. `ops.ps1 admit` is PRE-PUBLICATION admission: run it on
-the clean committed candidate after implementation/focused checks and before
-the first push. A new branch exactly at develop is intentionally ineligible;
+Pre-edit admission checks the exact base, branch, origin, remote identity,
+tracked/index cleanliness and the explicitly expected working-tree state. Known
+generated/untracked evidence may be present when it is part of that expected
+state; preserve and, when required, fingerprint it rather than cleaning it to
+satisfy a generic cleanliness check. `ops.ps1 admit` is PRE-PUBLICATION
+admission: run it on the committed candidate after implementation/focused
+checks and before the first push. Here, "clean committed candidate" means no
+unexpected staged/unstaged tracked drift and only the explicitly expected
+untracked state. A new branch exactly at develop is intentionally ineligible;
 do not weaken the strict-descendant/nonempty-diff gate or run it before edits.
 If this unpublished admission fails, preserve its report and classify it before
 any push. Replacing an unpublished candidate commit requires explicit task
 authorization; the standing prohibition on rewriting published history remains.
 
 If mapped canonical CI finds a deterministic, locally reproducible
-stale-current, pin, fixture or ownership failure that the required
+stale-current, pin, fixture, portability or ownership failure that the required
 prepublication gate did not exercise, classify it as
-`PREPUBLICATION_COVERAGE_DEFECT`, preserve the terminal evidence, and stop for
-ChatGPT review. Do not silently continue through C1/C2/C3 corrective patches.
-The no-arbitrary-correction-count rule otherwise remains in force for failures
-that the required prepublication gate did exercise.
+`PREPUBLICATION_COVERAGE_DEFECT` and preserve the terminal evidence. When the
+failure is fully reproduced and bounded/mechanical, the same implementing Codex
+session retains ownership: add or retain a deterministic regression where
+practical, run the affected focused/local prepublication gate, declare a
+separately named corrective checkpoint, create one new atomic commit/push, and
+follow that new mapped CI run to terminal. Stop for ChatGPT review when the
+failure is non-reproducible or unclassified, or involves semantic, security,
+authority, protected-effect, unexpected-state or material-scope changes. Never
+rerun unchanged CI or silently rewrite failed evidence. The no-arbitrary-
+correction-count rule remains in force.
 
 One logical checkpoint still receives one prepared atomic commit/push and one
 CI admission. A red attempt is preserved; a bounded mechanical correction is a
@@ -728,23 +739,25 @@ checks appropriate to the change, exact-file stage/commit/push only when
 authorized, and leave broad/final certification to the established gate.
 
 After a ChatGPT-direct commit/push that triggers GitHub Actions, ChatGPT must
-poll the relevant push-triggered workflow/source gate to a **terminal** state
+follow the relevant push-triggered workflow/source gate to a **terminal** state
 before reporting the checkpoint complete, accepting the closeout, or advancing
-to the next checkpoint. `queued` and `in_progress` are not completion. The
-push is the checkpoint's single planned CI admission attempt, not an iterative
-debug loop. On failure, preserve the terminal-red attempt, inspect and classify
-the exact job/log evidence, and do not automatically end the same delegated
-Codex task merely because the attempt ended. If the failure is reproduced and
-fully classified as bounded/mechanical, declare the next separately named
-corrective checkpoint, add or retain a deterministic regression where
-practical, rerun the complete focused/local pre-publication gate, create one
-new atomic commit/push, and poll its CI to terminal. Codex remains owner across
-bounded mechanical corrective checkpoints until terminal green; there is no
-arbitrary C1/C2/C3 cap. Hand back on terminal green, a non-reproducible or
-unclassified failure, semantic/security/authority or remote-state ambiguity,
-protected effects, or material scope expansion. Never rerun unchanged CI,
-rewrite failed evidence, amend, rebase or force-push. On success, verify the
-run belongs to the exact pushed HEAD.
+to the next checkpoint. `queued` and `in_progress` are progress states, not
+handoff/completion states. On a bounded mechanical failure, preserve the
+terminal-red attempt and either correct it directly when it remains a small
+known-surface ChatGPT task or delegate the separately named correction when
+implementation/discovery isolation is useful. Never rerun unchanged CI,
+rewrite failed evidence, amend, rebase or force-push.
+
+For a delegated implementation checkpoint, the same implementing Codex session
+owns its focused test results and mapped GitHub CI through terminal. It inspects
+failed job/log evidence, corrects fully reproduced bounded/mechanical failures
+as separately named descendant checkpoints with fresh affected verification and
+prepublication admission, and continues until terminal green. Do not hand a
+nonterminal run to ChatGPT merely because it is still queued/in progress, and
+do not create a separate waiting/polling agent. Hand back on terminal green or
+on a non-reproducible/unclassified failure, semantic/security/authority or
+remote-state ambiguity, protected effects, or material scope expansion. On
+success, verify the terminal run belongs to the exact pushed HEAD.
 Delegate to Luna/Astra/Sol High only when implementation size, discovery,
 isolation, or architecture/security sensitivity makes delegation materially
 useful.
@@ -777,21 +790,15 @@ After every accepted checkpoint, ChatGPT must automatically:
    or review-thread changes, broker/live effects, or another explicitly
    protected action.
 
-### Short closeout CI polling exception
+### CI ownership continuity
 
-ChatGPT may poll a short, low-risk docs-only or mechanical closeout CI run to
-terminal when doing so permits seamless automatic continuation into the next
-already-reviewed safe step. This exception is intentionally narrow: it covers
-coordination/documentation closeouts and similarly bounded bookkeeping gates
-that do not introduce executable-source, strategy, provider, broker, production,
-security, or authority changes.
-
-Substantive implementation/publication certification retains the stricter
-handoff rule: after the one ordinary push, inspect the mapped run once; if it is
-nonterminal, report `CI_PENDING=<run-id>` and stop that implementation session.
-Do not use a delegated agent merely to wait or poll substantive CI. A later
-ChatGPT review turn may check that run again. Never rerun unchanged source just
-to obtain a different result.
+The checkpoint owner follows its mapped CI to terminal: ChatGPT for a
+ChatGPT-direct publication, or the same implementing Codex session for a
+delegated publication. A nonterminal run is not itself a reason to hand the
+checkpoint back. Do not create a separate waiting/polling agent. Preserve every
+terminal-red attempt, never rerun unchanged source merely to obtain a different
+result, and use a separately named corrective descendant for bounded mechanical
+fixes.
 
 For a reviewed bounded local command, the user's decision
    to execute it supplies approval for that exact boundary under the standing
@@ -1763,7 +1770,12 @@ syntax deliberately boring and parser-stable:
   than relying on a prior shell variable that may not have been assigned;
 - structured diagnostic or operator logic belongs in a reviewed `.ps1`/`.py`
   file or a stdin Python block; PowerShell should remain a short launcher and
-  exact-state fence.
+  exact-state fence;
+- do not define a PowerShell function, alias, or wrapper whose name collides
+  case-insensitively with the native command it invokes. For example, a
+  `function Git` wrapper that calls `git` can recursively resolve to itself
+  and end in `CallDepthOverflow`. Prefer direct native invocation or a clearly
+  distinct wrapper name such as `Invoke-NativeGit`.
 
 These rules are mandatory for generated ChatGPT/Codex operator instructions,
 not just repository scripts.

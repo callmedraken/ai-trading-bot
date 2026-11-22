@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 foundation accepted/integrated; discovery+validation data custody next
+## Current milestone: Architecture 150 D1 data-custody source accepted/integrated; real discovery+validation acquisition next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -216,14 +216,22 @@ Jan-Oct 2026 recent-regime extension. No end-of-2026 wait is required. See
 its [validation plan](validation/arch150-intraday-ai-day-trading-campaign.md).
 
 The Architecture-150 foundation is SOURCE/CERTIFICATION ACCEPTED and
-FAST-FORWARD INTEGRATED at HEAD `df504d166690ed7e6d2b67b5376565926b76baed` / tree `9431111706710406baf336a7fd6a16f00a8db36a`. Feature
-mapped FULL `44975857710`, attempt 1, is terminal SUCCESS. Develop source-gate
-`44981797946`, attempt 1, is terminal SUCCESS and proved exact feature
-certification reuse; active/FULL/certification execution was skipped. No real
-Architecture-150 market data has been acquired or opened. The immediate
-authorized continuation is acquisition/custody of only SPY/QQQ 1-minute
-discovery+validation data for `[2016-01-01, 2024-01-01)`. Do not acquire or
-open 2024-2025 holdout data or Jan-Oct 2026 extension data at this stage.
+FAST-FORWARD INTEGRATED at HEAD `df504d166690ed7e6d2b67b5376565926b76baed` /
+tree `9431111706710406baf336a7fd6a16f00a8db36a`. D1 data-custody source is now
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`55f3bd8ae91c73c15e073c5a13e848f24c919bb9` / tree
+`23daa9536fbf73f9c706e5e2661f6b3623dba1d3`. The original D1 publication
+`a5bc7ec6bde787490ced14457d7b9bc83ed6e9f4` is preserved with terminal failed
+run `44990894674` / `PREPUBLICATION_COVERAGE_DEFECT` for test-output-root
+portability. Corrective feature FULL `44995353037`, attempt 1, is terminal
+SUCCESS with all seven FULL lanes, active-tests and source-gates passing.
+Develop run `44997145175`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`; no duplicate
+FULL ran. No real Architecture-150 market data has been acquired or opened. The
+immediate continuation is the separately reviewed one-shot acquisition/custody
+of only SPY/QQQ 1-minute discovery+validation data for
+`[2016-01-01, 2024-01-01)`. Do not acquire or open 2024-2025 holdout data or
+Jan-Oct 2026 extension data at this stage.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,
@@ -372,7 +380,9 @@ RHC2 remains `CONSUMED / PASS / NO RETRY`. RHC3 retained account-wide-all-agents
 
 `RHC4_C2_CLOSEOUT_C1_DOCS_HYGIENE_DEFECT` preserves direct docs run `44239165344`, attempt 1, terminal FAILURE. Its only source-static defect was one new blank line at EOF in each newly added L43-Q1 document; canonical FULL/active tests were skipped. The run is immutable evidence and is not rerun unchanged.
 
-For future Windows/Git operator commands, follow the normative sections of `docs/AI_DEVELOPMENT_WORKFLOW.md` rather than reconstructing the rules from memory. The standing CI cadence now allows ChatGPT to poll short docs-only/mechanical closeouts to terminal for seamless continuation; substantive implementation CI still uses one mapped check and `CI_PENDING=<run-id>` when nonterminal, with no waiting/polling agent.
+`ARCH150_D1_INTEGRATION_GIT_FUNCTION_RECURSION` records a later ChatGPT-generated integration wrapper that defined `function Git` and then invoked `git` inside it. PowerShell command resolution is case-insensitive, so the wrapper recursively resolved to itself and stopped with `CallDepthOverflow` before integration. No source/protected effect or partial integration occurred in that failed wrapper. The subsequent Codex-owned transition followed the established simple Git procedure and integrated D1 successfully. Do not use case-colliding native-command wrapper names.
+
+For future Windows/Git operator commands, follow the normative sections of `docs/AI_DEVELOPMENT_WORKFLOW.md` rather than reconstructing the rules from memory. The checkpoint owner follows mapped CI to terminal: ChatGPT for ChatGPT-direct publications and the same implementing Codex session for delegated publications. Codex may correct fully reproduced bounded/mechanical failures as separately named descendants with affected focused verification and fresh admission. Do not hand back merely because CI is queued/in progress, and do not use a separate waiting/polling agent.
 
 - discover or re-prove the exact worktree; never derive it from a branch name;
 - normalize filesystem identity with `Resolve-Path`;

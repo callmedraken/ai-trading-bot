@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION SOURCE/CERTIFICATION ACCEPTED AND FAST-FORWARD INTEGRATED; REAL DATA NOT YET OPENED**.
+Status: **FOUNDATION + D1 DATA-CUSTODY SOURCE/CERTIFICATION ACCEPTED AND FAST-FORWARD INTEGRATED; REAL DATA NOT YET OPENED**.
 
 Normative design:
 
@@ -33,6 +33,22 @@ Source-only/fake-only.
 
 ## D1 data-custody source checkpoint
 
+Accepted/integrated HEAD:
+`55f3bd8ae91c73c15e073c5a13e848f24c919bb9`
+
+Accepted/integrated tree:
+`23daa9536fbf73f9c706e5e2661f6b3623dba1d3`
+
+The original D1 publication
+`a5bc7ec6bde787490ced14457d7b9bc83ed6e9f4` remains immutable terminal-red
+evidence. Mapped run `44990894674`, attempt 1, exposed the test-output-root
+portability `PREPUBLICATION_COVERAGE_DEFECT`. Corrective feature run
+`44995353037`, attempt 1, is terminal SUCCESS with source-static, active-tests,
+source-gates and all seven FULL lanes passing. Develop run `44997145175`,
+attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`; canonical
+FULL was not duplicated.
+
 Route:
 
 `arch150-intraday-data-custody-source`
@@ -58,19 +74,20 @@ Versioned schemas:
 - `arch150-intraday-raw-page/v1`
 - `arch150-intraday-provider-request/v1`
 
-The future interlocked operator writes under
+The accepted interlocked operator writes under
 `F:\AI\research-data\arch150-intraday-data-custody`, outside repositories and
 worktrees. Its successful state means only that the data custody package is
 ready for independent review. It does not open validation for strategy use,
 freeze G1, authorize holdout/extension access, or authorize trading. A failed
 attempt is immutable and has no automatic retry.
 
-For this source checkpoint, the operator is tested only with injected fake
+For this source checkpoint, the operator was tested only with injected fake
 source facts, credentials, clock, transport, and storage. No credential read,
 provider/network request, market-data acquisition, strategy replay, P&L, holdout,
-extension, broker, order, or production effect is performed. The D1 mapped FULL
-run and exact-source review remain the acceptance gates before any separately
-reviewed real acquisition.
+extension, broker, order, or production effect occurred. D1 source review,
+feature FULL, fast-forward integration and develop certification reuse are now
+accepted. The next boundary is the separately reviewed one-shot real acquisition
+of only the frozen 2016-2023 SPY/QQQ discovery+validation data.
 
 ## Initial implementation scope
 
@@ -144,5 +161,8 @@ Do not run local FULL unless repository admission requires it.
 
 Publication is one atomic commit, one ordinary push, one mapped CI run.
 
-Implementation is performed directly by one Luna Extra High session. No Codex
-coordinator and no subagents/polling agents.
+Future Architecture-150 implementation follows the current workflow routing.
+For delegated implementation, one implementing Codex session owns focused test
+results and its mapped GitHub CI through terminal, including fully reproduced
+bounded/mechanical corrective descendants. Do not create a separate coordinator,
+subagent, or waiting/polling agent unless explicitly requested.

@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 intraday AI day-trading campaign frozen; foundation next
+## Current milestone: Architecture 150 foundation accepted/integrated; discovery+validation data custody next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -214,6 +214,16 @@ selection-bias correction, 2024-2025 untouched historical holdout, and a fixed
 Jan-Oct 2026 recent-regime extension. No end-of-2026 wait is required. See
 [Architecture 150](architecture/150-intraday-ai-day-trading-campaign.md) and
 its [validation plan](validation/arch150-intraday-ai-day-trading-campaign.md).
+
+The Architecture-150 foundation is SOURCE/CERTIFICATION ACCEPTED and
+FAST-FORWARD INTEGRATED at HEAD `df504d166690ed7e6d2b67b5376565926b76baed` / tree `9431111706710406baf336a7fd6a16f00a8db36a`. Feature
+mapped FULL `44975857710`, attempt 1, is terminal SUCCESS. Develop source-gate
+`44981797946`, attempt 1, is terminal SUCCESS and proved exact feature
+certification reuse; active/FULL/certification execution was skipped. No real
+Architecture-150 market data has been acquired or opened. The immediate
+authorized continuation is acquisition/custody of only SPY/QQQ 1-minute
+discovery+validation data for `[2016-01-01, 2024-01-01)`. Do not acquire or
+open 2024-2025 holdout data or Jan-Oct 2026 extension data at this stage.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,

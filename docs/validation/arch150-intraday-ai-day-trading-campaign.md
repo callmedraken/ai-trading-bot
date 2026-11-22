@@ -1,22 +1,31 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **DESIGN FROZEN; SOURCE NOT IMPLEMENTED**.
+Status: **FOUNDATION SOURCE/CERTIFICATION ACCEPTED AND FAST-FORWARD INTEGRATED; REAL DATA NOT YET OPENED**.
 
 Normative design:
 
 `../architecture/150-intraday-ai-day-trading-campaign.md`
 
-## First source checkpoint
+## Accepted foundation checkpoint
 
-Planned route:
+Integrated HEAD: `df504d166690ed7e6d2b67b5376565926b76baed`
+
+Integrated tree: `9431111706710406baf336a7fd6a16f00a8db36a`
+
+Feature mapped FULL: `44975857710`, attempt 1, terminal SUCCESS.
+
+Develop source-gate: `44981797946`, attempt 1, terminal SUCCESS with exact
+feature-certification reuse and no duplicate FULL execution.
+
+Route:
 
 `arch150-intraday-ai-research-foundation`
 
-Planned branch:
+Branch:
 
 `feature/research-arch150-intraday-ai-current`
 
-Planned worktree:
+Worktree:
 
 `F:\AI\worktrees\ai-trading-bot-arch150-intraday-ai-current`
 

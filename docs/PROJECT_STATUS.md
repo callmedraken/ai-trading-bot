@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 intraday AI day-trading campaign frozen; foundation next
+## Current milestone - Architecture 150 foundation accepted/integrated; discovery+validation data custody next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -209,8 +209,15 @@ flatness, bounded AI-generated deterministic intraday programs, realistic
 per-fill costs, full trial-ledger selection-bias correction, an untouched
 2024-2025 historical holdout, and a fixed Jan-Oct 2026 recent-regime extension.
 This uses completed historical periods available now and does not require
-waiting for calendar year-end. The foundation source is NOT IMPLEMENTED and no
-Architecture-150 real data has been opened.
+waiting for calendar year-end. The Architecture-150 foundation is
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD `df504d166690ed7e6d2b67b5376565926b76baed` /
+tree `9431111706710406baf336a7fd6a16f00a8db36a`. Feature mapped FULL run `44975857710`, attempt 1, is
+terminal SUCCESS with all seven canonical FULL lanes passing. Develop run
+`44981797946`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse; active/FULL/certification execution was skipped, so no duplicate FULL ran.
+No Architecture-150 real market data has been opened. The next milestone is
+custody of only SPY/QQQ 1-minute discovery+validation data for
+`[2016-01-01, 2024-01-01)`; 2024+ data remains outside the authorized boundary.
 
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,

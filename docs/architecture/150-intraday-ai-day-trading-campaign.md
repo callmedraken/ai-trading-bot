@@ -139,6 +139,10 @@ STRESS trial with at least one discovery trade becomes SHORTLISTED. Discovery
 return, Sharpe, win rate, profit factor, BASE, and ZERO results do not select or
 reject a trial. STRESS is the qualification case; BASE and ZERO remain
 diagnostics. Validation is the first economic and frequency rejection stage.
+Validation authorization is mechanically the complete SHORTLISTED set in
+manifest ordinal order; callers cannot omit or add candidates. If no trial is
+SHORTLISTED, candidate freezing fails with `NO_VALIDATION_CANDIDATES` and does
+not create validation authorization.
 This population freeze has not consumed a real trial. No real sparse custody
 files have been read for strategy use; the 2021-2023 validation partition and
 all 2024+ data remain unopened.

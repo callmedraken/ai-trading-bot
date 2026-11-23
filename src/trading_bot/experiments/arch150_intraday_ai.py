@@ -32,7 +32,7 @@ G1_POPULATION_SCHEMA = "arch150-g1-pre-evaluation-population/v2"
 G1_RESULT_SCHEMA = "arch150-g1-trial-result/v2"
 DISCOVERY_RESULT_SCHEMA = "arch150-discovery-result-freeze/v2"
 SELECTION_BIAS_SCHEMA = "arch150-selection-bias-input/v3"
-CANDIDATE_FREEZE_SCHEMA = "arch150-candidate-freeze/v2"
+CANDIDATE_FREEZE_SCHEMA = "arch150-candidate-freeze/v3"
 REPLAY_SCHEMA = "arch150-deterministic-replay/v2"
 SPARSE_FIVE_MINUTE_SCHEMA = "arch150-sparse-five-minute-view/v1"
 SPARSE_CUSTODY_AUTHORITY_SCHEMA = "arch150-sparse-custody-authority/v1"
@@ -127,6 +127,10 @@ class UnsupportedProgramError(Arch150Error):
 
 class TrialBudgetExceeded(Arch150Error):
     """Raised when a consumed trial would exceed a frozen G1 budget."""
+
+
+class NoValidationCandidatesError(Arch150Error):
+    """Raised when discovery has no shortlisted trial to authorize validation."""
 
 
 class StrategyFamily(StrEnum):
@@ -3496,39 +3500,25 @@ def finalize_discovery_population(
 def freeze_candidate_population(
     discovery_result_freeze: DiscoveryResultFreeze,
     ledger: TrialLedger,
-    candidate_slot_ids: Iterable[UUID],
 ) -> CandidateFreeze:
-    """Freeze shortlisted slots without erasing their source or resolution."""
+    """Freeze every shortlisted slot in frozen manifest order for validation."""
 
     if not _discovery_result_freeze_is_valid(discovery_result_freeze, ledger):
         raise InformationFirewallError(
             "candidate freeze requires the completed exact G1 result ledger"
         )
-    records_by_slot = {record.slot_id: record for record in ledger.records}
-    slots_by_id = {slot.slot_id: slot for slot in ledger.manifest.slots}
-    materialized = tuple(candidate_slot_ids)
     candidate_slots: list[FrozenTrialSlot] = []
-    for slot_id in materialized:
-        if type(slot_id) is not UUID:
-            raise InformationFirewallError(
-                "candidate freeze requires originating frozen slot identities"
-            )
-        slot = slots_by_id.get(slot_id)
-        record = records_by_slot.get(slot_id)
-        if (
-            slot is None
-            or record is None
-            or record.disposition is not TrialDisposition.SHORTLISTED
-            or record.program_id is None
-        ):
-            raise InformationFirewallError(
-                "candidate slot was not shortlisted in the completed discovery ledger"
-            )
-        candidate_slots.append(slot)
+    for slot, record in zip(ledger.manifest.slots, ledger.records, strict=True):
+        if record.disposition is TrialDisposition.SHORTLISTED:
+            if slot.program_id is None:
+                raise InformationFirewallError(
+                    "shortlisted G1 slot does not bind a typed program"
+                )
+            candidate_slots.append(slot)
     slot_ids = tuple(slot.slot_id for slot in candidate_slots)
-    if not candidate_slots or len(set(slot_ids)) != len(slot_ids):
-        raise InformationFirewallError(
-            "candidate freeze requires a nonempty unique frozen population subset"
+    if not candidate_slots:
+        raise NoValidationCandidatesError(
+            "NO_VALIDATION_CANDIDATES: completed G1 discovery has no SHORTLISTED trials"
         )
     candidate_ids = tuple(slot.program_id for slot in candidate_slots)
     fingerprints = tuple(slot.semantic_fingerprint for slot in candidate_slots)

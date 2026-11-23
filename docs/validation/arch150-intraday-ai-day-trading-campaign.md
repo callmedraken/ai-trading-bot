@@ -277,6 +277,10 @@ trial that produces at least one STRESS discovery trade becomes SHORTLISTED.
 Return magnitude, Sharpe, win rate, profit factor, BASE, and ZERO do not decide
 advancement. BASE and ZERO are diagnostics only; validation is the first
 economic/frequency rejection stage.
+Candidate freezing uses schema `arch150-candidate-freeze/v3` and mechanically
+includes every SHORTLISTED slot in manifest ordinal order, with no
+caller-selected subset. An empty SHORTLISTED set raises
+`NO_VALIDATION_CANDIDATES` and cannot authorize validation.
 
 No real G1 trial has been consumed, no real sparse custody file was read for
 strategy evaluation, and no strategy P&L was generated. Validation

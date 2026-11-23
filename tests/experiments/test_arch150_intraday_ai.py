@@ -42,6 +42,7 @@ from trading_bot.experiments.arch150_intraday_ai import (
     IntradayBar,
     InvalidTrialReference,
     NoiseAreaVwapMomentumProgram,
+    NoValidationCandidatesError,
     OpeningRangeBreakoutReversalProgram,
     OpeningRangeDirection,
     ResearchDataset,
@@ -180,9 +181,7 @@ def _frozen_candidates(
         evaluation = _evaluate_frozen_trial_for_test(ledger, slot, discovery)
         ledger = ledger.consume(evaluation)
     finalized = finalize_discovery_population(discovery, ledger)
-    frozen_candidates = freeze_candidate_population(
-        finalized, ledger, (manifest.slots[1].slot_id,)
-    )
+    frozen_candidates = freeze_candidate_population(finalized, ledger)
     return ledger, manifest, finalized, frozen_candidates
 
 
@@ -424,9 +423,7 @@ def test_freeze_artifact_cannot_be_rebound_to_another_trial_population() -> None
     with pytest.raises(
         InformationFirewallError, match="completed exact G1 result ledger"
     ):
-        freeze_candidate_population(
-            population, other_ledger, (other_manifest.slots[0].slot_id,)
-        )
+        freeze_candidate_population(population, other_ledger)
 
 
 def test_public_dataset_construction_and_later_stages_cannot_bypass_firewall() -> None:
@@ -1126,6 +1123,32 @@ def test_canonical_g1_population_is_the_exact_ordered_24_slot_manifest() -> None
     assert not inspect.signature(freeze_g1_population).parameters
     assert manifest.manifest_id == repeated.manifest_id
     assert str(manifest.manifest_id) == "7e179cbc-18cf-59ce-9116-899cc876ece0"
+    assert tuple(str(slot.slot_id) for slot in manifest.slots) == (
+        "69e38e92-3748-53e4-a24f-a700c04386c3",
+        "05b34c9f-4aa3-5b32-99ee-e76de7d30682",
+        "612e820a-25c6-56eb-ac95-fbf943352842",
+        "e771607a-3c78-5bb9-970a-7e0bb34da4bd",
+        "fae4d0b5-348d-5ba4-a7ea-e2d75512a09d",
+        "3e4b5053-b17e-582b-851e-c8c9927e524a",
+        "4fdc7fe8-6845-5e1c-8aa8-a3d679f77aa3",
+        "03532ff1-5c9a-5772-8d07-f905560c7800",
+        "ad36a3fb-90ce-552a-81a6-a8791bba47d0",
+        "5646b3cb-0bfb-54cf-8131-d3237cabfcd2",
+        "59db62c4-3d17-5e73-9f94-20e516b25b5a",
+        "11e66a27-c0a7-516e-b810-37ef5c4bcb78",
+        "db72c3a0-3291-5eec-b6d3-0d8546b8cd75",
+        "a5a4d9cb-c97f-5e71-b2b5-44137eb6e637",
+        "30b0716b-4949-5bd6-8ab8-c582c8e5d3d6",
+        "997cc95c-5e7c-5252-85bf-3a76d705ca4e",
+        "5d19627f-25ec-5e76-961e-3d6ac86224df",
+        "7aa841e8-0e9f-5eef-89e1-4f3f377a1fc6",
+        "f55fc548-6597-5d23-a7f6-1152879f76d9",
+        "63c665ab-8fc7-5feb-9b20-cdb25f702685",
+        "1190874c-23af-503f-8b2f-4be6c8a1da85",
+        "3d79db4f-f1a0-56da-a5fd-4438c6689fdc",
+        "b80e9148-1620-5f47-9a8e-a2dc89468efd",
+        "c0ea9f0b-8dc4-573b-932e-4777d1817dcb",
+    )
     assert len(manifest.slots) == G1_TOTAL_TRIAL_LIMIT == 24
     assert tuple(slot.ordinal for slot in manifest.slots) == tuple(range(1, 25))
     assert (
@@ -1381,11 +1404,15 @@ def test_cross_symbol_trials_preserve_candidate_identity() -> None:
     )
 
     result_freeze = finalize_discovery_population(discovery, ledger)
-    candidate = freeze_candidate_population(
-        result_freeze,
-        ledger,
-        tuple(slot.slot_id for slot in manifest.slots),
+    assert tuple(inspect.signature(freeze_candidate_population).parameters) == (
+        "discovery_result_freeze",
+        "ledger",
     )
+    candidate = freeze_candidate_population(result_freeze, ledger)
+    repeated_candidate = freeze_candidate_population(result_freeze, ledger)
+    with pytest.raises(TypeError):
+        freeze_candidate_population(result_freeze, ledger, (manifest.slots[0].slot_id,))  # type: ignore[call-arg]
+    assert candidate.freeze_id == repeated_candidate.freeze_id
     assert candidate.candidate_slot_ids == tuple(
         slot.slot_id for slot in manifest.slots
     )
@@ -1409,9 +1436,15 @@ def test_cross_symbol_trials_preserve_candidate_identity() -> None:
     assert bias_payload["source_symbols"] == ["SPY", "QQQ"]
     assert bias_payload["bar_resolutions"] == ["ONE_MINUTE", "ONE_MINUTE"]
     candidate_payload = json.loads(candidate.to_bytes())
+    assert candidate_payload["schema"] == "arch150-candidate-freeze/v3"
     assert candidate_payload["candidate_slot_ids"] == [
         str(slot.slot_id) for slot in manifest.slots
     ]
+    assert candidate_payload["candidate_program_ids"] == [str(program_id(program))] * 2
+    assert (
+        candidate_payload["candidate_fingerprints"]
+        == [program_fingerprint(program)] * 2
+    )
     assert candidate_payload["candidate_source_symbols"] == ["SPY", "QQQ"]
     assert candidate_payload["candidate_bar_resolutions"] == [
         "ONE_MINUTE",
@@ -1457,7 +1490,7 @@ def test_completed_discovery_freeze_gates_candidates_and_validation() -> None:
     with pytest.raises(
         InformationFirewallError, match="completed exact G1 result ledger"
     ):
-        freeze_candidate_population(None, ledger, ())  # type: ignore[arg-type]
+        freeze_candidate_population(None, ledger)  # type: ignore[arg-type]
 
     first = _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], discovery)
     with pytest.raises(TypeError):
@@ -1470,23 +1503,39 @@ def test_completed_discovery_freeze_gates_candidates_and_validation() -> None:
             _discovery_dataset(_flat(date(2020, 1, 2))), ledger
         )
     finalized = finalize_discovery_population(discovery, ledger)
-    freeze = freeze_candidate_population(
-        finalized, ledger, (manifest.slots[0].slot_id,)
-    )
+    freeze = freeze_candidate_population(finalized, ledger)
     assert freeze.population_manifest_id == manifest.manifest_id
     assert freeze.ledger_id == ledger.ledger_id
-    with pytest.raises(InformationFirewallError, match="not shortlisted"):
-        freeze_candidate_population(
-            finalized,
-            ledger,
-            (manifest.slots[1].slot_id,),
-        )
+    assert freeze.candidate_slot_ids == (manifest.slots[0].slot_id,)
     with pytest.raises(InformationFirewallError, match="candidate-freeze"):
         open_validation_dataset(_universe_bars(date(2022, 1, 3)))
     validation = open_validation_dataset(_universe_bars(date(2022, 1, 3)), freeze)
     assert validation
     with pytest.raises(InformationFirewallError, match="opened discovery dataset"):
         _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], validation)
+
+
+def test_candidate_freeze_fails_closed_when_discovery_has_no_shortlisted_trials() -> (
+    None
+):
+    manifest = _freeze_g1_population_for_test(
+        _specifications((NoiseAreaVwapMomentumProgram(),))
+    )
+    ledger = TrialLedger(manifest)
+    discovery = _discovery_dataset(_flat(date(2020, 1, 2)))
+    evaluation = _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], discovery)
+    assert evaluation.fixed_disposition is TrialDisposition.ZERO_TRADE
+    ledger = ledger.consume(evaluation)
+    finalized = finalize_discovery_population(discovery, ledger)
+
+    with pytest.raises(
+        NoValidationCandidatesError,
+        match="NO_VALIDATION_CANDIDATES",
+    ) as first:
+        freeze_candidate_population(finalized, ledger)
+    with pytest.raises(NoValidationCandidatesError) as repeated:
+        freeze_candidate_population(finalized, ledger)
+    assert str(first.value) == str(repeated.value)
 
 
 def test_selection_bias_binds_every_completed_frozen_attempt() -> None:
@@ -1528,6 +1577,13 @@ def test_selection_bias_binds_every_completed_frozen_attempt() -> None:
     )
     finalized = finalize_discovery_population(discovery, ledger)
     bias = selection_bias_input(finalized, ledger)
+    candidates = freeze_candidate_population(finalized, ledger)
+    assert candidates.candidate_slot_ids == (manifest.slots[0].slot_id,)
+    assert candidates.candidate_source_symbols == ("SPY",)
+    with pytest.raises(TypeError):
+        freeze_candidate_population(
+            finalized, ledger, tuple(slot.slot_id for slot in manifest.slots)
+        )  # type: ignore[call-arg]
     assert bias.consumed_trial_count == len(manifest.slots) == 5
     assert bias.population_manifest_id == manifest.manifest_id
     assert bias.discovery_result_freeze_id == finalized.freeze_id

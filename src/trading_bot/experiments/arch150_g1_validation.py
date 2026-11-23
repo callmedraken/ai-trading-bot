@@ -43,10 +43,10 @@ _ACCEPTED_DISCOVERY: Final = _AcceptedDiscovery(
         "dc4ed895a370036fd49c45e7ec50929eaf214fe4",
         "0d838d11535c1ba759181f1fcea98e5c43a37a81",
     ),
-    UUID("ec23c374-e069-59e9-9167-14b2adf3fb16"),
-    UUID("eef87bad-cf1e-520f-9b95-ebd35d0fd575"),
-    UUID("88a7e148-cbf7-5f6b-9ef0-a9858d9396cd"),
-    UUID("84367c0f-74d4-5125-a2f3-71f5a9ad6014"),
+    arch150._ACCEPTED_G1_REPORT_ID,
+    arch150._ACCEPTED_G1_LEDGER_ID,
+    arch150._ACCEPTED_G1_DISCOVERY_FREEZE_ID,
+    arch150._ACCEPTED_G1_CANDIDATE_FREEZE_ID,
 )
 
 
@@ -66,9 +66,7 @@ class _DiscoveryAuthority:
     trials: tuple[_DiscoveryTrial, ...]
     slots: tuple[arch150.FrozenTrialSlot, ...]
 
-    def bind_candidates(
-        self, dataset: arch150.ResearchDataset
-    ) -> arch150.CandidateFreeze:
+    def verify_bindings(self, dataset: arch150.ResearchDataset) -> None:
         if (
             type(dataset) is not arch150.ResearchDataset
             or dataset._authority_seal is not arch150._DATASET_SEAL
@@ -78,7 +76,6 @@ class _DiscoveryAuthority:
         ):
             raise Arch150G1ValidationError("ACCEPTED_DISCOVERY_CUSTODY_REQUIRED")
         dataset_id = arch150._discovery_dataset_id(dataset)
-        ledger = arch150.TrialLedger(self.manifest)
         for slot, trial in zip(self.manifest.slots, self.trials, strict=True):
             fixed = (
                 None
@@ -106,25 +103,14 @@ class _DiscoveryAuthority:
                 != dataset.bars.by_symbol[slot.source_symbol].input_digest
             ):
                 raise Arch150G1ValidationError("DISCOVERY_EVALUATION_BINDING_MISMATCH")
-            ledger = ledger._append_result(
-                slot,
-                dataset_id,
-                trial.evaluation_id,
-                trial.replay_id,
-                trial.disposition,
-                trial.diagnostic_code,
-            )
-        finalized = arch150.finalize_discovery_population(dataset, ledger)
-        candidates = arch150.freeze_candidate_population(finalized, ledger)
         if (
-            ledger.ledger_id != self.accepted.ledger_id
-            or finalized.freeze_id != self.accepted.discovery_freeze_id
-            or candidates.freeze_id != self.accepted.candidate_freeze_id
-            or candidates.candidate_slot_ids
-            != tuple(slot.slot_id for slot in self.slots)
+            self.accepted.ledger_id != arch150._ACCEPTED_G1_LEDGER_ID
+            or self.accepted.discovery_freeze_id
+            != arch150._ACCEPTED_G1_DISCOVERY_FREEZE_ID
+            or self.accepted.candidate_freeze_id
+            != arch150._ACCEPTED_G1_CANDIDATE_FREEZE_ID
         ):
             raise Arch150G1ValidationError("DISCOVERY_FREEZE_BINDING_MISMATCH")
-        return candidates
 
 
 def _uuid(value: object) -> UUID:
@@ -209,7 +195,7 @@ def _authenticate_discovery_report(
         if trial.disposition is arch150.TrialDisposition.SHORTLISTED:
             slots.append(slot)
     if (
-        not slots
+        tuple(slots) != manifest.slots
         or canonical_json_bytes(material.get("terminal_disposition_counts"))
         != canonical_json_bytes(counts)
         or canonical_json_bytes(material.get("candidate_slots"))
@@ -313,7 +299,7 @@ def _replay_validation_slot(
     ):
         raise Arch150G1ValidationError("VALIDATION_CUSTODY_REQUIRED")
     freeze = dataset.candidate_freeze
-    if freeze is None or not arch150._candidate_freeze_is_valid(freeze):
+    if freeze is None or not arch150._accepted_g1_candidate_freeze_is_valid(freeze):
         raise Arch150G1ValidationError("VALIDATION_CANDIDATE_FREEZE_REQUIRED")
     manifest = arch150.freeze_g1_population()
     if (
@@ -527,7 +513,7 @@ def _run_one_shot(
     authority = _authenticate_discovery_report(report_reader(), accepted)
     progress("ARCH150_VALIDATION_STAGE=DISCOVERY_AUTHORITY_ACCEPTED")
     snapshot = input_reader()
-    dataset = arch150._open_sparse_validation(snapshot.bars, authority.bind_candidates)
+    dataset = arch150._open_sparse_validation(snapshot.bars, authority.verify_bindings)
     progress("ARCH150_VALIDATION_STAGE=SPARSE_VALIDATION_OPENED")
 
     records = []

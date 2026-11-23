@@ -66,24 +66,54 @@ def _sign(material):
     return identity, canonical_json_bytes({"report_id": str(identity), **material})
 
 
-def _observation(bars):
+def _synthetic_ledger(dataset, shortlisted):
+    manifest = arch150.freeze_g1_population()
+    ledger = arch150.TrialLedger(manifest)
+    templates = {
+        (symbol, traded): arch150.replay_program(
+            manifest.slots[(8 if traded else 0) + offset]._program,
+            dataset.bars.by_symbol[symbol],
+        )
+        for offset, symbol in enumerate(arch150.INITIAL_UNIVERSE)
+        for traded in (False, True)
+    }
+    evaluations = []
+    for slot in manifest.slots:
+        traded = slot.ordinal in shortlisted
+        template = templates[slot.source_symbol, traded]
+        assert bool(template.trades) == traded
+        replay_id = uuid5(
+            arch150._REPLAY_NAMESPACE,
+            arch150._canonical_json(
+                {
+                    "program_id": str(slot.program_id),
+                    "input_digest": template.input_digest,
+                    "cost_case": "STRESS",
+                    "equity_digest": template.equity_digest,
+                }
+            ).decode(),
+        )
+        replay = replace(template, program_id=slot.program_id, replay_id=replay_id)
+        evaluation = arch150._make_g1_evaluation(
+            slot,
+            arch150._discovery_dataset_id(dataset),
+            replay,
+            None if traded else arch150.TrialDisposition.ZERO_TRADE,
+            None,
+        )
+        evaluations.append(evaluation)
+        ledger = ledger.consume(evaluation)
+    finalized = arch150.finalize_discovery_population(dataset, ledger)
+    return manifest, ledger, evaluations, finalized
+
+
+def _observation(bars, *, shortlisted=range(1, 25)):
     admitted = arch150.validate_universe_minute_bars(bars)
     dataset = arch150._project_accepted_sparse_stage(
         admitted, arch150.ResearchStage.DISCOVERY
     )
-    manifest = arch150.freeze_g1_population()
-    ledger = arch150.TrialLedger(manifest)
-    evaluations = []
-    for slot in manifest.slots:
-        evaluation = arch150.evaluate_frozen_trial(ledger, slot, dataset)
-        evaluations.append(evaluation)
-        ledger = ledger.consume(evaluation)
-    finalized = arch150.finalize_discovery_population(dataset, ledger)
+    manifest, ledger, evaluations, finalized = _synthetic_ledger(dataset, shortlisted)
     freeze = arch150.freeze_candidate_population(finalized, ledger)
-    # A single synthetic up session shortlists B1 on each symbol and nothing else.
-    assert freeze.candidate_slot_ids == tuple(
-        slot.slot_id for slot in manifest.slots[8:10]
-    )
     material = discovery._report_material(
         source=SOURCE,
         input_root=discovery.ACCEPTED_INPUT_ROOT,
@@ -101,7 +131,16 @@ def _observation(bars):
     return admitted, dataset, accepted, freeze, material, body
 
 
-def test_authentication_reconstructs_exact_authority_and_blocks_generic_data(
+def _install_synthetic_acceptance(monkeypatch, accepted):
+    for name, field in (
+        ("_ACCEPTED_G1_LEDGER_ID", accepted.ledger_id),
+        ("_ACCEPTED_G1_DISCOVERY_FREEZE_ID", accepted.discovery_freeze_id),
+        ("_ACCEPTED_G1_CANDIDATE_FREEZE_ID", accepted.candidate_freeze_id),
+    ):
+        monkeypatch.setattr(arch150, name, field)
+
+
+def test_authentication_binds_exact_authority_and_blocks_generic_data(
     monkeypatch,
 ):
     bars = _make_custody()
@@ -109,7 +148,11 @@ def test_authentication_reconstructs_exact_authority_and_blocks_generic_data(
         bars
     )
     authority = validation._authenticate_discovery_report(body, accepted)
-    assert authority.bind_candidates(discovery_dataset) == candidate_freeze
+    with pytest.raises(arch150.InformationFirewallError, match="does not bind"):
+        arch150.accepted_g1_candidate_freeze(discovery_dataset)
+    _install_synthetic_acceptance(monkeypatch, accepted)
+    authority.verify_bindings(discovery_dataset)
+    assert arch150.accepted_g1_candidate_freeze(discovery_dataset) == candidate_freeze
     with pytest.raises(arch150.Arch150Error):
         arch150.open_sparse_validation_dataset(bars, candidate_freeze)
 
@@ -138,33 +181,51 @@ def test_authentication_reconstructs_exact_authority_and_blocks_generic_data(
         validation.Arch150G1ValidationError, match="VALIDATION_CUSTODY_REQUIRED"
     ):
         validation._replay_validation_slot(generic, authority.slots[0])
+    foreign = arch150.open_discovery_dataset(
+        bar for bar in bars if bar.session_date.year == 2020
+    )
     with pytest.raises(
-        validation.Arch150G1ValidationError, match="VALIDATION_SLOT_NOT_AUTHORIZED"
+        arch150.InformationFirewallError, match="accepted discovery dataset"
     ):
-        validation._replay_validation_slot(dataset, authority.manifest.slots[0])
-    with pytest.raises(
-        arch150.InformationFirewallError, match="bind accepted discovery"
-    ):
-        arch150.open_sparse_validation_dataset(
-            bars, replace_candidate_dataset(candidate_freeze)
-        )
+        arch150.accepted_g1_candidate_freeze(foreign)
 
 
-def replace_candidate_dataset(freeze):
-    manifest = arch150.freeze_g1_population()
-    wrong = arch150.open_discovery_dataset(
-        bar for bar in _make_custody() if bar.session_date.year == 2020
+def test_slots_7_and_8_cannot_replace_the_accepted_campaign_freeze(monkeypatch):
+    bars = _make_custody()
+    admitted, dataset, accepted, exact, _, _ = _observation(bars)
+    _install_synthetic_acceptance(monkeypatch, accepted)
+    _, _, subset_accepted, subset, _, subset_body = _observation(
+        bars, shortlisted=(7, 8)
     )
-    ledger = arch150.TrialLedger(manifest)
-    for slot in manifest.slots:
-        ledger = ledger.consume(
-            arch150._evaluate_frozen_trial_for_test(ledger, slot, wrong)
+    assert not hasattr(arch150.TrialLedger, "_append_result")
+    assert tuple(
+        inspect.signature(arch150.accepted_g1_candidate_freeze).parameters
+    ) == ("discovery",)
+    assert subset.discovery_dataset_id == exact.discovery_dataset_id
+    assert subset.candidate_slot_ids == tuple(
+        slot.slot_id for slot in arch150.freeze_g1_population().slots[6:8]
+    )
+    assert arch150._candidate_freeze_is_valid(subset)
+    assert not arch150._accepted_g1_candidate_freeze_is_valid(subset)
+    with pytest.raises(arch150.InformationFirewallError, match="exact accepted"):
+        arch150.open_sparse_validation_dataset(bars, subset)
+    with pytest.raises(
+        arch150.InformationFirewallError, match="invalid for this dataset stage"
+    ):
+        arch150._project_accepted_sparse_stage(
+            admitted, arch150.ResearchStage.VALIDATION, subset
         )
-    other = arch150.freeze_candidate_population(
-        arch150.finalize_discovery_population(wrong, ledger), ledger
+    monkeypatch.setattr(
+        arch150, "_validate_accepted_sparse_custody", lambda _: admitted
     )
-    assert other.candidate_slot_ids == freeze.candidate_slot_ids
-    return other
+    # Even a callback returning the wrong freeze cannot choose the campaign population.
+    opened = arch150._open_sparse_validation(bars, lambda _: subset)
+    assert opened.candidate_freeze == exact
+    assert arch150.accepted_g1_candidate_freeze(dataset) == exact
+    with pytest.raises(
+        validation.Arch150G1ValidationError, match="CANDIDATE_POPULATION"
+    ):
+        validation._authenticate_discovery_report(subset_body, subset_accepted)
 
 
 @pytest.mark.parametrize(
@@ -197,7 +258,7 @@ def test_rebuilt_evaluation_binding_rejects_tampered_evaluation_id():
         body, replace(accepted, report_id=report_id)
     )
     with pytest.raises(validation.Arch150G1ValidationError, match="EVALUATION_BINDING"):
-        authority.bind_candidates(dataset)
+        authority.verify_bindings(dataset)
 
 
 @pytest.mark.parametrize("profitable", [False, True])
@@ -206,6 +267,7 @@ def test_one_shot_ranks_and_freezes_by_slot_not_shared_program(
 ):
     bars = _make_custody(profitable=profitable)
     admitted, _, accepted, _, _, body = _observation(bars)
+    _install_synthetic_acceptance(monkeypatch, accepted)
     calls = []
 
     def validate(candidate):
@@ -233,30 +295,40 @@ def test_one_shot_ranks_and_freezes_by_slot_not_shared_program(
     assert report_bytes == (clone.output_directory / "validation.json").read_bytes()
     report = json.loads(report_bytes)
     freeze = report["validation_freeze"]
-    first, second = freeze["evaluated_slots"]
+    evaluated = freeze["evaluated_slots"]
+    assert [row["ordinal"] for row in evaluated] == list(range(1, 25))
+    first, second = evaluated[8:10]
     assert first["program_id"] == second["program_id"]
     assert first["slot_id"] != second["slot_id"]
     assert [first["source_symbol"], second["source_symbol"]] == ["SPY", "QQQ"]
-    assert report["ranking_slot_ids"] == sorted((first["slot_id"], second["slot_id"]))
-    assert [item["slot_id"] for item in freeze["qualified_slots"]] == (
-        [first["slot_id"], second["slot_id"]] if profitable else []
-    )
+    ranking = report["ranking_slot_ids"]
+    assert set(ranking) == {row["slot_id"] for row in evaluated}
+    assert [
+        item for item in ranking if item in {first["slot_id"], second["slot_id"]}
+    ] == sorted((first["slot_id"], second["slot_id"]))
+    qualified = {item["slot_id"] for item in freeze["qualified_slots"]}
+    if profitable:
+        assert {first["slot_id"], second["slot_id"]} <= qualified
+    else:
+        assert not qualified
     assert freeze["holdout_authorized"] is False
     assert result.terminal_disposition == (
         "VALIDATION_CANDIDATES_FROZEN_PENDING_SELECTION_BIAS"
         if profitable
         else "NO_HOLDOUT_CANDIDATES"
     )
-    assert report["effect_counters"]["validation_strategy_replay_count"] == 2
+    assert report["effect_counters"]["validation_strategy_replay_count"] == 24
     assert report["effect_counters"]["discovery_strategy_replay_count"] == 0
-    assert progress[:6] == [
+    expected_progress = [
         "ARCH150_VALIDATION_STAGE=DISCOVERY_AUTHORITY_ACCEPTED",
         "ARCH150_VALIDATION_STAGE=SPARSE_VALIDATION_OPENED",
-        "ARCH150_VALIDATION_SLOT_START=1/2",
-        "ARCH150_VALIDATION_SLOT_COMPLETE=1/2",
-        "ARCH150_VALIDATION_SLOT_START=2/2",
-        "ARCH150_VALIDATION_SLOT_COMPLETE=2/2",
+        *(
+            f"ARCH150_VALIDATION_SLOT_{state}={ordinal}/24"
+            for ordinal in range(1, 25)
+            for state in ("START", "COMPLETE")
+        ),
     ]
+    assert progress == expected_progress * 2
     with pytest.raises(
         discovery.Arch150G1DiscoveryError, match="OUTPUT_ALREADY_EXISTS"
     ):

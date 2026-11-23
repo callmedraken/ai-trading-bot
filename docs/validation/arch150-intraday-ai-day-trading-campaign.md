@@ -325,7 +325,8 @@ qualification. Discovery is consumed and must not be rerun.
 ## G1 validation source checkpoint
 
 The offline validation observer authenticates the accepted discovery report,
-reconstitutes both freezes, validates the full D1R input, and replays only the
+checks the report against the exact accepted candidate freeze without
+reconstructing a discovery ledger, validates the full D1R input, and replays only the
 frozen candidates against `[2021-01-01, 2024-01-01)` at STRESS, starting each
 slot at equity 1. It keeps SPY and QQQ slots distinct even when they share a
 program ID. Interim progress includes stage and slot position only.

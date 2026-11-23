@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 sparse 2016-2023 custody accepted; sparse-replay source checkpoint next
+## Current milestone - Architecture 150 G1 population source-frozen; one-shot discovery evaluation next after review
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -256,9 +256,23 @@ contains the preserved 2016-2023 SPY/QQQ regular-session observations with
 explicit gaps only: SPY 104 missing, QQQ 115 missing, 64 common / 155 union,
 across 9 affected sessions, with no fully missing sessions and zero
 duplicates/malformed bars. All requalifier protected-effect counters were zero
-and the original D1 custody remained unchanged. The next milestone is the
-source-only/fake-only sparse-replay semantics checkpoint. Real G1 population
-freeze/evaluation and strategy P&L remain closed.
+and the original D1 custody remained unchanged. D2 sparse-replay semantics are
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`6fb7b128d83b4846b384bb1709f0ee4e724d173d` / tree
+`7fd5ea4c516a7f97ce2f5227befd4dbef4e3a802`. Feature FULL run `45113622952`,
+attempt 1, is terminal SUCCESS; develop run `45122666587`, attempt 1, is
+terminal SUCCESS with exact feature-certification reuse and no duplicate FULL.
+
+The canonical G1 population is now frozen in source under
+`arch150-g1-pre-evaluation-population/v2`, manifest
+`7e179cbc-18cf-59ce-9116-899cc876ece0`: 24 ordered one-minute trials, 8 per
+family, 12 SPY and 12 QQQ. Each slot binds program semantics, source symbol and
+resolution. A unique STRESS discovery trial with any trade advances to
+SHORTLISTED; discovery metrics and BASE/ZERO diagnostics do not choose winners.
+No real G1 trial is consumed and no real strategy P&L has been opened.
+Validation and all 2024+ data remain sealed. After exact-source review, the next
+milestone is the one-shot offline 2016-2020 G1 discovery evaluation against the
+accepted sparse dataset.
 
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,

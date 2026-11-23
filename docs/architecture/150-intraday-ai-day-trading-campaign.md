@@ -1,6 +1,6 @@
 # Architecture 150 — Intraday AI day-trading research campaign
 
-Status: **DESIGN FROZEN; FOUNDATION + D1 + D1R + D1R-C1 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; SPARSE-REPLAY SOURCE CHECKPOINT NEXT; REAL STRATEGY P&L REMAINS CLOSED**.
+Status: **DESIGN FROZEN; FOUNDATION + D1 + D1R + D1R-C1 + D2 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; CANONICAL G1 POPULATION SOURCE-FROZEN; REAL STRATEGY P&L REMAINS CLOSED**.
 
 ## Product goal
 
@@ -116,9 +116,32 @@ must make the accepted deterministic replay semantics explicit:
   the stage, so sparse data cannot inflate activity ratios by deleting hard
   sessions from the denominator.
 
-The sparse-replay checkpoint is synthetic/source-only. It must be accepted
-before the complete G1 population is frozen and before any real discovery P&L
-is opened.
+D2 sparse-replay semantics are SOURCE/CERTIFICATION ACCEPTED and integrated at
+HEAD `6fb7b128d83b4846b384bb1709f0ee4e724d173d` / tree
+`7fd5ea4c516a7f97ce2f5227befd4dbef4e3a802`. Feature FULL run `45113622952`,
+attempt 1, is terminal SUCCESS. Develop run `45122666587`, attempt 1, is
+terminal SUCCESS with exact feature-certification reuse and no duplicate FULL.
+The synthetic/source-only checkpoint opened no custody files and generated no
+real P&L.
+
+The complete G1 population is now frozen in source before any real result is
+visible. Each ordered slot binds the typed program, source symbol, and bar
+resolution. The official population contains 24 one-minute trials: each of 12
+structural variants is evaluated once on SPY and once on QQQ, with SPY first.
+There are eight slots per family and twelve per symbol. Five-minute variants
+are outside G1 and require a later separately authorized G2 recombination.
+Manifest schema `arch150-g1-pre-evaluation-population/v2` binds source and
+resolution in deterministic slot and population identities.
+
+G1 discovery advancement is mechanical: INVALID, DUPLICATE, deterministic
+FAILED, and ZERO_TRADE keep their terminal dispositions; each valid unique
+STRESS trial with at least one discovery trade becomes SHORTLISTED. Discovery
+return, Sharpe, win rate, profit factor, BASE, and ZERO results do not select or
+reject a trial. STRESS is the qualification case; BASE and ZERO remain
+diagnostics. Validation is the first economic and frequency rejection stage.
+This population freeze has not consumed a real trial. No real sparse custody
+files have been read for strategy use; the 2021-2023 validation partition and
+all 2024+ data remain unopened.
 
 ## Historical research chronology
 
@@ -200,7 +223,8 @@ from this family and may not be regenerated.
 
 Generation 1 maximum:
 
-- 24 total evaluated programs;
+- 24 ordered trial slots: 12 structural variants, each assigned to SPY then QQQ;
+- `BarResolution.ONE_MINUTE` for every G1 slot;
 - maximum 8 per family.
 
 Every attempted program consumes one trial, including:
@@ -296,6 +320,12 @@ any final holdout access.
 Use DSR or an equivalently reviewed multiple-testing correction against all
 consumed search trials.
 
+Discovery advancement is fixed before P&L: INVALID, DUPLICATE, deterministic
+FAILED, and ZERO_TRADE retain their terminal dispositions. Every valid unique
+STRESS trial with at least one discovery trade is SHORTLISTED. Discovery return,
+Sharpe, win rate, profit factor, BASE and ZERO do not decide advancement.
+Validation is the first economic and frequency rejection stage.
+
 ## Final holdout
 
 Before 2024-2025 data is opened, freeze the final candidate set.
@@ -357,11 +387,13 @@ returns.
 
 ## Immediate milestone
 
-The next checkpoint is source-only/fake-only campaign infrastructure plus a
-historical intraday acquisition contract for SPY and QQQ discovery/validation
-data only.
+After exact-source review and acceptance of the frozen G1 population, the next
+milestone is the one-shot offline 2016-2020 discovery evaluation of that exact
+24-slot manifest against the accepted sparse dataset. It must not open
+2021-2023 validation or 2024+ data.
 
-Do not acquire 2024+ data in that checkpoint.
+The G1 evaluation is a separate real-data/P&L boundary; source acceptance alone
+does not consume or authorize a trial.
 
 Do not implement live execution.
 

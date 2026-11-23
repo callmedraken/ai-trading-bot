@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 sparse 2016-2023 custody accepted; sparse-replay source checkpoint next
+## Current milestone: Architecture 150 G1 population source-frozen; offline discovery next after review
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -290,9 +290,25 @@ SPY has 781,876 observed / 104 missing scheduled slots; QQQ has 781,865 /
 missing sessions. The original consumed D1 attempt remains unchanged and every
 new protected-effect counter is zero.
 
-The immediate continuation is the separately frozen source-only/fake-only
-sparse-replay semantics checkpoint. Do not freeze G1 or open real strategy P&L
-until that source is accepted/integrated.
+Architecture-150 D2 sparse-replay semantics are SOURCE/CERTIFICATION ACCEPTED
+and integrated at HEAD `6fb7b128d83b4846b384bb1709f0ee4e724d173d` / tree
+`7fd5ea4c516a7f97ce2f5227befd4dbef4e3a802`. Feature FULL run `45113622952`,
+attempt 1, is terminal SUCCESS. Develop run `45122666587`, attempt 1, is
+terminal SUCCESS with exact feature-certification reuse; no duplicate FULL ran.
+
+The source-owned G1 population is frozen under schema
+`arch150-g1-pre-evaluation-population/v2`, manifest
+`7e179cbc-18cf-59ce-9116-899cc876ece0`: exactly 24 ordered one-minute trials,
+eight per family, with 12 SPY and 12 QQQ. Each slot binds program, symbol and
+resolution; identical programs on different symbols are separate trials. A
+valid unique STRESS discovery trial with any trade is shortlisted; discovery
+economic metrics and BASE/ZERO diagnostics do not decide advancement.
+
+No real G1 trial is consumed and no real strategy P&L is open. The accepted
+sparse D1R artifacts were not read for strategy evaluation, validation remains
+unopened, and 2024+ remains sealed. After exact-source review and acceptance,
+the next milestone is the separately reviewed one-shot offline 2016-2020 G1
+discovery evaluation of this exact manifest.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,

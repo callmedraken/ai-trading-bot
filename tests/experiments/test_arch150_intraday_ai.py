@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import ast
+import inspect
+import json
 from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 from decimal import Context, Decimal, localcontext
@@ -11,6 +13,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from trading_bot.experiments import arch150_intraday_ai as arch150_ai
 from trading_bot.experiments.arch148_intraday import HistoricalIntradaySessionAuthority
 from trading_bot.experiments.arch150_intraday_ai import (
     _ACCEPTED_SPARSE_CUSTODY_AUTHORITY,
@@ -33,6 +36,7 @@ from trading_bot.experiments.arch150_intraday_ai import (
     DiscoveryResultFreeze,
     FrequencyDiagnostics,
     G1PopulationManifest,
+    G1TrialSpecification,
     IncompleteFiveMinuteAggregation,
     InformationFirewallError,
     IntradayBar,
@@ -55,6 +59,7 @@ from trading_bot.experiments.arch150_intraday_ai import (
     _discovery_dataset_id,
     _entry_signal,
     _evaluate_frozen_trial_for_test,
+    _freeze_g1_population_for_test,
     _open_sparse_discovery_dataset_for_test,
     _vwap_through,
     aggregate_five_minute_bars,
@@ -122,11 +127,27 @@ def _universe_bars(day: date) -> list[IntradayBar]:
     return [_bar(symbol, day, 0) for symbol in INITIAL_UNIVERSE]
 
 
-def _discovery_dataset(spy_bars: list[IntradayBar] | None = None) -> ResearchDataset:
+def _discovery_dataset(
+    spy_bars: list[IntradayBar] | None = None,
+    qqq_bars: list[IntradayBar] | None = None,
+) -> ResearchDataset:
     if spy_bars is None:
         spy_bars = [_bar("SPY", date(2020, 1, 2), 0)]
     day = spy_bars[0].session_date
-    return open_discovery_dataset((*spy_bars, _bar("QQQ", day, 0)))
+    if qqq_bars is None:
+        qqq_bars = [_bar("QQQ", day, 0)]
+    return open_discovery_dataset((*spy_bars, *qqq_bars))
+
+
+def _specifications(
+    programs,
+    *,
+    source_symbol: str = "SPY",
+    resolution: BarResolution = BarResolution.ONE_MINUTE,
+):
+    return tuple(
+        G1TrialSpecification(program, source_symbol, resolution) for program in programs
+    )
 
 
 def _frozen_candidates(
@@ -153,18 +174,15 @@ def _frozen_candidates(
     )
     spy_bars = _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
     discovery = _discovery_dataset(spy_bars)
-    manifest = freeze_g1_population(programs)
+    manifest = _freeze_g1_population_for_test(_specifications(programs))
     ledger = TrialLedger(manifest)
     for slot in manifest.slots:
         evaluation = _evaluate_frozen_trial_for_test(ledger, slot, discovery)
-        disposition = (
-            TrialDisposition.SHORTLISTED
-            if evaluation.replay_result is not None and evaluation.replay_result.trades
-            else None
-        )
-        ledger = ledger.consume(evaluation, disposition)
+        ledger = ledger.consume(evaluation)
     finalized = finalize_discovery_population(discovery, ledger)
-    frozen_candidates = freeze_candidate_population(finalized, ledger, (programs[1],))
+    frozen_candidates = freeze_candidate_population(
+        finalized, ledger, (manifest.slots[1].slot_id,)
+    )
     return ledger, manifest, finalized, frozen_candidates
 
 
@@ -377,6 +395,9 @@ def test_validation_requires_an_immutable_candidate_freeze_after_full_population
             )
         ),
     )
+    assert candidates.candidate_slot_ids == (manifest.slots[1].slot_id,)
+    assert candidates.candidate_source_symbols == ("SPY",)
+    assert candidates.candidate_bar_resolutions == (BarResolution.ONE_MINUTE,)
     with pytest.raises(InformationFirewallError):
         CandidateFreeze(
             candidates.freeze_id,
@@ -384,8 +405,11 @@ def test_validation_requires_an_immutable_candidate_freeze_after_full_population
             finalized.freeze_id,
             finalized.discovery_dataset_id,
             ledger.ledger_id,
+            candidates.candidate_slot_ids,
             candidates.candidate_program_ids,
             candidates.candidate_fingerprints,
+            candidates.candidate_source_symbols,
+            candidates.candidate_bar_resolutions,
         )
 
 
@@ -394,18 +418,15 @@ def test_freeze_artifact_cannot_be_rebound_to_another_trial_population() -> None
     other_ledger, other_manifest, other_population, _ = _frozen_candidates(
         start_noise_band_bps=30
     )
-    other_program = NoiseAreaVwapMomentumProgram(
-        lookback_sessions=1,
-        noise_band_bps=Decimal("30"),
-        confirmation_bars=1,
-    )
     assert population.ledger_id == ledger.ledger_id
     assert manifest.manifest_id != other_manifest.manifest_id
     assert other_population.freeze_id != population.freeze_id
     with pytest.raises(
         InformationFirewallError, match="completed exact G1 result ledger"
     ):
-        freeze_candidate_population(population, other_ledger, (other_program,))
+        freeze_candidate_population(
+            population, other_ledger, (other_manifest.slots[0].slot_id,)
+        )
 
 
 def test_public_dataset_construction_and_later_stages_cannot_bypass_firewall() -> None:
@@ -446,7 +467,9 @@ def test_public_dataset_construction_and_later_stages_cannot_bypass_firewall() -
         )
 
 
-def test_sparse_custody_binding_is_immutable_and_required_for_official_g1() -> None:
+def test_sparse_custody_binding_is_immutable_and_required_for_official_g1(
+    monkeypatch,
+) -> None:
     day = date(2020, 1, 2)
     source = [
         _bar("SPY", day, 0),
@@ -506,8 +529,14 @@ def test_sparse_custody_binding_is_immutable_and_required_for_official_g1() -> N
         max_hold_minutes=1,
         cooldown_bars=0,
     )
-    manifest = freeze_g1_population((program,))
+    manifest = _freeze_g1_population_for_test(_specifications((program,)))
     with pytest.raises(InformationFirewallError, match="accepted sparse custody"):
+        evaluate_frozen_trial(TrialLedger(manifest), manifest.slots[0], sparse_dataset)
+
+    monkeypatch.setattr(arch150_ai, "_ACCEPTED_SPARSE_CUSTODY_AUTHORITY", authority)
+    with pytest.raises(
+        InformationFirewallError, match="canonical source-owned population"
+    ):
         evaluate_frozen_trial(TrialLedger(manifest), manifest.slots[0], sparse_dataset)
 
 
@@ -1017,9 +1046,9 @@ def test_g1_manifest_freezes_ordered_proposals_before_any_result() -> None:
     first = NoiseAreaVwapMomentumProgram()
     second = VwapTrendReversalProgram()
     proposals = (first, second, first)
-    manifest = freeze_g1_population(proposals)
-    same_manifest = freeze_g1_population(proposals)
-    reordered = freeze_g1_population((second, first, first))
+    manifest = _freeze_g1_population_for_test(_specifications(proposals))
+    same_manifest = _freeze_g1_population_for_test(_specifications(proposals))
+    reordered = _freeze_g1_population_for_test(_specifications((second, first, first)))
     ledger = TrialLedger(manifest)
 
     assert isinstance(manifest, G1PopulationManifest)
@@ -1036,7 +1065,164 @@ def test_g1_manifest_freezes_ordered_proposals_before_any_result() -> None:
     with pytest.raises(AttributeError):
         manifest.slots[0].program_id = program_id(second)  # type: ignore[misc]
     with pytest.raises(TrialBudgetExceeded, match="at least one"):
-        freeze_g1_population(())
+        _freeze_g1_population_for_test(())
+
+
+def test_canonical_g1_population_is_the_exact_ordered_24_slot_manifest() -> None:
+    programs = (
+        NoiseAreaVwapMomentumProgram(3, Decimal("10"), 1, 15),
+        NoiseAreaVwapMomentumProgram(5, Decimal("20"), 2, 30),
+        NoiseAreaVwapMomentumProgram(10, Decimal("35"), 2, 45),
+        NoiseAreaVwapMomentumProgram(20, Decimal("50"), 3, 60),
+        VwapTrendReversalProgram(
+            Decimal("10"),
+            VwapStrategyMode.CONTINUATION,
+            VwapReferenceSide.ABOVE,
+            1,
+            15,
+            5,
+        ),
+        VwapTrendReversalProgram(
+            Decimal("10"),
+            VwapStrategyMode.CONTINUATION,
+            VwapReferenceSide.BELOW,
+            1,
+            15,
+            5,
+        ),
+        VwapTrendReversalProgram(
+            Decimal("35"),
+            VwapStrategyMode.BOUNDED_REVERSAL,
+            VwapReferenceSide.ABOVE,
+            2,
+            20,
+            10,
+        ),
+        VwapTrendReversalProgram(
+            Decimal("35"),
+            VwapStrategyMode.BOUNDED_REVERSAL,
+            VwapReferenceSide.BELOW,
+            2,
+            20,
+            10,
+        ),
+        OpeningRangeBreakoutReversalProgram(
+            5, OpeningRangeDirection.CONTINUATION, 0, 10
+        ),
+        OpeningRangeBreakoutReversalProgram(
+            15, OpeningRangeDirection.CONTINUATION, 1, 20
+        ),
+        OpeningRangeBreakoutReversalProgram(15, OpeningRangeDirection.REVERSAL, 1, 20),
+        OpeningRangeBreakoutReversalProgram(30, OpeningRangeDirection.REVERSAL, 2, 30),
+    )
+    expected = tuple(
+        (program, symbol, BarResolution.ONE_MINUTE)
+        for program in programs
+        for symbol in ("SPY", "QQQ")
+    )
+    manifest = freeze_g1_population()
+    repeated = freeze_g1_population()
+
+    assert not inspect.signature(freeze_g1_population).parameters
+    assert manifest.manifest_id == repeated.manifest_id
+    assert str(manifest.manifest_id) == "7e179cbc-18cf-59ce-9116-899cc876ece0"
+    assert len(manifest.slots) == G1_TOTAL_TRIAL_LIMIT == 24
+    assert tuple(slot.ordinal for slot in manifest.slots) == tuple(range(1, 25))
+    assert (
+        tuple(
+            (slot._program, slot.source_symbol, slot.bar_resolution)
+            for slot in manifest.slots
+        )
+        == expected
+    )
+    assert (
+        tuple(slot.family for slot in manifest.slots).count(
+            StrategyFamily.NOISE_AREA_VWAP_MOMENTUM
+        )
+        == 8
+    )
+    assert (
+        tuple(slot.family for slot in manifest.slots).count(
+            StrategyFamily.VWAP_TREND_REVERSAL
+        )
+        == 8
+    )
+    assert (
+        tuple(slot.family for slot in manifest.slots).count(
+            StrategyFamily.OPENING_RANGE_BREAKOUT_REVERSAL
+        )
+        == 8
+    )
+    assert tuple(slot.source_symbol for slot in manifest.slots).count("SPY") == 12
+    assert tuple(slot.source_symbol for slot in manifest.slots).count("QQQ") == 12
+    assert {slot.bar_resolution for slot in manifest.slots} == {
+        BarResolution.ONE_MINUTE
+    }
+    assert (
+        len(
+            {
+                (slot.semantic_fingerprint, slot.source_symbol, slot.bar_resolution)
+                for slot in manifest.slots
+            }
+        )
+        == 24
+    )
+
+    payload = json.loads(manifest.to_bytes())
+    assert payload["schema"] == "arch150-g1-pre-evaluation-population/v2"
+    assert payload["manifest_id"] == str(manifest.manifest_id)
+    assert len(payload["slots"]) == 24
+    assert all(
+        slot["source_symbol"] in ("SPY", "QQQ")
+        and slot["bar_resolution"] == "ONE_MINUTE"
+        and slot["program_id"] is not None
+        and len(slot["semantic_fingerprint"]) == 64
+        for slot in payload["slots"]
+    )
+    assert b"pnl" not in manifest.to_bytes().lower()
+    with pytest.raises(AttributeError):
+        manifest.slots[0].source_symbol = "QQQ"  # type: ignore[misc]
+    with pytest.raises(AttributeError):
+        manifest.slots[0].bar_resolution = BarResolution.FIVE_MINUTE  # type: ignore[misc]
+
+
+def test_g1_manifest_identity_binds_program_symbol_and_resolution() -> None:
+    program = VwapTrendReversalProgram()
+    spy = _freeze_g1_population_for_test(_specifications((program,)))
+    qqq = _freeze_g1_population_for_test(
+        _specifications((program,), source_symbol="QQQ")
+    )
+    five_minute = _freeze_g1_population_for_test(
+        _specifications((program,), resolution=BarResolution.FIVE_MINUTE)
+    )
+    changed_program = _freeze_g1_population_for_test(
+        _specifications((replace(program, displacement_bps=Decimal("26")),))
+    )
+
+    assert (
+        len(
+            {
+                spy.manifest_id,
+                qqq.manifest_id,
+                five_minute.manifest_id,
+                changed_program.manifest_id,
+            }
+        )
+        == 4
+    )
+    assert spy.slots[0].slot_id != qqq.slots[0].slot_id
+    assert spy.slots[0].program_id == qqq.slots[0].program_id
+    assert "source_symbol" not in inspect.signature(evaluate_frozen_trial).parameters
+    assert "bar_resolution" not in inspect.signature(evaluate_frozen_trial).parameters
+    assert "cost_case" not in inspect.signature(evaluate_frozen_trial).parameters
+    assert (
+        "source_symbol"
+        not in inspect.signature(_evaluate_frozen_trial_for_test).parameters
+    )
+    assert (
+        "bar_resolution"
+        not in inspect.signature(_evaluate_frozen_trial_for_test).parameters
+    )
 
 
 def test_g1_manifest_enforces_total_and_family_ceilings() -> None:
@@ -1045,7 +1231,7 @@ def test_g1_manifest_enforces_total_and_family_ceilings() -> None:
         for index in range(G1_FAMILY_TRIAL_LIMIT + 1)
     )
     with pytest.raises(TrialBudgetExceeded, match="family trial budget"):
-        freeze_g1_population(family_a)
+        _freeze_g1_population_for_test(_specifications(family_a))
     over_total = (
         tuple(
             NoiseAreaVwapMomentumProgram(noise_band_bps=Decimal(index + 1))
@@ -1065,7 +1251,7 @@ def test_g1_manifest_enforces_total_and_family_ceilings() -> None:
         + (VwapTrendReversalProgram(displacement_bps=Decimal(99)),)
     )
     with pytest.raises(TrialBudgetExceeded, match="total trial budget"):
-        freeze_g1_population(over_total)
+        _freeze_g1_population_for_test(_specifications(over_total))
 
 
 def test_g1_evaluation_requires_exact_next_slot_and_cannot_be_consumed_twice() -> None:
@@ -1078,7 +1264,9 @@ def test_g1_evaluation_requires_exact_next_slot_and_cannot_be_consumed_twice() -
     second_program = OpeningRangeBreakoutReversalProgram(
         opening_range_minutes=5, entry_delay_bars=0, max_hold_minutes=5
     )
-    manifest = freeze_g1_population((first_program, second_program))
+    manifest = _freeze_g1_population_for_test(
+        _specifications((first_program, second_program))
+    )
     ledger = TrialLedger(manifest)
     trend_bars = _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
     discovery = _discovery_dataset(trend_bars)
@@ -1091,11 +1279,9 @@ def test_g1_evaluation_requires_exact_next_slot_and_cannot_be_consumed_twice() -
     assert first_result.replay_result is not None
     assert first_result.replay_result.trades
     with pytest.raises(InformationFirewallError, match="not authorized"):
-        ledger.consume(first_program, TrialDisposition.SHORTLISTED)  # type: ignore[arg-type]
+        ledger.consume(first_program)  # type: ignore[arg-type]
 
-    ledger_after_first = ledger.consume(
-        first_result, TrialDisposition.ECONOMICALLY_REJECTED
-    )
+    ledger_after_first = ledger.consume(first_result)
     with pytest.raises(InformationFirewallError, match="exact next frozen"):
         _evaluate_frozen_trial_for_test(
             ledger_after_first, manifest.slots[0], discovery
@@ -1121,14 +1307,16 @@ def test_invalid_and_duplicate_proposals_consume_their_frozen_slots() -> None:
         "caller-invalid-hypothesis-v1",
         "PROGRAM_PARSE_REJECTED",
     )
-    manifest = freeze_g1_population((program, program, invalid))
+    manifest = _freeze_g1_population_for_test(
+        _specifications((program, program, invalid))
+    )
     assert manifest.slots[0].slot_id != manifest.slots[1].slot_id
     assert manifest.slots[0].program_id == manifest.slots[1].program_id
     ledger = TrialLedger(manifest)
     bars = _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
     discovery = _discovery_dataset(bars)
     first = _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], discovery)
-    ledger = ledger.consume(first, TrialDisposition.SHORTLISTED)
+    ledger = ledger.consume(first)
     duplicate = _evaluate_frozen_trial_for_test(ledger, manifest.slots[1], discovery)
     assert duplicate.fixed_disposition is TrialDisposition.DUPLICATE
     ledger = ledger.consume(duplicate)
@@ -1146,33 +1334,119 @@ def test_invalid_and_duplicate_proposals_consume_their_frozen_slots() -> None:
     assert ledger.records[2].slot_id == manifest.slots[2].slot_id
 
 
+def test_cross_symbol_trials_preserve_candidate_identity() -> None:
+    program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("5"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    manifest = _freeze_g1_population_for_test(
+        (
+            G1TrialSpecification(program, "SPY", BarResolution.ONE_MINUTE),
+            G1TrialSpecification(program, "QQQ", BarResolution.ONE_MINUTE),
+        )
+    )
+    day = date(2020, 1, 2)
+    trade_bars = _prices(day, ["100", "110", "110", "90", "90"])
+    discovery = _discovery_dataset(
+        trade_bars,
+        [
+            _bar("QQQ", day, index, value)
+            for index, value in enumerate(["100", "110", "110", "90", "90"])
+        ],
+    )
+    ledger = TrialLedger(manifest)
+
+    spy_result = _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], discovery)
+    assert spy_result.replay_result is not None and spy_result.replay_result.trades
+    ledger = ledger.consume(spy_result)
+    qqq_result = _evaluate_frozen_trial_for_test(ledger, manifest.slots[1], discovery)
+    assert qqq_result.fixed_disposition is None
+    assert qqq_result.replay_result is not None and qqq_result.replay_result.trades
+    assert qqq_result.evaluation_id != spy_result.evaluation_id
+    ledger = ledger.consume(qqq_result)
+    assert tuple(record.source_symbol for record in ledger.records) == ("SPY", "QQQ")
+    assert tuple(record.bar_resolution for record in ledger.records) == (
+        BarResolution.ONE_MINUTE,
+        BarResolution.ONE_MINUTE,
+    )
+    serialized_records = json.loads(ledger.to_bytes())["records"]
+    assert tuple(record["source_symbol"] for record in serialized_records) == (
+        "SPY",
+        "QQQ",
+    )
+    assert all(
+        record["bar_resolution"] == "ONE_MINUTE" for record in serialized_records
+    )
+
+    result_freeze = finalize_discovery_population(discovery, ledger)
+    candidate = freeze_candidate_population(
+        result_freeze,
+        ledger,
+        tuple(slot.slot_id for slot in manifest.slots),
+    )
+    assert candidate.candidate_slot_ids == tuple(
+        slot.slot_id for slot in manifest.slots
+    )
+    assert candidate.candidate_program_ids == (program_id(program), program_id(program))
+    assert candidate.candidate_fingerprints == (
+        program_fingerprint(program),
+        program_fingerprint(program),
+    )
+    assert candidate.candidate_source_symbols == ("SPY", "QQQ")
+    assert candidate.candidate_bar_resolutions == (
+        BarResolution.ONE_MINUTE,
+        BarResolution.ONE_MINUTE,
+    )
+    bias = selection_bias_input(result_freeze, ledger)
+    assert bias.source_symbols == ("SPY", "QQQ")
+    assert bias.bar_resolutions == (
+        BarResolution.ONE_MINUTE,
+        BarResolution.ONE_MINUTE,
+    )
+    bias_payload = json.loads(bias.to_bytes())
+    assert bias_payload["source_symbols"] == ["SPY", "QQQ"]
+    assert bias_payload["bar_resolutions"] == ["ONE_MINUTE", "ONE_MINUTE"]
+    candidate_payload = json.loads(candidate.to_bytes())
+    assert candidate_payload["candidate_slot_ids"] == [
+        str(slot.slot_id) for slot in manifest.slots
+    ]
+    assert candidate_payload["candidate_source_symbols"] == ["SPY", "QQQ"]
+    assert candidate_payload["candidate_bar_resolutions"] == [
+        "ONE_MINUTE",
+        "ONE_MINUTE",
+    ]
+    with pytest.raises(AttributeError):
+        candidate.candidate_source_symbols = ("QQQ", "SPY")  # type: ignore[misc]
+
+
 def test_frozen_slot_and_ledger_cannot_be_rebound_or_accept_absent_programs() -> None:
     program = VwapTrendReversalProgram()
-    manifest = freeze_g1_population((program,))
-    other_manifest = freeze_g1_population(
-        (replace(program, displacement_bps=Decimal(30)),)
+    manifest = _freeze_g1_population_for_test(_specifications((program,)))
+    other_manifest = _freeze_g1_population_for_test(
+        _specifications((replace(program, displacement_bps=Decimal(30)),))
     )
     ledger = TrialLedger(manifest)
     discovery = _discovery_dataset(_flat(date(2020, 1, 2)))
     with pytest.raises(InformationFirewallError, match="exact next frozen"):
         _evaluate_frozen_trial_for_test(ledger, other_manifest.slots[0], discovery)
     with pytest.raises(InformationFirewallError, match="not authorized"):
-        ledger.consume(
-            VwapTrendReversalProgram(displacement_bps=Decimal(31)),
-            TrialDisposition.FAILED,
-        )  # type: ignore[arg-type]
+        ledger.consume(VwapTrendReversalProgram(displacement_bps=Decimal(31)))  # type: ignore[arg-type]
 
 
 def test_completed_discovery_freeze_gates_candidates_and_validation() -> None:
-    manifest = freeze_g1_population(
-        (
-            VwapTrendReversalProgram(
-                displacement_bps=Decimal(5),
-                confirmation_bars=1,
-                max_hold_minutes=1,
-                cooldown_bars=0,
-            ),
-            NoiseAreaVwapMomentumProgram(),
+    manifest = _freeze_g1_population_for_test(
+        _specifications(
+            (
+                VwapTrendReversalProgram(
+                    displacement_bps=Decimal(5),
+                    confirmation_bars=1,
+                    max_hold_minutes=1,
+                    cooldown_bars=0,
+                ),
+                NoiseAreaVwapMomentumProgram(),
+            )
         )
     )
     ledger = TrialLedger(manifest)
@@ -1185,10 +1459,10 @@ def test_completed_discovery_freeze_gates_candidates_and_validation() -> None:
     ):
         freeze_candidate_population(None, ledger, ())  # type: ignore[arg-type]
 
-    candidate = manifest.slots[0]._program
-    assert candidate is not None
     first = _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], discovery)
-    ledger = ledger.consume(first, TrialDisposition.SHORTLISTED)
+    with pytest.raises(TypeError):
+        ledger.consume(first, TrialDisposition.ECONOMICALLY_REJECTED)  # type: ignore[call-arg]
+    ledger = ledger.consume(first)
     second = _evaluate_frozen_trial_for_test(ledger, manifest.slots[1], discovery)
     ledger = ledger.consume(second)
     with pytest.raises(InformationFirewallError, match="different discovery dataset"):
@@ -1196,14 +1470,16 @@ def test_completed_discovery_freeze_gates_candidates_and_validation() -> None:
             _discovery_dataset(_flat(date(2020, 1, 2))), ledger
         )
     finalized = finalize_discovery_population(discovery, ledger)
-    freeze = freeze_candidate_population(finalized, ledger, (candidate,))
+    freeze = freeze_candidate_population(
+        finalized, ledger, (manifest.slots[0].slot_id,)
+    )
     assert freeze.population_manifest_id == manifest.manifest_id
     assert freeze.ledger_id == ledger.ledger_id
     with pytest.raises(InformationFirewallError, match="not shortlisted"):
         freeze_candidate_population(
             finalized,
             ledger,
-            (NoiseAreaVwapMomentumProgram(),),
+            (manifest.slots[1].slot_id,),
         )
     with pytest.raises(InformationFirewallError, match="candidate-freeze"):
         open_validation_dataset(_universe_bars(date(2022, 1, 3)))
@@ -1230,7 +1506,7 @@ def test_selection_bias_binds_every_completed_frozen_attempt() -> None:
     )
     zero_trade = NoiseAreaVwapMomentumProgram()
     proposals = (duplicate, duplicate, invalid, failed, zero_trade)
-    manifest = freeze_g1_population(proposals)
+    manifest = _freeze_g1_population_for_test(_specifications(proposals))
     ledger = TrialLedger(manifest)
     discovery = _discovery_dataset(
         _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
@@ -1242,12 +1518,9 @@ def test_selection_bias_binds_every_completed_frozen_attempt() -> None:
             discovery,
             initial_equity=Decimal("-1") if slot.ordinal == 4 else Decimal("1"),
         )
-        disposition = (
-            TrialDisposition.ECONOMICALLY_REJECTED if slot.ordinal == 1 else None
-        )
-        ledger = ledger.consume(evaluation, disposition)
+        ledger = ledger.consume(evaluation)
     assert tuple(record.disposition for record in ledger.records) == (
-        TrialDisposition.ECONOMICALLY_REJECTED,
+        TrialDisposition.SHORTLISTED,
         TrialDisposition.DUPLICATE,
         TrialDisposition.INVALID,
         TrialDisposition.FAILED,
@@ -1273,7 +1546,9 @@ def test_selection_bias_binds_every_completed_frozen_attempt() -> None:
 def test_selection_bias_and_effect_free_arch150_surface_leave_arch149_untouched() -> (
     None
 ):
-    manifest = freeze_g1_population((NoiseAreaVwapMomentumProgram(),))
+    manifest = _freeze_g1_population_for_test(
+        _specifications((NoiseAreaVwapMomentumProgram(),))
+    )
     ledger = TrialLedger(manifest)
     discovery = _discovery_dataset(_flat(date(2020, 1, 2)))
     zero_trade = _evaluate_frozen_trial_for_test(
@@ -1287,7 +1562,7 @@ def test_selection_bias_and_effect_free_arch150_surface_leave_arch149_untouched(
     assert bias.consumed_trial_count == 1
     assert bias.trial_ids == (ledger.records[0].trial_id,)
     assert bias.ledger_id == ledger.ledger_id
-    assert b"arch150-selection-bias-input/v2" in bias.to_bytes()
+    assert b"arch150-selection-bias-input/v3" in bias.to_bytes()
     assert foundation_help().startswith("Architecture 150 foundation")
     assert (
         FOUNDATION_EFFECT_COUNTERS.provider_calls,

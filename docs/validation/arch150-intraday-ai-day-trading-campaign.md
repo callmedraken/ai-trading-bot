@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION + D1 + D1R + D1R-C1 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; SPARSE-REPLAY SOURCE CHECKPOINT NEXT; G1 FREEZE/EVALUATION NOT YET AUTHORIZED**.
+Status: **FOUNDATION + D1 + D1R + D1R-C1 + D2 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; CANONICAL G1 POPULATION FROZEN IN SOURCE; REAL G1 RESULTS NOT OPENED**.
 
 Normative design:
 
@@ -227,10 +227,60 @@ The sparse evidence is internally consistent:
 post-result numeric missing-count threshold; missing minutes remain explicit
 absence and no OHLCV was synthesized.
 
-Sparse custody acceptance does not authorize strategy P&L. The next checkpoint
-is a source-only/fake-only sparse-replay semantics implementation. It must be
-accepted before the complete G1 population is frozen and before any real
-discovery P&L is opened.
+Sparse custody acceptance does not itself authorize strategy P&L. D2
+sparse-replay semantics are SOURCE/CERTIFICATION ACCEPTED and integrated at
+HEAD `6fb7b128d83b4846b384bb1709f0ee4e724d173d` / tree
+`7fd5ea4c516a7f97ce2f5227befd4dbef4e3a802`. Feature FULL run `45113622952`,
+attempt 1, is terminal SUCCESS. Develop run `45122666587`, attempt 1, is
+terminal SUCCESS with exact feature-certification reuse; no duplicate FULL ran.
+
+## Canonical G1 population freeze
+
+The source-owned canonical manifest is frozen before any real strategy result
+is visible:
+
+- schema: `arch150-g1-pre-evaluation-population/v2`;
+- manifest ID: `7e179cbc-18cf-59ce-9116-899cc876ece0`;
+- 24 ordered slots, eight per family;
+- 12 SPY and 12 QQQ slots, all `ONE_MINUTE`;
+- each slot identity binds the typed program semantic fingerprint, source symbol,
+  and bar resolution.
+
+The canonical order is four variants per family, with SPY followed by QQQ for
+each variant:
+
+| Slots | Family and structural variant | Frozen parameters |
+| --- | --- | --- |
+| 1–2 | A1 noise-area/VWAP momentum | lookback 3 sessions; noise band 10 bps; 1 confirmation bar; 15-minute max hold |
+| 3–4 | A2 noise-area/VWAP momentum | lookback 5; 20 bps; 2 confirmation bars; 30-minute max hold |
+| 5–6 | A3 noise-area/VWAP momentum | lookback 10; 35 bps; 2 confirmation bars; 45-minute max hold |
+| 7–8 | A4 noise-area/VWAP momentum | lookback 20; 50 bps; 3 confirmation bars; 60-minute max hold |
+| 9–10 | B1 VWAP continuation above | displacement 10 bps; 1 confirmation bar; 15-minute max hold; 5-bar cooldown |
+| 11–12 | B2 VWAP continuation below | displacement 10 bps; 1 confirmation bar; 15-minute max hold; 5-bar cooldown |
+| 13–14 | B3 bounded reversal above | displacement 35 bps; 2 confirmation bars; 20-minute max hold; 10-bar cooldown |
+| 15–16 | B4 bounded reversal below | displacement 35 bps; 2 confirmation bars; 20-minute max hold; 10-bar cooldown |
+| 17–18 | C1 opening-range continuation | 5-minute range; no entry delay; 10-minute max hold |
+| 19–20 | C2 opening-range continuation | 15-minute range; 1-bar entry delay; 20-minute max hold |
+| 21–22 | C3 opening-range reversal | 15-minute range; 1-bar entry delay; 20-minute max hold |
+| 23–24 | C4 opening-range reversal | 30-minute range; 2-bar entry delay; 30-minute max hold |
+
+Within every row above, the odd-numbered slot is SPY and the next slot is QQQ.
+All slots use `BarResolution.ONE_MINUTE`. The same program on the two symbols is
+two distinct trial identities; a repeated program/symbol/resolution in a
+synthetic population is a duplicate. Five-minute G1 trials are not permitted.
+The official evaluator accepts only the source-owned canonical manifest and
+derives symbol/resolution from each frozen slot.
+
+The discovery advancement rule is frozen: INVALID, DUPLICATE, deterministic
+FAILED, and ZERO_TRADE retain their terminal dispositions. Each valid unique
+trial that produces at least one STRESS discovery trade becomes SHORTLISTED.
+Return magnitude, Sharpe, win rate, profit factor, BASE, and ZERO do not decide
+advancement. BASE and ZERO are diagnostics only; validation is the first
+economic/frequency rejection stage.
+
+No real G1 trial has been consumed, no real sparse custody file was read for
+strategy evaluation, and no strategy P&L was generated. Validation
+`[2021-01-01, 2024-01-01)` remains unopened. 2024+ remains sealed.
 
 ## Initial implementation scope
 
@@ -254,16 +304,18 @@ Do not open real intraday market data in the foundation checkpoint.
 
 ## Data acquisition sequence
 
-After foundation acceptance:
+After foundation acceptance, the source/evidence sequence is:
 
 1. acquire and preserve only SPY/QQQ 1-minute discovery+validation data for
    `[2016-01-01, 2024-01-01)`;
 2. validate/custody that dataset;
-3. freeze the complete G1 population before P&L visibility;
-4. run G1 discovery/validation;
-5. perform selection-bias correction and freeze final candidate set;
-6. only then acquire/open 2024-2025 holdout data;
-7. if a candidate survives, only then acquire/open the fixed Jan-Oct 2026
+3. accept D2 sparse-replay semantics;
+4. freeze the complete canonical G1 population before P&L visibility;
+5. run the separately reviewed one-shot 2016-2020 G1 discovery evaluation;
+6. only after discovery is terminal, open 2021-2023 validation;
+7. perform selection-bias correction and freeze final candidate set;
+8. only then acquire/open 2024-2025 holdout data;
+9. if a candidate survives, only then acquire/open the fixed Jan-Oct 2026
    recent-regime extension.
 
 No waiting for the end of calendar 2026 is required.
@@ -284,8 +336,15 @@ Pin at minimum:
 - nonempty ordered manifest identity is deterministic and preserves duplicate
   proposal slots;
 - every official evaluation consumes only the next exact frozen slot;
-- invalid, duplicate, zero-trade, deterministic-failure, economic-rejection, and
-  shortlist results all consume their frozen trial slot;
+- invalid, duplicate, zero-trade, deterministic-failure, and shortlist results
+  all consume their frozen trial slot;
+- each canonical trial binds its program, SPY/QQQ source symbol, and one-minute
+  resolution in manifest, evaluation, ledger, candidate, and selection-bias
+  identities;
+- a same-program SPY/QQQ pair has distinct trial identities, while repeating
+  the exact program/symbol/resolution is a duplicate;
+- every valid unique STRESS discovery replay with a trade is shortlisted;
+  discovery economics and BASE/ZERO diagnostics cannot reject or promote;
 - BASE 2-bps/fill and STRESS 5-bps/fill contracts;
 - zero-friction cannot qualify;
 - complete-trial-ledger DSR/multiple-testing inputs;

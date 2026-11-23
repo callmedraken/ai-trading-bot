@@ -27,11 +27,12 @@ from trading_bot.experiments.arch148_intraday import (
 
 ARCH150_SCHEMA = "arch150-intraday-ai-research-foundation/v1"
 PROGRAM_SCHEMA = "arch150-typed-intraday-program/v1"
-TRIAL_LEDGER_SCHEMA = "arch150-consumed-trial-ledger/v2"
-G1_POPULATION_SCHEMA = "arch150-g1-pre-evaluation-population/v1"
-G1_RESULT_SCHEMA = "arch150-g1-trial-result/v1"
-DISCOVERY_RESULT_SCHEMA = "arch150-discovery-result-freeze/v1"
-SELECTION_BIAS_SCHEMA = "arch150-selection-bias-input/v2"
+TRIAL_LEDGER_SCHEMA = "arch150-consumed-trial-ledger/v3"
+G1_POPULATION_SCHEMA = "arch150-g1-pre-evaluation-population/v2"
+G1_RESULT_SCHEMA = "arch150-g1-trial-result/v2"
+DISCOVERY_RESULT_SCHEMA = "arch150-discovery-result-freeze/v2"
+SELECTION_BIAS_SCHEMA = "arch150-selection-bias-input/v3"
+CANDIDATE_FREEZE_SCHEMA = "arch150-candidate-freeze/v2"
 REPLAY_SCHEMA = "arch150-deterministic-replay/v2"
 SPARSE_FIVE_MINUTE_SCHEMA = "arch150-sparse-five-minute-view/v1"
 SPARSE_CUSTODY_AUTHORITY_SCHEMA = "arch150-sparse-custody-authority/v1"
@@ -1189,6 +1190,8 @@ class FrozenTrialSlot:
     slot_id: UUID
     ordinal: int
     family: StrategyFamily
+    source_symbol: str
+    bar_resolution: BarResolution
     semantic_fingerprint: str
     program_id: UUID | None
     invalid_reference: InvalidTrialReference | None
@@ -1201,6 +1204,8 @@ class FrozenTrialSlot:
         slot_id: UUID,
         ordinal: int,
         family: StrategyFamily,
+        source_symbol: str,
+        bar_resolution: BarResolution,
         semantic_fingerprint: str,
         program_id: UUID | None,
         invalid_reference: InvalidTrialReference | None,
@@ -1217,6 +1222,8 @@ class FrozenTrialSlot:
             ("slot_id", slot_id),
             ("ordinal", ordinal),
             ("family", family),
+            ("source_symbol", source_symbol),
+            ("bar_resolution", bar_resolution),
             ("semantic_fingerprint", semantic_fingerprint),
             ("program_id", program_id),
             ("invalid_reference", invalid_reference),
@@ -1259,6 +1266,8 @@ class G1PopulationManifest:
                         "ordinal": slot.ordinal,
                         "slot_id": str(slot.slot_id),
                         "family": slot.family.value,
+                        "source_symbol": slot.source_symbol,
+                        "bar_resolution": slot.bar_resolution.name,
                         "semantic_fingerprint": slot.semantic_fingerprint,
                         "program_id": str(slot.program_id) if slot.program_id else None,
                         "proposal": _slot_material(slot),
@@ -1317,8 +1326,11 @@ class CandidateFreeze:
     discovery_result_freeze_id: UUID
     discovery_dataset_id: UUID
     ledger_id: UUID
+    candidate_slot_ids: tuple[UUID, ...]
     candidate_program_ids: tuple[UUID, ...]
     candidate_fingerprints: tuple[str, ...]
+    candidate_source_symbols: tuple[str, ...]
+    candidate_bar_resolutions: tuple[BarResolution, ...]
     _authority_seal: object = field(repr=False, compare=False)
 
     def __init__(
@@ -1328,8 +1340,11 @@ class CandidateFreeze:
         discovery_result_freeze_id: UUID,
         discovery_dataset_id: UUID,
         ledger_id: UUID,
+        candidate_slot_ids: tuple[UUID, ...],
         candidate_program_ids: tuple[UUID, ...],
         candidate_fingerprints: tuple[str, ...],
+        candidate_source_symbols: tuple[str, ...],
+        candidate_bar_resolutions: tuple[BarResolution, ...],
         *,
         _seal: object = None,
     ) -> None:
@@ -1343,11 +1358,35 @@ class CandidateFreeze:
             ("discovery_result_freeze_id", discovery_result_freeze_id),
             ("discovery_dataset_id", discovery_dataset_id),
             ("ledger_id", ledger_id),
+            ("candidate_slot_ids", candidate_slot_ids),
             ("candidate_program_ids", candidate_program_ids),
             ("candidate_fingerprints", candidate_fingerprints),
+            ("candidate_source_symbols", candidate_source_symbols),
+            ("candidate_bar_resolutions", candidate_bar_resolutions),
         ):
             object.__setattr__(self, name, value)
         object.__setattr__(self, "_authority_seal", _seal)
+
+    def to_bytes(self) -> bytes:
+        return _canonical_json(
+            {
+                "schema": CANDIDATE_FREEZE_SCHEMA,
+                "freeze_id": str(self.freeze_id),
+                "population_manifest_id": str(self.population_manifest_id),
+                "discovery_result_freeze_id": str(self.discovery_result_freeze_id),
+                "discovery_dataset_id": str(self.discovery_dataset_id),
+                "ledger_id": str(self.ledger_id),
+                "candidate_slot_ids": [str(item) for item in self.candidate_slot_ids],
+                "candidate_program_ids": [
+                    str(item) for item in self.candidate_program_ids
+                ],
+                "candidate_fingerprints": list(self.candidate_fingerprints),
+                "candidate_source_symbols": list(self.candidate_source_symbols),
+                "candidate_bar_resolutions": [
+                    item.name for item in self.candidate_bar_resolutions
+                ],
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -1438,16 +1477,29 @@ def _candidate_freeze_is_valid(value: CandidateFreeze | None) -> bool:
         type(value) is CandidateFreeze
         and value._authority_seal is _CANDIDATE_FREEZE_SEAL
         and bool(value.candidate_program_ids)
-        and len(value.candidate_program_ids) == len(value.candidate_fingerprints)
+        and len(value.candidate_slot_ids)
+        == len(value.candidate_program_ids)
+        == len(value.candidate_fingerprints)
+        == len(value.candidate_source_symbols)
+        == len(value.candidate_bar_resolutions)
+        and len(set(value.candidate_slot_ids)) == len(value.candidate_slot_ids)
+        and all(symbol in INITIAL_UNIVERSE for symbol in value.candidate_source_symbols)
+        and all(type(item) is BarResolution for item in value.candidate_bar_resolutions)
     ):
         return False
     material = {
+        "schema": CANDIDATE_FREEZE_SCHEMA,
         "population_manifest_id": str(value.population_manifest_id),
         "discovery_result_freeze_id": str(value.discovery_result_freeze_id),
         "discovery_dataset_id": str(value.discovery_dataset_id),
         "ledger_id": str(value.ledger_id),
+        "candidate_slot_ids": [str(item) for item in value.candidate_slot_ids],
         "candidate_program_ids": [str(item) for item in value.candidate_program_ids],
         "candidate_fingerprints": list(value.candidate_fingerprints),
+        "candidate_source_symbols": list(value.candidate_source_symbols),
+        "candidate_bar_resolutions": [
+            item.name for item in value.candidate_bar_resolutions
+        ],
     }
     expected = uuid5(_CANDIDATE_FREEZE_NAMESPACE, _canonical_json(material).decode())
     return value.freeze_id == expected
@@ -2469,12 +2521,38 @@ type TrialProgram = IntradayProgram | InvalidTrialReference
 
 
 @dataclass(frozen=True, slots=True)
+class G1TrialSpecification:
+    """A typed proposal and the source identity frozen before evaluation."""
+
+    program: TrialProgram
+    source_symbol: str
+    bar_resolution: BarResolution
+
+    def __post_init__(self) -> None:
+        if not (
+            _is_intraday_program(self.program)
+            or type(self.program) is InvalidTrialReference
+        ):
+            raise UnsupportedProgramError(
+                "G1 trial specifications require the closed typed grammar"
+            )
+        if (
+            type(self.source_symbol) is not str
+            or self.source_symbol not in INITIAL_UNIVERSE
+        ):
+            raise ValueError("G1 source symbol must be SPY or QQQ")
+        if type(self.bar_resolution) is not BarResolution:
+            raise TypeError("G1 bar resolution must be a BarResolution")
+
+
+@dataclass(frozen=True, slots=True)
 class TrialRecord:
     trial_ordinal: int
     trial_id: UUID
     slot_id: UUID
     discovery_dataset_id: UUID
     source_symbol: str
+    bar_resolution: BarResolution
     family: StrategyFamily
     program_id: UUID | None
     semantic_fingerprint: str
@@ -2493,26 +2571,40 @@ def _is_intraday_program(value: object) -> bool:
     )
 
 
-def _proposal_material(proposal: TrialProgram) -> dict[str, object]:
+def _proposal_material(
+    proposal: TrialProgram,
+    source_symbol: str,
+    bar_resolution: BarResolution,
+) -> dict[str, object]:
+    material: dict[str, object] = {
+        "source_symbol": source_symbol,
+        "bar_resolution": bar_resolution.name,
+    }
     if _is_intraday_program(proposal):
         program = proposal
-        return {
-            "kind": "TYPED_PROGRAM",
-            "family": program.family.value,
-            "semantic_fingerprint": program_fingerprint(program),
-            "program_id": str(program_id(program)),
-        }
-    if type(proposal) is InvalidTrialReference:
-        return {
-            "kind": "INVALID_ATTEMPT",
-            "family": proposal.family.value,
-            "semantic_fingerprint": proposal.semantic_fingerprint,
-            "program_id": None,
-            "diagnostic_code": proposal.diagnostic_code,
-        }
-    raise UnsupportedProgramError(
-        "G1 proposals must be typed programs or explicit invalid references"
-    )
+        material.update(
+            {
+                "kind": "TYPED_PROGRAM",
+                "family": program.family.value,
+                "semantic_fingerprint": program_fingerprint(program),
+                "program_id": str(program_id(program)),
+            }
+        )
+    elif type(proposal) is InvalidTrialReference:
+        material.update(
+            {
+                "kind": "INVALID_ATTEMPT",
+                "family": proposal.family.value,
+                "semantic_fingerprint": proposal.semantic_fingerprint,
+                "program_id": None,
+                "diagnostic_code": proposal.diagnostic_code,
+            }
+        )
+    else:
+        raise UnsupportedProgramError(
+            "G1 proposals must be typed programs or explicit invalid references"
+        )
+    return material
 
 
 def _slot_material(slot: FrozenTrialSlot) -> dict[str, object]:
@@ -2522,7 +2614,7 @@ def _slot_material(slot: FrozenTrialSlot) -> dict[str, object]:
         proposal = slot._program
     else:
         raise InformationFirewallError("frozen G1 slot lost its proposal binding")
-    return _proposal_material(proposal)
+    return _proposal_material(proposal, slot.source_symbol, slot.bar_resolution)
 
 
 def _manifest_is_valid(manifest: G1PopulationManifest | None) -> bool:
@@ -2541,6 +2633,9 @@ def _manifest_is_valid(manifest: G1PopulationManifest | None) -> bool:
             and slot._authority_seal is _G1_SLOT_SEAL
             and slot.manifest_id == manifest.manifest_id
             and slot.ordinal == ordinal
+            and type(slot.source_symbol) is str
+            and slot.source_symbol in INITIAL_UNIVERSE
+            and type(slot.bar_resolution) is BarResolution
         ):
             return False
         try:
@@ -2549,6 +2644,8 @@ def _manifest_is_valid(manifest: G1PopulationManifest | None) -> bool:
             return False
         if (
             slot.family.value != material["family"]
+            or slot.source_symbol != material["source_symbol"]
+            or slot.bar_resolution.name != material["bar_resolution"]
             or slot.semantic_fingerprint != material["semantic_fingerprint"]
             or (str(slot.program_id) if slot.program_id else None)
             != material["program_id"]
@@ -2580,18 +2677,24 @@ def _manifest_is_valid(manifest: G1PopulationManifest | None) -> bool:
     return manifest.manifest_id == expected_manifest_id
 
 
-def freeze_g1_population(proposals: Iterable[TrialProgram]) -> G1PopulationManifest:
-    """Freeze the ordered bounded G1 proposal population before evaluation."""
-
-    materialized = tuple(proposals)
+def _freeze_g1_population(
+    specifications: tuple[G1TrialSpecification, ...],
+) -> G1PopulationManifest:
+    materialized = specifications
     if not materialized:
         raise TrialBudgetExceeded("G1 population must contain at least one proposal")
     if len(materialized) > G1_TOTAL_TRIAL_LIMIT:
         raise TrialBudgetExceeded("G1 total trial budget is 24")
     counts = {family: 0 for family in StrategyFamily}
     proposal_material: list[dict[str, object]] = []
-    for proposal in materialized:
-        item = _proposal_material(proposal)
+    for specification in materialized:
+        if type(specification) is not G1TrialSpecification:
+            raise UnsupportedProgramError("G1 population requires trial specifications")
+        item = _proposal_material(
+            specification.program,
+            specification.source_symbol,
+            specification.bar_resolution,
+        )
         family = StrategyFamily(item["family"])
         counts[family] += 1
         if counts[family] > G1_FAMILY_TRIAL_LIMIT:
@@ -2618,14 +2721,14 @@ def freeze_g1_population(proposals: Iterable[TrialProgram]) -> G1PopulationManif
                 }
             ).decode(),
         )
-        if type(proposal) is InvalidTrialReference:
-            family = proposal.family
-            fingerprint = proposal.semantic_fingerprint
+        if type(proposal.program) is InvalidTrialReference:
+            family = proposal.program.family
+            fingerprint = proposal.program.semantic_fingerprint
             identifier = None
-            invalid_reference = proposal
+            invalid_reference = proposal.program
             program = None
         else:
-            program = proposal
+            program = proposal.program
             family = program.family
             fingerprint = program_fingerprint(program)
             identifier = program_id(program)
@@ -2636,6 +2739,8 @@ def freeze_g1_population(proposals: Iterable[TrialProgram]) -> G1PopulationManif
                 slot_id,
                 ordinal,
                 family,
+                proposal.source_symbol,
+                proposal.bar_resolution,
                 fingerprint,
                 identifier,
                 invalid_reference,
@@ -2649,11 +2754,97 @@ def freeze_g1_population(proposals: Iterable[TrialProgram]) -> G1PopulationManif
     return manifest
 
 
+def _freeze_g1_population_for_test(
+    specifications: Iterable[G1TrialSpecification],
+) -> G1PopulationManifest:
+    """Private synthetic seam for bounded noncanonical populations."""
+
+    return _freeze_g1_population(tuple(specifications))
+
+
+def _canonical_g1_trial_specifications() -> tuple[G1TrialSpecification, ...]:
+    programs: tuple[IntradayProgram, ...] = (
+        NoiseAreaVwapMomentumProgram(3, Decimal("10"), 1, 15),
+        NoiseAreaVwapMomentumProgram(5, Decimal("20"), 2, 30),
+        NoiseAreaVwapMomentumProgram(10, Decimal("35"), 2, 45),
+        NoiseAreaVwapMomentumProgram(20, Decimal("50"), 3, 60),
+        VwapTrendReversalProgram(
+            Decimal("10"),
+            VwapStrategyMode.CONTINUATION,
+            VwapReferenceSide.ABOVE,
+            1,
+            15,
+            5,
+        ),
+        VwapTrendReversalProgram(
+            Decimal("10"),
+            VwapStrategyMode.CONTINUATION,
+            VwapReferenceSide.BELOW,
+            1,
+            15,
+            5,
+        ),
+        VwapTrendReversalProgram(
+            Decimal("35"),
+            VwapStrategyMode.BOUNDED_REVERSAL,
+            VwapReferenceSide.ABOVE,
+            2,
+            20,
+            10,
+        ),
+        VwapTrendReversalProgram(
+            Decimal("35"),
+            VwapStrategyMode.BOUNDED_REVERSAL,
+            VwapReferenceSide.BELOW,
+            2,
+            20,
+            10,
+        ),
+        OpeningRangeBreakoutReversalProgram(
+            5, OpeningRangeDirection.CONTINUATION, 0, 10
+        ),
+        OpeningRangeBreakoutReversalProgram(
+            15, OpeningRangeDirection.CONTINUATION, 1, 20
+        ),
+        OpeningRangeBreakoutReversalProgram(15, OpeningRangeDirection.REVERSAL, 1, 20),
+        OpeningRangeBreakoutReversalProgram(30, OpeningRangeDirection.REVERSAL, 2, 30),
+    )
+    return tuple(
+        G1TrialSpecification(program, symbol, BarResolution.ONE_MINUTE)
+        for program in programs
+        for symbol in INITIAL_UNIVERSE
+    )
+
+
+def freeze_g1_population() -> G1PopulationManifest:
+    """Return the source-owned canonical 24-slot Architecture-150 G1 manifest."""
+
+    manifest = _freeze_g1_population(_canonical_g1_trial_specifications())
+    if (
+        len(manifest.slots) != G1_TOTAL_TRIAL_LIMIT
+        or any(
+            slot.bar_resolution is not BarResolution.ONE_MINUTE
+            for slot in manifest.slots
+        )
+        or {slot.source_symbol for slot in manifest.slots} != set(INITIAL_UNIVERSE)
+        or sum(slot.source_symbol == "SPY" for slot in manifest.slots) != 12
+        or sum(slot.source_symbol == "QQQ" for slot in manifest.slots) != 12
+        or any(
+            sum(slot.family is family for slot in manifest.slots)
+            != G1_FAMILY_TRIAL_LIMIT
+            for family in StrategyFamily
+        )
+    ):
+        raise InformationFirewallError("canonical G1 population contract drift")
+    return manifest
+
+
 def _evaluation_identity_material(
     manifest_id: UUID,
     slot_id: UUID,
     discovery_dataset_id: UUID,
     source_symbol: str,
+    bar_resolution: BarResolution,
     replay_id: UUID | None,
     fixed_disposition: TrialDisposition | None,
     diagnostic_code: str | None,
@@ -2664,6 +2855,8 @@ def _evaluation_identity_material(
         "slot_id": str(slot_id),
         "discovery_dataset_id": str(discovery_dataset_id),
         "source_symbol": source_symbol,
+        "bar_resolution": bar_resolution.name,
+        "qualification_cost_case": CostCase.STRESS.value,
         "replay_id": str(replay_id) if replay_id else None,
         "fixed_disposition": (
             fixed_disposition.value if fixed_disposition is not None else None
@@ -2680,6 +2873,7 @@ class G1TrialEvaluation:
     slot_id: UUID
     discovery_dataset_id: UUID
     source_symbol: str
+    bar_resolution: BarResolution
     evaluation_id: UUID
     replay_result: ReplayResult | None
     fixed_disposition: TrialDisposition | None
@@ -2692,6 +2886,7 @@ class G1TrialEvaluation:
         slot_id: UUID,
         discovery_dataset_id: UUID,
         source_symbol: str,
+        bar_resolution: BarResolution,
         evaluation_id: UUID,
         replay_result: ReplayResult | None,
         fixed_disposition: TrialDisposition | None,
@@ -2708,6 +2903,7 @@ class G1TrialEvaluation:
             ("slot_id", slot_id),
             ("discovery_dataset_id", discovery_dataset_id),
             ("source_symbol", source_symbol),
+            ("bar_resolution", bar_resolution),
             ("evaluation_id", evaluation_id),
             ("replay_result", replay_result),
             ("fixed_disposition", fixed_disposition),
@@ -2723,6 +2919,8 @@ def _evaluation_is_valid(evaluation: G1TrialEvaluation, slot: FrozenTrialSlot) -
         and evaluation._authority_seal is _G1_RESULT_SEAL
         and evaluation.manifest_id == slot.manifest_id
         and evaluation.slot_id == slot.slot_id
+        and evaluation.source_symbol == slot.source_symbol
+        and evaluation.bar_resolution is slot.bar_resolution
     ):
         return False
     replay = evaluation.replay_result
@@ -2766,6 +2964,7 @@ def _evaluation_is_valid(evaluation: G1TrialEvaluation, slot: FrozenTrialSlot) -
                 evaluation.slot_id,
                 evaluation.discovery_dataset_id,
                 evaluation.source_symbol,
+                evaluation.bar_resolution,
                 replay.replay_id if replay is not None else None,
                 evaluation.fixed_disposition,
                 evaluation.diagnostic_code,
@@ -2778,7 +2977,6 @@ def _evaluation_is_valid(evaluation: G1TrialEvaluation, slot: FrozenTrialSlot) -
 def _make_g1_evaluation(
     slot: FrozenTrialSlot,
     discovery_dataset_id: UUID,
-    source_symbol: str,
     replay_result: ReplayResult | None,
     fixed_disposition: TrialDisposition | None,
     diagnostic_code: str | None,
@@ -2787,7 +2985,8 @@ def _make_g1_evaluation(
         slot.manifest_id,
         slot.slot_id,
         discovery_dataset_id,
-        source_symbol,
+        slot.source_symbol,
+        slot.bar_resolution,
         replay_result.replay_id if replay_result is not None else None,
         fixed_disposition,
         diagnostic_code,
@@ -2796,7 +2995,8 @@ def _make_g1_evaluation(
         slot.manifest_id,
         slot.slot_id,
         discovery_dataset_id,
-        source_symbol,
+        slot.source_symbol,
+        slot.bar_resolution,
         uuid5(_G1_RESULT_NAMESPACE, _canonical_json(material).decode()),
         replay_result,
         fixed_disposition,
@@ -2833,18 +3033,20 @@ class TrialLedger:
                 or record.trial_ordinal != ordinal
                 or record.slot_id != slot.slot_id
                 or record.family is not slot.family
+                or record.source_symbol != slot.source_symbol
+                or record.bar_resolution is not slot.bar_resolution
                 or record.program_id != slot.program_id
                 or record.semantic_fingerprint != slot.semantic_fingerprint
             ):
                 raise InformationFirewallError(
                     "trial ledger records must consume manifest slots in order"
                 )
-            if materialized and (
-                record.discovery_dataset_id != materialized[0].discovery_dataset_id
-                or record.source_symbol != materialized[0].source_symbol
+            if (
+                materialized
+                and record.discovery_dataset_id != materialized[0].discovery_dataset_id
             ):
                 raise InformationFirewallError(
-                    "all G1 results must use one discovery dataset and source symbol"
+                    "all G1 results must use one discovery dataset"
                 )
         object.__setattr__(self, "_manifest", manifest)
         object.__setattr__(self, "_records", materialized)
@@ -2877,12 +3079,6 @@ class TrialLedger:
         return self._records[0].discovery_dataset_id
 
     @property
-    def source_symbol(self) -> str | None:
-        if not self._records:
-            return None
-        return self._records[0].source_symbol
-
-    @property
     def next_slot(self) -> FrozenTrialSlot | None:
         if self.is_complete:
             return None
@@ -2908,6 +3104,7 @@ class TrialLedger:
                     "slot_id": str(record.slot_id),
                     "discovery_dataset_id": str(record.discovery_dataset_id),
                     "source_symbol": record.source_symbol,
+                    "bar_resolution": record.bar_resolution.name,
                     "result_id": str(record.result_id),
                     "evaluation_id": str(record.evaluation_id),
                     "replay_id": str(record.replay_id) if record.replay_id else None,
@@ -2922,7 +3119,6 @@ class TrialLedger:
     def consume(
         self,
         evaluation: G1TrialEvaluation,
-        disposition: TrialDisposition | None = None,
     ) -> TrialLedger:
         slot = self.next_slot
         if slot is None:
@@ -2931,29 +3127,22 @@ class TrialLedger:
             raise InformationFirewallError(
                 "trial result is not authorized for the next frozen population slot"
             )
-        if self._records and (
+        if (
             evaluation.discovery_dataset_id != self.discovery_dataset_id
-            or evaluation.source_symbol != self.source_symbol
+            and self.discovery_dataset_id is not None
         ):
             raise InformationFirewallError(
-                "all G1 results must use one discovery dataset and source symbol"
+                "all G1 results must use one discovery dataset"
             )
         fixed = evaluation.fixed_disposition
         if fixed is not None:
-            if disposition is not None and disposition is not fixed:
-                raise InformationFirewallError(
-                    "fixed G1 evaluation disposition cannot be changed"
-                )
             terminal_disposition = fixed
         else:
-            if type(disposition) is not TrialDisposition or disposition not in (
-                TrialDisposition.ECONOMICALLY_REJECTED,
-                TrialDisposition.SHORTLISTED,
-            ):
+            if evaluation.replay_result is None or not evaluation.replay_result.trades:
                 raise InformationFirewallError(
-                    "a nonzero replay must be classified as rejected or shortlisted"
+                    "G1 advancement requires a nonzero STRESS discovery replay"
                 )
-            terminal_disposition = disposition
+            terminal_disposition = TrialDisposition.SHORTLISTED
         diagnostic_code = evaluation.diagnostic_code
         replay_id = (
             evaluation.replay_result.replay_id
@@ -2966,6 +3155,7 @@ class TrialLedger:
             "slot_id": str(slot.slot_id),
             "discovery_dataset_id": str(evaluation.discovery_dataset_id),
             "source_symbol": evaluation.source_symbol,
+            "bar_resolution": evaluation.bar_resolution.name,
             "evaluation_id": str(evaluation.evaluation_id),
             "replay_id": str(replay_id) if replay_id else None,
             "disposition": terminal_disposition.value,
@@ -2992,6 +3182,7 @@ class TrialLedger:
             slot.slot_id,
             evaluation.discovery_dataset_id,
             evaluation.source_symbol,
+            evaluation.bar_resolution,
             slot.family,
             slot.program_id,
             slot.semantic_fingerprint,
@@ -3022,6 +3213,7 @@ class TrialLedger:
                         "slot_id": str(record.slot_id),
                         "discovery_dataset_id": str(record.discovery_dataset_id),
                         "source_symbol": record.source_symbol,
+                        "bar_resolution": record.bar_resolution.name,
                         "family": record.family.value,
                         "program_id": (
                             str(record.program_id) if record.program_id else None
@@ -3047,8 +3239,6 @@ def _evaluate_frozen_trial_common(
     discovery_dataset: ResearchDataset,
     *,
     require_accepted_sparse_custody: bool,
-    source_symbol: str = "SPY",
-    cost_case: CostCase | CostModel = CostCase.STRESS,
     initial_equity: Decimal = Decimal("1"),
 ) -> G1TrialEvaluation:
     """Evaluate only the next manifest slot through official G1 campaign authority."""
@@ -3071,18 +3261,18 @@ def _evaluate_frozen_trial_common(
         raise InformationFirewallError(
             "official G1 evaluation requires accepted sparse custody binding"
         )
-    if type(source_symbol) is not str or source_symbol not in INITIAL_UNIVERSE:
-        raise InformationFirewallError(
-            "G1 source symbol must be in the frozen universe"
-        )
-    discovery_dataset_id = _discovery_dataset_id(discovery_dataset)
-    if ledger.discovery_dataset_id is not None and (
-        ledger.discovery_dataset_id != discovery_dataset_id
-        or ledger.source_symbol != source_symbol
+    if require_accepted_sparse_custody and (
+        ledger.manifest.manifest_id != freeze_g1_population().manifest_id
     ):
         raise InformationFirewallError(
-            "all G1 results must use one discovery dataset and source symbol"
+            "official G1 evaluation requires the canonical source-owned population"
         )
+    discovery_dataset_id = _discovery_dataset_id(discovery_dataset)
+    if (
+        ledger.discovery_dataset_id is not None
+        and ledger.discovery_dataset_id != discovery_dataset_id
+    ):
+        raise InformationFirewallError("all G1 results must use one discovery dataset")
     next_slot = ledger.next_slot
     if next_slot is None:
         raise TrialBudgetExceeded("all frozen G1 proposal slots are consumed")
@@ -3099,7 +3289,6 @@ def _evaluate_frozen_trial_common(
         return _make_g1_evaluation(
             slot,
             discovery_dataset_id,
-            source_symbol,
             None,
             TrialDisposition.INVALID,
             slot.invalid_reference.diagnostic_code,
@@ -3108,30 +3297,34 @@ def _evaluate_frozen_trial_common(
         raise InformationFirewallError("frozen typed program binding is incomplete")
     if any(
         record.semantic_fingerprint == slot.semantic_fingerprint
+        and record.source_symbol == slot.source_symbol
+        and record.bar_resolution is slot.bar_resolution
         and record.program_id is not None
         for record in ledger.records
     ):
         return _make_g1_evaluation(
             slot,
             discovery_dataset_id,
-            source_symbol,
             None,
             TrialDisposition.DUPLICATE,
             "DUPLICATE_SEMANTIC_PROGRAM",
         )
-    bars = discovery_dataset.bars.by_symbol[source_symbol]
+    bars = discovery_dataset.bars.by_symbol[slot.source_symbol]
+    if any(bar.resolution is not slot.bar_resolution for bar in bars.bars):
+        raise InformationFirewallError(
+            "G1 trial resolution does not match its discovery source bars"
+        )
     try:
         replay = replay_program(
             slot._program,
             bars,
-            cost_case=cost_case,
+            cost_case=CostCase.STRESS,
             initial_equity=initial_equity,
         )
     except (Arch150Error, ValueError) as exc:
         return _make_g1_evaluation(
             slot,
             discovery_dataset_id,
-            source_symbol,
             None,
             TrialDisposition.FAILED,
             f"REPLAY_{type(exc).__name__.upper()}",
@@ -3140,14 +3333,11 @@ def _evaluate_frozen_trial_common(
         return _make_g1_evaluation(
             slot,
             discovery_dataset_id,
-            source_symbol,
             replay,
             TrialDisposition.ZERO_TRADE,
             None,
         )
-    return _make_g1_evaluation(
-        slot, discovery_dataset_id, source_symbol, replay, None, None
-    )
+    return _make_g1_evaluation(slot, discovery_dataset_id, replay, None, None)
 
 
 def evaluate_frozen_trial(
@@ -3155,8 +3345,6 @@ def evaluate_frozen_trial(
     slot: FrozenTrialSlot,
     discovery_dataset: ResearchDataset,
     *,
-    source_symbol: str = "SPY",
-    cost_case: CostCase | CostModel = CostCase.STRESS,
     initial_equity: Decimal = Decimal("1"),
 ) -> G1TrialEvaluation:
     """Official G1 evaluation requires the accepted D1R sparse custody bind."""
@@ -3166,8 +3354,6 @@ def evaluate_frozen_trial(
         slot,
         discovery_dataset,
         require_accepted_sparse_custody=True,
-        source_symbol=source_symbol,
-        cost_case=cost_case,
         initial_equity=initial_equity,
     )
 
@@ -3177,8 +3363,6 @@ def _evaluate_frozen_trial_for_test(
     slot: FrozenTrialSlot,
     discovery_dataset: ResearchDataset,
     *,
-    source_symbol: str = "SPY",
-    cost_case: CostCase | CostModel = CostCase.STRESS,
     initial_equity: Decimal = Decimal("1"),
 ) -> G1TrialEvaluation:
     """Private synthetic-only G1 seam for deterministic contract tests."""
@@ -3188,8 +3372,6 @@ def _evaluate_frozen_trial_for_test(
         slot,
         discovery_dataset,
         require_accepted_sparse_custody=False,
-        source_symbol=source_symbol,
-        cost_case=cost_case,
         initial_equity=initial_equity,
     )
 
@@ -3314,48 +3496,55 @@ def finalize_discovery_population(
 def freeze_candidate_population(
     discovery_result_freeze: DiscoveryResultFreeze,
     ledger: TrialLedger,
-    candidates: Iterable[IntradayProgram],
+    candidate_slot_ids: Iterable[UUID],
 ) -> CandidateFreeze:
-    """Freeze eligible shortlisted typed candidates after all discovery results."""
+    """Freeze shortlisted slots without erasing their source or resolution."""
 
     if not _discovery_result_freeze_is_valid(discovery_result_freeze, ledger):
         raise InformationFirewallError(
             "candidate freeze requires the completed exact G1 result ledger"
         )
-    shortlisted = {
-        (record.program_id, record.semantic_fingerprint)
-        for record in ledger.records
-        if record.disposition is TrialDisposition.SHORTLISTED
-        and record.program_id is not None
-    }
-    materialized = tuple(candidates)
-    candidate_material: list[tuple[UUID, str]] = []
-    for program in materialized:
-        if not _is_intraday_program(program):
+    records_by_slot = {record.slot_id: record for record in ledger.records}
+    slots_by_id = {slot.slot_id: slot for slot in ledger.manifest.slots}
+    materialized = tuple(candidate_slot_ids)
+    candidate_slots: list[FrozenTrialSlot] = []
+    for slot_id in materialized:
+        if type(slot_id) is not UUID:
             raise InformationFirewallError(
-                "candidate freeze accepts only the closed typed grammar"
+                "candidate freeze requires originating frozen slot identities"
             )
-        identity = (program_id(program), program_fingerprint(program))
-        if identity not in shortlisted:
+        slot = slots_by_id.get(slot_id)
+        record = records_by_slot.get(slot_id)
+        if (
+            slot is None
+            or record is None
+            or record.disposition is not TrialDisposition.SHORTLISTED
+            or record.program_id is None
+        ):
             raise InformationFirewallError(
-                "candidate was not shortlisted in the completed discovery ledger"
+                "candidate slot was not shortlisted in the completed discovery ledger"
             )
-        candidate_material.append(identity)
-    if not candidate_material or len(set(candidate_material)) != len(
-        candidate_material
-    ):
+        candidate_slots.append(slot)
+    slot_ids = tuple(slot.slot_id for slot in candidate_slots)
+    if not candidate_slots or len(set(slot_ids)) != len(slot_ids):
         raise InformationFirewallError(
             "candidate freeze requires a nonempty unique frozen population subset"
         )
-    candidate_ids = tuple(item[0] for item in candidate_material)
-    fingerprints = tuple(item[1] for item in candidate_material)
+    candidate_ids = tuple(slot.program_id for slot in candidate_slots)
+    fingerprints = tuple(slot.semantic_fingerprint for slot in candidate_slots)
+    source_symbols = tuple(slot.source_symbol for slot in candidate_slots)
+    resolutions = tuple(slot.bar_resolution for slot in candidate_slots)
     identity_material = {
+        "schema": CANDIDATE_FREEZE_SCHEMA,
         "population_manifest_id": str(discovery_result_freeze.population_manifest_id),
         "discovery_result_freeze_id": str(discovery_result_freeze.freeze_id),
         "discovery_dataset_id": str(discovery_result_freeze.discovery_dataset_id),
         "ledger_id": str(ledger.ledger_id),
+        "candidate_slot_ids": [str(item) for item in slot_ids],
         "candidate_program_ids": [str(item) for item in candidate_ids],
         "candidate_fingerprints": list(fingerprints),
+        "candidate_source_symbols": list(source_symbols),
+        "candidate_bar_resolutions": [item.name for item in resolutions],
     }
     freeze_id = uuid5(
         _CANDIDATE_FREEZE_NAMESPACE, _canonical_json(identity_material).decode()
@@ -3366,8 +3555,11 @@ def freeze_candidate_population(
         discovery_result_freeze.freeze_id,
         discovery_result_freeze.discovery_dataset_id,
         ledger.ledger_id,
+        slot_ids,
         candidate_ids,
         fingerprints,
+        source_symbols,
+        resolutions,
         _seal=_CANDIDATE_FREEZE_SEAL,
     )
 
@@ -3384,6 +3576,8 @@ class SelectionBiasInput:
     result_ids: tuple[UUID, ...]
     program_ids: tuple[UUID | None, ...]
     semantic_fingerprints: tuple[str, ...]
+    source_symbols: tuple[str, ...]
+    bar_resolutions: tuple[BarResolution, ...]
     dispositions: tuple[TrialDisposition, ...]
     diagnostic_codes: tuple[str | None, ...]
     metric_schema: str
@@ -3404,6 +3598,8 @@ class SelectionBiasInput:
                     str(item) if item else None for item in self.program_ids
                 ],
                 "semantic_fingerprints": list(self.semantic_fingerprints),
+                "source_symbols": list(self.source_symbols),
+                "bar_resolutions": [item.name for item in self.bar_resolutions],
                 "dispositions": [item.value for item in self.dispositions],
                 "diagnostic_codes": list(self.diagnostic_codes),
                 "metric_schema": self.metric_schema,
@@ -3430,6 +3626,8 @@ def selection_bias_input(
         tuple(record.result_id for record in ledger.records),
         tuple(record.program_id for record in ledger.records),
         tuple(record.semantic_fingerprint for record in ledger.records),
+        tuple(record.source_symbol for record in ledger.records),
+        tuple(record.bar_resolution for record in ledger.records),
         tuple(record.disposition for record in ledger.records),
         tuple(record.diagnostic_code for record in ledger.records),
         "arch150-validation-ranking-metrics/v1",

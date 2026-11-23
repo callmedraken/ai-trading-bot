@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Final
 from uuid import UUID, uuid5
 
+from trading_bot.experiments import arch150_d1_requalify as d1r
 from trading_bot.experiments import arch150_intraday_ai as arch150
 from trading_bot.experiments.historical_research_custody import canonical_json_bytes
 
@@ -40,41 +41,28 @@ _CSV_HEADER: Final = (
     "close",
     "volume",
 )
-_ARTIFACT_PINS: Final = {
-    "normalized/SPY.csv": (
-        55_599_367,
-        "f7c1a708db72f9f73bd0d05c45dfffed26f5b5fa36c9428c8069af28d897c8ed",
-    ),
-    "normalized/QQQ.csv": (
-        55_214_275,
-        "c9c95664f1a0112d410cdc01273be8146f0136ca57591b18ddb6a7f1fbd3c471",
-    ),
-    "dataset.json": (
-        871_998,
-        "5f1fa356baaf6830bb3e9a7e045db156912a64b130fa63ebfc4cc34d1518e2",
-    ),
-    "custody-evidence.json": (
-        310_526,
-        "2422a9ca8528dce9f41fa1a24d3e983e9d580ba18c236975f87b3d27a9b83c1e",
-    ),
-    "evidence.json": (
-        1_476,
-        "1e481ac8d9f48f6c3f4ce6c9c4a49325e7e63ae2021d03f9c600278f37e9e528",
-    ),
+_ARTIFACT_LENGTHS: Final = {
+    "normalized/SPY.csv": 55_599_367,
+    "normalized/QQQ.csv": 55_214_275,
+    "dataset.json": 871_998,
+    "custody-evidence.json": 310_526,
+    "evidence.json": 1_476,
+}
+_SEMANTIC_SCHEMAS: Final = {
+    "dataset.json": (d1r.DATASET_SCHEMA, d1r._DATASET_NAMESPACE),
+    "custody-evidence.json": (d1r.CUSTODY_SCHEMA, d1r._CUSTODY_NAMESPACE),
+    "evidence.json": (d1r.EVIDENCE_SCHEMA, d1r._EVIDENCE_NAMESPACE),
 }
 _SEMANTIC_PINS: Final = {
     "dataset.json": (
-        "arch150-intraday-sparse-custody-dataset/v1",
-        "ff5a3847-09c2-5902-b174-9e77eebf7d53",
-        "0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd",
+        str(arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.dataset_id),
+        arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.dataset_semantic_sha256,
     ),
     "custody-evidence.json": (
-        "arch150-intraday-sparse-custody-evidence/v1",
-        "21e121dc-a9da-538f-bc88-c15fe7ea7f50",
-        "5b6ac554eda73b588f2f6d664c14e5c7fca3c151966cb546c17621d0c7e6ad83",
+        str(arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.custody_id),
+        arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.custody_semantic_sha256,
     ),
     "evidence.json": (
-        "arch150-d1-offline-requalification-evidence/v1",
         "c31bb29d-3d53-5e2f-a01f-55a42ec96295",
         "e58a6e5d95c44b33eb34311f705e6cc26982120689f98ddb207768dc304b4ecd",
     ),
@@ -176,11 +164,14 @@ def _run_one_shot(
             "state": "G1_DISCOVERY_ATTEMPT_STARTED",
             "source": _source_material(source),
             "accepted_input_root": str(input_root),
-            "expected_artifacts": _artifact_pin_material(_ARTIFACT_PINS),
-            "dataset_id": _SEMANTIC_PINS["dataset.json"][1],
-            "dataset_semantic_sha256": _SEMANTIC_PINS["dataset.json"][2],
-            "custody_id": _SEMANTIC_PINS["custody-evidence.json"][1],
-            "custody_semantic_sha256": _SEMANTIC_PINS["custody-evidence.json"][2],
+            "expected_artifacts": [
+                {"name": name, "byte_length": length}
+                for name, length in _ARTIFACT_LENGTHS.items()
+            ],
+            "dataset_id": _SEMANTIC_PINS["dataset.json"][0],
+            "dataset_semantic_sha256": _SEMANTIC_PINS["dataset.json"][1],
+            "custody_id": _SEMANTIC_PINS["custody-evidence.json"][0],
+            "custody_semantic_sha256": _SEMANTIC_PINS["custody-evidence.json"][1],
             "manifest_id": str(manifest.manifest_id),
             "slot_count": len(manifest.slots),
         },
@@ -285,36 +276,56 @@ def _read_pinned_input(root: Path) -> InputSnapshot:
 def _read_input_snapshot(
     root: Path,
     *,
-    artifact_pins: Mapping[str, tuple[int, str]] = _ARTIFACT_PINS,
-    semantic_pins: Mapping[str, tuple[str, str, str]] = _SEMANTIC_PINS,
+    artifact_lengths: Mapping[str, int] = _ARTIFACT_LENGTHS,
+    semantic_pins: Mapping[str, tuple[str, str]] = _SEMANTIC_PINS,
 ) -> InputSnapshot:
     _require_real_directory(root, "INPUT_DIRECTORY_INVALID")
     bodies: dict[str, bytes] = {}
-    commitments: list[ArtifactCommitment] = []
+    commitments: dict[str, ArtifactCommitment] = {}
+
+    def read(name: str) -> bytes:
+        expected_length = artifact_lengths[name]
+        body = _read_regular_file(root / name, expected_length=expected_length)
+        if len(body) != expected_length:
+            raise Arch150G1DiscoveryError("INPUT_ARTIFACT_COMMITMENT_MISMATCH")
+        commitments[name] = ArtifactCommitment(
+            name, len(body), hashlib.sha256(body).hexdigest()
+        )
+        return body
+
+    materials = {}
     try:
-        for name, (expected_length, expected_hash) in artifact_pins.items():
-            path = root / name
-            body = _read_regular_file(path, expected_length=expected_length)
-            actual_hash = hashlib.sha256(body).hexdigest()
-            if len(body) != expected_length or actual_hash != expected_hash:
+        for name, (schema, namespace) in _SEMANTIC_SCHEMAS.items():
+            value = _parse_canonical_object(read(name))
+            material = value.get("material")
+            expected = semantic_pins[name]
+            if (
+                set(value) != {"schema", "identity", "sha256", "material"}
+                or value.get("schema") != schema
+                or (value.get("identity"), value.get("sha256")) != expected
+                or type(material) is not dict
+                or d1r._versioned_identity(schema, material, namespace) != expected
+            ):
+                raise Arch150G1DiscoveryError("INPUT_SEMANTIC_IDENTITY_MISMATCH")
+            materials[name] = material
+
+        normalized = materials["dataset.json"].get("normalized_sparse_regular_bars")
+        if type(normalized) is not dict or set(normalized) != set(
+            arch150.INITIAL_UNIVERSE
+        ):
+            raise Arch150G1DiscoveryError("INPUT_NORMALIZED_COMMITMENTS_INVALID")
+        for symbol in arch150.INITIAL_UNIVERSE:
+            entry = normalized[symbol]
+            if type(entry) is not dict or not _is_sha256(entry.get("sha256")):
+                raise Arch150G1DiscoveryError("INPUT_NORMALIZED_COMMITMENTS_INVALID")
+            name = f"normalized/{symbol}.csv"
+            bodies[name] = read(name)
+            if commitments[name].sha256 != entry["sha256"]:
                 raise Arch150G1DiscoveryError("INPUT_ARTIFACT_COMMITMENT_MISMATCH")
-            bodies[name] = body
-            commitments.append(ArtifactCommitment(name, len(body), actual_hash))
     except Arch150G1DiscoveryError:
         raise
     except OSError:
         raise Arch150G1DiscoveryError("INPUT_ARTIFACT_READ_FAILED") from None
-
-    for name, (schema, identity, semantic_sha256) in semantic_pins.items():
-        value = _parse_canonical_object(bodies[name])
-        if (
-            set(value) != {"schema", "identity", "sha256", "material"}
-            or value.get("schema") != schema
-            or value.get("identity") != identity
-            or value.get("sha256") != semantic_sha256
-            or type(value.get("material")) is not dict
-        ):
-            raise Arch150G1DiscoveryError("INPUT_SEMANTIC_IDENTITY_MISMATCH")
 
     bars = tuple(
         bar
@@ -324,7 +335,17 @@ def _read_input_snapshot(
             symbol,
         )
     )
-    return InputSnapshot(tuple(bars), tuple(commitments))
+    return InputSnapshot(
+        tuple(bars), tuple(commitments[name] for name in artifact_lengths)
+    )
+
+
+def _is_sha256(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
 
 
 def _parse_normalized_csv(
@@ -493,10 +514,10 @@ def _report_material(
             for artifact in snapshot.artifacts
         ],
         "accepted_sparse_custody": {
-            "dataset_id": _SEMANTIC_PINS["dataset.json"][1],
-            "dataset_semantic_sha256": _SEMANTIC_PINS["dataset.json"][2],
-            "custody_id": _SEMANTIC_PINS["custody-evidence.json"][1],
-            "custody_semantic_sha256": _SEMANTIC_PINS["custody-evidence.json"][2],
+            "dataset_id": _SEMANTIC_PINS["dataset.json"][0],
+            "dataset_semantic_sha256": _SEMANTIC_PINS["dataset.json"][1],
+            "custody_id": _SEMANTIC_PINS["custody-evidence.json"][0],
+            "custody_semantic_sha256": _SEMANTIC_PINS["custody-evidence.json"][1],
         },
         "discovery_window": {
             "start_inclusive": arch150.DISCOVERY_START.isoformat(),
@@ -761,15 +782,6 @@ def _repository_root() -> Path:
 
 def _source_material(source: SourceIdentity) -> dict[str, str]:
     return {"branch": source.branch, "head": source.head, "tree": source.tree}
-
-
-def _artifact_pin_material(
-    pins: Mapping[str, tuple[int, str]],
-) -> list[dict[str, object]]:
-    return [
-        {"name": name, "byte_length": length, "sha256": digest}
-        for name, (length, digest) in pins.items()
-    ]
 
 
 def main(argv: list[str] | None = None) -> int:

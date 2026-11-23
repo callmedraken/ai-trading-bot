@@ -34,42 +34,40 @@ def _csv_body(symbol: str, *, minutes: tuple[int, ...] = (0, 1, 2, 3, 4)) -> byt
     return ("\n".join(rows) + "\n").encode("utf-8")
 
 
-def _artifact_body(name: str, *, identity: str | None = None) -> bytes:
-    schema, expected_identity, semantic_sha256 = discovery._SEMANTIC_PINS[name]
-    return canonical_json_bytes(
-        {
-            "schema": schema,
-            "identity": identity or expected_identity,
-            "sha256": semantic_sha256,
-            "material": {},
-        }
-    )
-
-
-def _make_inputs(
-    root: Path,
-    *,
-    wrong_identity: tuple[str, str] | None = None,
-    minutes: tuple[int, ...] = (0, 1, 2, 3, 4),
-) -> tuple[dict[str, tuple[int, str]], Path]:
+def _make_inputs(root: Path):
     root.mkdir()
     (root / "normalized").mkdir()
     bodies = {
-        "normalized/SPY.csv": _csv_body("SPY", minutes=minutes),
-        "normalized/QQQ.csv": _csv_body("QQQ", minutes=minutes),
+        f"normalized/{symbol}.csv": _csv_body(symbol)
+        for symbol in arch150.INITIAL_UNIVERSE
     }
-    for name in discovery._SEMANTIC_PINS:
-        identity = "wrong" if wrong_identity == (name, "wrong") else None
-        bodies[name] = _artifact_body(name, identity=identity)
+    semantic_pins = {}
+    for name, (schema, namespace) in discovery._SEMANTIC_SCHEMAS.items():
+        material = {"fixture": name}
+        if name == "dataset.json":
+            material["normalized_sparse_regular_bars"] = {
+                symbol: {
+                    "sha256": hashlib.sha256(
+                        bodies[f"normalized/{symbol}.csv"]
+                    ).hexdigest(),
+                }
+                for symbol in arch150.INITIAL_UNIVERSE
+            }
+        identity, digest = discovery.d1r._versioned_identity(
+            schema, material, namespace
+        )
+        semantic_pins[name] = (identity, digest)
+        bodies[name] = discovery.d1r._artifact(schema, identity, digest, material)
+    lengths = {name: len(body) for name, body in bodies.items()}
     for name, body in bodies.items():
-        path = root / name
-        path.parent.mkdir(exist_ok=True)
-        path.write_bytes(body)
-    pins = {
-        name: (len(body), hashlib.sha256(body).hexdigest())
-        for name, body in bodies.items()
-    }
-    return pins, root
+        (root / name).write_bytes(body)
+
+    def read(path):
+        return discovery._read_input_snapshot(
+            path, artifact_lengths=lengths, semantic_pins=semantic_pins
+        )
+
+    return read, root
 
 
 def _run_fake(
@@ -117,35 +115,24 @@ def test_published_input_artifact_and_semantic_pins_are_exact():
     assert discovery.ACCEPTED_INPUT_ROOT == Path(
         r"F:\AI\temp\arch150-d1r-offline-requalification-a46c4ad1-4287-4e51-8741-0316f784f1de"
     )
-    assert discovery._ARTIFACT_PINS == {
-        "normalized/SPY.csv": (
-            55_599_367,
-            "f7c1a708db72f9f73bd0d05c45dfffed26f5b5fa36c9428c8069af28d897c8ed",
-        ),
-        "normalized/QQQ.csv": (
-            55_214_275,
-            "c9c95664f1a0112d410cdc01273be8146f0136ca57591b18ddb6a7f1fbd3c471",
-        ),
-        "dataset.json": (
-            871_998,
-            "5f1fa356baaf6830bb3e9a7e045db156912a64b130fa63ebfc4cc34d1518e2",
-        ),
-        "custody-evidence.json": (
-            310_526,
-            "2422a9ca8528dce9f41fa1a24d3e983e9d580ba18c236975f87b3d27a9b83c1e",
-        ),
-        "evidence.json": (
-            1_476,
-            "1e481ac8d9f48f6c3f4ce6c9c4a49325e7e63ae2021d03f9c600278f37e9e528",
-        ),
-    }
-    assert discovery._SEMANTIC_PINS["dataset.json"][1:] == (
-        "ff5a3847-09c2-5902-b174-9e77eebf7d53",
-        "0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd",
+    assert discovery._ARTIFACT_LENGTHS["dataset.json"] == 871_998
+    authority = arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY
+    assert discovery._SEMANTIC_PINS["dataset.json"] == (
+        str(authority.dataset_id),
+        authority.dataset_semantic_sha256,
     )
-    assert discovery._SEMANTIC_PINS["custody-evidence.json"][1:] == (
-        "21e121dc-a9da-538f-bc88-c15fe7ea7f50",
-        "5b6ac554eda73b588f2f6d664c14e5c7fca3c151966cb546c17621d0c7e6ad83",
+    assert discovery._SEMANTIC_PINS["custody-evidence.json"] == (
+        str(authority.custody_id),
+        authority.custody_semantic_sha256,
+    )
+
+
+def test_published_input_sha256_pins_are_lowercase_hex():
+    digests = (digest for _, digest in discovery._SEMANTIC_PINS.values())
+    assert all(
+        len(digest) == 64
+        and all(character in "0123456789abcdef" for character in digest)
+        for digest in digests
     )
 
 
@@ -213,7 +200,7 @@ def test_parser_fails_closed_on_malformed_or_out_of_scope_csv(body):
 
 @pytest.mark.parametrize("name", ("normalized/SPY.csv", "normalized/QQQ.csv"))
 def test_wrong_normalized_csv_hash_fails_before_any_trial(name, tmp_path):
-    pins, root = _make_inputs(tmp_path / "input")
+    input_reader, root = _make_inputs(tmp_path / "input")
     path = root / name
     original = path.read_bytes()
     tampered = original.replace(
@@ -234,59 +221,51 @@ def test_wrong_normalized_csv_hash_fails_before_any_trial(name, tmp_path):
         _run_fake(
             output,
             root,
-            discovery._read_input_snapshot,
+            input_reader,
             evaluator=forbidden_evaluator,
         )
     assert error.value.code == "INPUT_ARTIFACT_COMMITMENT_MISMATCH"
     assert calls == []
     assert (output / "attempt.json").is_file()
     assert not (output / "discovery.json").exists()
-    assert pins[name] != (
-        path.stat().st_size,
-        hashlib.sha256(path.read_bytes()).hexdigest(),
-    )
+    assert path.read_bytes() == tampered
 
 
-@pytest.mark.parametrize("name", ("dataset.json", "custody-evidence.json"))
-def test_wrong_dataset_or_custody_semantics_fail_before_replay(name, tmp_path):
-    _, root = _make_inputs(tmp_path / "input", wrong_identity=(name, "wrong"))
-    custom_physical_pins = {
-        path.relative_to(root).as_posix(): (
-            path.stat().st_size,
-            hashlib.sha256(path.read_bytes()).hexdigest(),
-        )
-        for path in root.rglob("*")
-        if path.is_file()
-    }
-    calls = []
+@pytest.mark.parametrize(
+    "name", ("dataset.json", "custody-evidence.json", "evidence.json")
+)
+@pytest.mark.parametrize("field", ("schema", "identity", "sha256", "material"))
+def test_tampered_semantic_envelope_fails_before_dataset_open(name, field, tmp_path):
+    input_reader, root = _make_inputs(tmp_path / "input")
+    path = root / name
+    original = path.read_bytes()
+    envelope = json.loads(original)
+    if field == "material":
+        envelope["material"]["fixture"] = "x" * len(name)
+    else:
+        envelope[field] = "x" * len(envelope[field])
+    tampered = canonical_json_bytes(envelope)
+    assert len(tampered) == len(original)
+    path.write_bytes(tampered)
 
-    def forbidden_evaluator(*args, **kwargs):
-        calls.append((args, kwargs))
-        pytest.fail("evaluation ran before semantic evidence was accepted")
-
-    def input_reader(path):
-        return discovery._read_input_snapshot(
-            path,
-            artifact_pins=custom_physical_pins,
-            semantic_pins=discovery._SEMANTIC_PINS,
-        )
+    def forbidden_opener(*args, **kwargs):
+        pytest.fail("dataset opened before the semantic evidence was accepted")
 
     with pytest.raises(discovery.Arch150G1DiscoveryError) as error:
         _run_fake(
             tmp_path / "wrong-semantics-output",
             root,
             input_reader,
-            evaluator=forbidden_evaluator,
+            dataset_opener=forbidden_opener,
         )
     assert error.value.code == "INPUT_SEMANTIC_IDENTITY_MISMATCH"
-    assert calls == []
 
 
 def test_exact_24_slot_stress_discovery_is_reported_deterministically(
     monkeypatch,
     tmp_path,
 ):
-    pins, input_root = _make_inputs(tmp_path / "input")
+    input_reader, input_root = _make_inputs(tmp_path / "input")
     evaluator_calls = []
     finalization_calls = []
     candidate_calls = []
@@ -319,9 +298,6 @@ def test_exact_24_slot_stress_discovery_is_reported_deterministically(
 
     monkeypatch.setattr(arch150, "finalize_discovery_population", finalize)
     monkeypatch.setattr(arch150, "freeze_candidate_population", freeze)
-
-    def input_reader(path):
-        return discovery._read_input_snapshot(path, artifact_pins=pins)
 
     first, calls = _run_fake(
         tmp_path / "result-one",
@@ -372,7 +348,7 @@ def test_nonprefix_shortlists_report_manifest_ordinals_and_unknown_slots_fail_cl
     monkeypatch,
     tmp_path,
 ):
-    pins, input_root = _make_inputs(tmp_path / "input")
+    input_reader, input_root = _make_inputs(tmp_path / "input")
     manifest = arch150.freeze_g1_population()
     eligible_session_dates = tuple(
         session
@@ -429,9 +405,6 @@ def test_nonprefix_shortlists_report_manifest_ordinals_and_unknown_slots_fail_cl
             None,
             None,
         )
-
-    def input_reader(path):
-        return discovery._read_input_snapshot(path, artifact_pins=pins)
 
     result, _ = _run_fake(
         tmp_path / "nonprefix-output",

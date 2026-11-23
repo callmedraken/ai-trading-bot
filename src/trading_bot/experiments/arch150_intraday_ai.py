@@ -1,9 +1,9 @@
-"""Architecture 150 synthetic-only intraday AI research foundation.
+"""Architecture 150 offline intraday AI research contracts.
 
-The module deliberately owns only typed, deterministic, offline research
-contracts.  It has no data acquisition, filesystem, credential, provider,
-broker, or execution imports.  Real campaign data is a later, separately
-reviewed custody boundary.
+The module owns deterministic research contracts and synthetic test seams. It
+does not read custody files, acquire data, access credentials, contact a
+provider, or execute broker effects. Accepted sparse custody can be bound only
+from an already materialized in-memory stream at a separately reviewed step.
 """
 
 from __future__ import annotations
@@ -32,12 +32,16 @@ G1_POPULATION_SCHEMA = "arch150-g1-pre-evaluation-population/v1"
 G1_RESULT_SCHEMA = "arch150-g1-trial-result/v1"
 DISCOVERY_RESULT_SCHEMA = "arch150-discovery-result-freeze/v1"
 SELECTION_BIAS_SCHEMA = "arch150-selection-bias-input/v2"
-REPLAY_SCHEMA = "arch150-deterministic-replay/v1"
+REPLAY_SCHEMA = "arch150-deterministic-replay/v2"
+SPARSE_FIVE_MINUTE_SCHEMA = "arch150-sparse-five-minute-view/v1"
+SPARSE_CUSTODY_AUTHORITY_SCHEMA = "arch150-sparse-custody-authority/v1"
 
 DISCOVERY_START = date(2016, 1, 1)
 DISCOVERY_END = date(2021, 1, 1)
 VALIDATION_START = date(2021, 1, 1)
 VALIDATION_END = date(2024, 1, 1)
+SPARSE_CUSTODY_START = date(2016, 1, 1)
+SPARSE_CUSTODY_END = date(2024, 1, 1)
 HOLDOUT_START = date(2024, 1, 1)
 HOLDOUT_END = date(2026, 1, 1)
 RECENT_EXTENSION_START = date(2026, 1, 1)
@@ -68,6 +72,7 @@ _TRADE_NAMESPACE = UUID("d1b8463f-349d-5d1d-9d1c-88a1f235122e")
 _REPLAY_NAMESPACE = UUID("e22c9066-4b42-5d7f-bdb8-a0b3d62e0c13")
 _FILL_NAMESPACE = UUID("0d76dd95-78fb-5fb5-93f1-0718fd6a7b9b")
 _DISCOVERY_DATASET_NAMESPACE = UUID("ab09fd8e-480d-5937-a238-b4fb9720437e")
+_SPARSE_TEST_DATASET_NAMESPACE = UUID("1a7395d3-a494-5b5c-940d-b0a7699302ad")
 _CANDIDATE_FREEZE_NAMESPACE = UUID("d463e47c-c8f8-5843-a059-7520dab589ea")
 _G1_MANIFEST_NAMESPACE = UUID("795ace21-a597-5bbd-9c4d-4daeffcf3028")
 _DISCOVERY_RESULT_NAMESPACE = UUID("2db93faf-c704-5612-9747-96a9bde00c65")
@@ -80,6 +85,31 @@ _DISCOVERY_RESULT_SEAL = object()
 _CANDIDATE_FREEZE_SEAL = object()
 _DATASET_SEAL = object()
 _FIVE_MINUTE_SEAL = object()
+_SPARSE_FIVE_MINUTE_SEAL = object()
+_SPARSE_CUSTODY_AUTHORITY_SEAL = object()
+
+_ACCEPTED_SPARSE_DATASET_ID = UUID("ff5a3847-09c2-5902-b174-9e77eebf7d53")
+_ACCEPTED_SPARSE_DATASET_SHA256 = (
+    "0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd"
+)
+_ACCEPTED_SPARSE_CUSTODY_ID = UUID("21e121dc-a9da-538f-bc88-c15fe7ea7f50")
+_ACCEPTED_SPARSE_CUSTODY_SHA256 = (
+    "5b6ac554eda73b588f2f6d664c14e5c7fca3c151966cb546c17621d0c7e6ad83"
+)
+_ACCEPTED_NORMALIZED_CSV_SHA256 = (
+    ("SPY", "f7c1a708db72f9f73bd0d05c45dfffed26f5b5fa36c9428c8069af28d897c8ed"),
+    ("QQQ", "c9c95664f1a0112d410cdc01273be8146f0136ca57591b18ddb6a7f1fbd3c471"),
+)
+_ACCEPTED_SCHEDULED_SLOTS = 781980
+_ACCEPTED_OBSERVED_COUNTS = (("SPY", 781876), ("QQQ", 781865))
+_ACCEPTED_MISSING_COUNTS = (("SPY", 104), ("QQQ", 115))
+_ACCEPTED_MISSING_SHA256 = (
+    ("SPY", "d6da92e26196d00a25355ebb83e58d16ef767d9a4c476ee848070727a9780eba"),
+    ("QQQ", "7f4eab086290576208f1d47887b32413de5015634da9e551aa9f8eecc385a0d4"),
+)
+_ACCEPTED_COMMON_MISSING_COUNT = 64
+_ACCEPTED_UNION_MISSING_COUNT = 155
+_ACCEPTED_FULLY_MISSING_SESSION_COUNTS = (("SPY", 0), ("QQQ", 0))
 
 
 class Arch150Error(ValueError):
@@ -597,6 +627,141 @@ class ValidatedUniverseBars:
     input_digest: str
 
 
+@dataclass(frozen=True, slots=True, init=False)
+class SparseCustodyAuthority:
+    """Immutable accepted custody facts, without exposing missing timestamps."""
+
+    schema: str
+    dataset_id: UUID
+    dataset_semantic_sha256: str
+    custody_id: UUID
+    custody_semantic_sha256: str
+    normalized_file_sha256_by_symbol: tuple[tuple[str, str], ...]
+    scheduled_slots_per_symbol: int
+    observed_counts_by_symbol: tuple[tuple[str, int], ...]
+    missing_counts_by_symbol: tuple[tuple[str, int], ...]
+    missing_timestamp_sha256_by_symbol: tuple[tuple[str, str], ...]
+    common_missing_count: int
+    union_missing_count: int
+    fully_missing_session_counts_by_symbol: tuple[tuple[str, int], ...]
+    authority_kind: str
+    _source_input_digest: str | None = field(repr=False, compare=False)
+    _authority_seal: object = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        dataset_id: UUID,
+        dataset_semantic_sha256: str,
+        custody_id: UUID,
+        custody_semantic_sha256: str,
+        normalized_file_sha256_by_symbol: tuple[tuple[str, str], ...],
+        scheduled_slots_per_symbol: int,
+        observed_counts_by_symbol: tuple[tuple[str, int], ...],
+        missing_counts_by_symbol: tuple[tuple[str, int], ...],
+        missing_timestamp_sha256_by_symbol: tuple[tuple[str, str], ...],
+        common_missing_count: int,
+        union_missing_count: int,
+        fully_missing_session_counts_by_symbol: tuple[tuple[str, int], ...],
+        authority_kind: str,
+        source_input_digest: str | None = None,
+        *,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _SPARSE_CUSTODY_AUTHORITY_SEAL:
+            raise InformationFirewallError(
+                "sparse custody authorities require source-owned binding"
+            )
+        for name, value in (
+            ("schema", SPARSE_CUSTODY_AUTHORITY_SCHEMA),
+            ("dataset_id", dataset_id),
+            ("dataset_semantic_sha256", dataset_semantic_sha256),
+            ("custody_id", custody_id),
+            ("custody_semantic_sha256", custody_semantic_sha256),
+            ("normalized_file_sha256_by_symbol", normalized_file_sha256_by_symbol),
+            ("scheduled_slots_per_symbol", scheduled_slots_per_symbol),
+            ("observed_counts_by_symbol", observed_counts_by_symbol),
+            ("missing_counts_by_symbol", missing_counts_by_symbol),
+            ("missing_timestamp_sha256_by_symbol", missing_timestamp_sha256_by_symbol),
+            ("common_missing_count", common_missing_count),
+            ("union_missing_count", union_missing_count),
+            (
+                "fully_missing_session_counts_by_symbol",
+                fully_missing_session_counts_by_symbol,
+            ),
+            ("authority_kind", authority_kind),
+            ("_source_input_digest", source_input_digest),
+        ):
+            object.__setattr__(self, name, value)
+        object.__setattr__(self, "_authority_seal", _seal)
+
+
+def _new_sparse_custody_authority(
+    *,
+    dataset_id: UUID,
+    dataset_semantic_sha256: str,
+    custody_id: UUID,
+    custody_semantic_sha256: str,
+    normalized_file_sha256_by_symbol: tuple[tuple[str, str], ...],
+    scheduled_slots_per_symbol: int,
+    observed_counts_by_symbol: tuple[tuple[str, int], ...],
+    missing_counts_by_symbol: tuple[tuple[str, int], ...],
+    missing_timestamp_sha256_by_symbol: tuple[tuple[str, str], ...],
+    common_missing_count: int,
+    union_missing_count: int,
+    fully_missing_session_counts_by_symbol: tuple[tuple[str, int], ...],
+    authority_kind: str,
+    source_input_digest: str | None = None,
+) -> SparseCustodyAuthority:
+    return SparseCustodyAuthority(
+        dataset_id,
+        dataset_semantic_sha256,
+        custody_id,
+        custody_semantic_sha256,
+        normalized_file_sha256_by_symbol,
+        scheduled_slots_per_symbol,
+        observed_counts_by_symbol,
+        missing_counts_by_symbol,
+        missing_timestamp_sha256_by_symbol,
+        common_missing_count,
+        union_missing_count,
+        fully_missing_session_counts_by_symbol,
+        authority_kind,
+        source_input_digest,
+        _seal=_SPARSE_CUSTODY_AUTHORITY_SEAL,
+    )
+
+
+_ACCEPTED_SPARSE_CUSTODY_AUTHORITY = _new_sparse_custody_authority(
+    dataset_id=_ACCEPTED_SPARSE_DATASET_ID,
+    dataset_semantic_sha256=_ACCEPTED_SPARSE_DATASET_SHA256,
+    custody_id=_ACCEPTED_SPARSE_CUSTODY_ID,
+    custody_semantic_sha256=_ACCEPTED_SPARSE_CUSTODY_SHA256,
+    normalized_file_sha256_by_symbol=_ACCEPTED_NORMALIZED_CSV_SHA256,
+    scheduled_slots_per_symbol=_ACCEPTED_SCHEDULED_SLOTS,
+    observed_counts_by_symbol=_ACCEPTED_OBSERVED_COUNTS,
+    missing_counts_by_symbol=_ACCEPTED_MISSING_COUNTS,
+    missing_timestamp_sha256_by_symbol=_ACCEPTED_MISSING_SHA256,
+    common_missing_count=_ACCEPTED_COMMON_MISSING_COUNT,
+    union_missing_count=_ACCEPTED_UNION_MISSING_COUNT,
+    fully_missing_session_counts_by_symbol=_ACCEPTED_FULLY_MISSING_SESSION_COUNTS,
+    authority_kind="ACCEPTED_D1R_SPARSE_CUSTODY",
+)
+
+
+def _sparse_custody_authority_is_valid(value: object) -> bool:
+    return (
+        type(value) is SparseCustodyAuthority
+        and value._authority_seal is _SPARSE_CUSTODY_AUTHORITY_SEAL
+        and (
+            value is _ACCEPTED_SPARSE_CUSTODY_AUTHORITY
+            or (
+                value.authority_kind == "SYNTHETIC_TEST"
+                and value._source_input_digest is not None
+            )
+        )
+    )
+
+
 def validate_universe_minute_bars(bars: Iterable[IntradayBar]) -> ValidatedUniverseBars:
     grouped: dict[str, list[IntradayBar]] = defaultdict(list)
     for bar in bars:
@@ -618,6 +783,131 @@ def validate_universe_minute_bars(bars: Iterable[IntradayBar]) -> ValidatedUnive
         )
     ).hexdigest()
     return ValidatedUniverseBars(MappingProxyType(validated), digest)
+
+
+def _custody_timestamp_text(value: datetime) -> str:
+    return (
+        value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    )
+
+
+def _normalized_custody_csv_row(bar: IntradayBar) -> bytes:
+    return (
+        ",".join(
+            (
+                _custody_timestamp_text(bar.timestamp),
+                bar.symbol,
+                "1Min",
+                _decimal_text(bar.open),
+                _decimal_text(bar.high),
+                _decimal_text(bar.low),
+                _decimal_text(bar.close),
+                str(bar.volume),
+            )
+        ).encode("utf-8")
+        + b"\n"
+    )
+
+
+def _validate_accepted_sparse_custody(
+    bars: Iterable[IntradayBar],
+) -> ValidatedUniverseBars:
+    materialized = tuple(bars)
+    if not materialized or any(
+        type(bar) is not IntradayBar
+        or not SPARSE_CUSTODY_START <= bar.session_date < SPARSE_CUSTODY_END
+        for bar in materialized
+    ):
+        raise Arch150Error(
+            "sparse custody input is outside its accepted 2016-2023 window"
+        )
+    validated = validate_universe_minute_bars(materialized)
+    csv_hashes: dict[str, str] = {}
+    bar_indexes = {symbol: 0 for symbol in INITIAL_UNIVERSE}
+    observed = {symbol: 0 for symbol in INITIAL_UNIVERSE}
+    missing = {symbol: 0 for symbol in INITIAL_UNIVERSE}
+    missing_hashes = {symbol: sha256() for symbol in INITIAL_UNIVERSE}
+    fully_missing_sessions = {symbol: 0 for symbol in INITIAL_UNIVERSE}
+    common_missing = 0
+    union_missing = 0
+    scheduled_count = 0
+
+    for symbol in INITIAL_UNIVERSE:
+        csv_hash = sha256()
+        csv_hash.update(b"timestamp,symbol,resolution,open,high,low,close,volume\n")
+        for bar in validated.by_symbol[symbol].bars:
+            csv_hash.update(_normalized_custody_csv_row(bar))
+        csv_hashes[symbol] = csv_hash.hexdigest()
+
+    for session in _SESSION_AUTHORITY.published.sessions:
+        if not SPARSE_CUSTODY_START <= session < SPARSE_CUSTODY_END:
+            continue
+        schedule = _SESSION_AUTHORITY.schedule_for(session)
+        if schedule is None:
+            raise Arch150Error("published sparse-custody session has no schedule")
+        slot = schedule.opens_at.astimezone(UTC)
+        close = schedule.closes_at.astimezone(UTC)
+        per_session_scheduled = 0
+        per_session_missing = {symbol: 0 for symbol in INITIAL_UNIVERSE}
+        while slot < close:
+            scheduled_count += 1
+            per_session_scheduled += 1
+            is_missing: dict[str, bool] = {}
+            for symbol in INITIAL_UNIVERSE:
+                stream = validated.by_symbol[symbol].bars
+                index = bar_indexes[symbol]
+                if index < len(stream) and stream[index].timestamp == slot:
+                    observed[symbol] += 1
+                    bar_indexes[symbol] = index + 1
+                    is_missing[symbol] = False
+                else:
+                    if index < len(stream) and stream[index].timestamp < slot:
+                        raise Arch150Error("sparse custody input is not slot ordered")
+                    missing[symbol] += 1
+                    per_session_missing[symbol] += 1
+                    missing_hashes[symbol].update(
+                        _custody_timestamp_text(slot).encode("ascii") + b"\n"
+                    )
+                    is_missing[symbol] = True
+            if all(is_missing.values()):
+                common_missing += 1
+            if any(is_missing.values()):
+                union_missing += 1
+            slot += timedelta(minutes=1)
+        for symbol in INITIAL_UNIVERSE:
+            if per_session_missing[symbol] == per_session_scheduled:
+                fully_missing_sessions[symbol] += 1
+
+    if any(
+        bar_indexes[symbol] != len(validated.by_symbol[symbol].bars)
+        for symbol in INITIAL_UNIVERSE
+    ):
+        raise Arch150Error("sparse custody input contains an unaccounted observation")
+    actual = (
+        scheduled_count,
+        tuple((symbol, observed[symbol]) for symbol in INITIAL_UNIVERSE),
+        tuple((symbol, missing[symbol]) for symbol in INITIAL_UNIVERSE),
+        tuple(
+            (symbol, missing_hashes[symbol].hexdigest()) for symbol in INITIAL_UNIVERSE
+        ),
+        tuple((symbol, csv_hashes[symbol]) for symbol in INITIAL_UNIVERSE),
+        common_missing,
+        union_missing,
+        tuple((symbol, fully_missing_sessions[symbol]) for symbol in INITIAL_UNIVERSE),
+    )
+    expected = (
+        _ACCEPTED_SCHEDULED_SLOTS,
+        _ACCEPTED_OBSERVED_COUNTS,
+        _ACCEPTED_MISSING_COUNTS,
+        _ACCEPTED_MISSING_SHA256,
+        _ACCEPTED_NORMALIZED_CSV_SHA256,
+        _ACCEPTED_COMMON_MISSING_COUNT,
+        _ACCEPTED_UNION_MISSING_COUNT,
+        _ACCEPTED_FULLY_MISSING_SESSION_COUNTS,
+    )
+    if actual != expected:
+        raise Arch150Error("sparse custody stream differs from accepted commitments")
+    return validated
 
 
 def aggregate_five_minute_bars(
@@ -726,6 +1016,168 @@ def _validate_derived_five_minute_bars(
     sessions = tuple(dict.fromkeys(bar.session_date for bar in bars.bars))
     if sessions != bars.sessions:
         raise Arch150Error("derived five-minute session index does not match its bars")
+    return bars.bars
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class SparseDerivedFiveMinuteBars:
+    """Sealed complete buckets derived independently from a sparse minute stream."""
+
+    symbol: str
+    bars: tuple[IntradayBar, ...]
+    sessions: tuple[date, ...]
+    input_digest: str
+    output_digest: str
+    source_digest: str
+    _authority_seal: object = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        symbol: str,
+        bars: tuple[IntradayBar, ...],
+        sessions: tuple[date, ...],
+        input_digest: str,
+        output_digest: str,
+        source_digest: str,
+        *,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _SPARSE_FIVE_MINUTE_SEAL:
+            raise Arch150Error("sparse five-minute streams require exact aggregation")
+        for name, value in (
+            ("symbol", symbol),
+            ("bars", bars),
+            ("sessions", sessions),
+            ("input_digest", input_digest),
+            ("output_digest", output_digest),
+            ("source_digest", source_digest),
+        ):
+            object.__setattr__(self, name, value)
+        object.__setattr__(self, "_authority_seal", _seal)
+
+    def __len__(self) -> int:
+        return len(self.bars)
+
+    def __iter__(self):
+        return iter(self.bars)
+
+    def __getitem__(self, index):
+        return self.bars[index]
+
+
+def _sparse_five_minute_source_digest(input_digest: str, output_digest: str) -> str:
+    material = {
+        "schema": SPARSE_FIVE_MINUTE_SCHEMA,
+        "input_digest": input_digest,
+        "output_digest": output_digest,
+    }
+    return sha256(_canonical_json(material)).hexdigest()
+
+
+def aggregate_sparse_five_minute_bars(
+    bars: ValidatedMinuteBars | Iterable[IntradayBar],
+) -> SparseDerivedFiveMinuteBars:
+    """Aggregate only complete XNYS-aligned buckets in a sparse stream."""
+
+    validated = validate_1_minute_bars(
+        bars.bars if type(bars) is ValidatedMinuteBars else bars,
+        symbol=bars.symbol if type(bars) is ValidatedMinuteBars else None,
+    )
+    groups: dict[tuple[date, int], list[IntradayBar]] = defaultdict(list)
+    schedules = {}
+    for bar in validated.bars:
+        schedule = _SESSION_AUTHORITY.schedule_for(bar.session_date)
+        if schedule is None:
+            raise Arch150Error("bar date is not a published regular XNYS session")
+        schedules[bar.session_date] = schedule
+        elapsed = bar.timestamp - schedule.opens_at
+        elapsed_minutes = int(elapsed.total_seconds() // 60)
+        if elapsed.total_seconds() != elapsed_minutes * 60:
+            raise Arch150Error("one-minute bars must align to XNYS session minutes")
+        bucket = elapsed_minutes // int(BarResolution.FIVE_MINUTE)
+        groups[(bar.session_date, bucket)].append(bar)
+
+    derived: list[IntradayBar] = []
+    for (session, bucket), group in sorted(groups.items()):
+        bucket_open = schedules[session].opens_at + timedelta(
+            minutes=bucket * int(BarResolution.FIVE_MINUTE)
+        )
+        if len(group) != int(BarResolution.FIVE_MINUTE) or any(
+            bar.timestamp != bucket_open + timedelta(minutes=offset)
+            for offset, bar in enumerate(group)
+        ):
+            continue
+        derived.append(
+            IntradayBar(
+                validated.symbol,
+                group[0].timestamp,
+                group[0].open,
+                max(bar.high for bar in group),
+                min(bar.low for bar in group),
+                group[-1].close,
+                sum(bar.volume for bar in group),
+                BarResolution.FIVE_MINUTE,
+            )
+        )
+    result = tuple(derived)
+    output_digest = sha256(
+        _canonical_json([_bar_material(bar) for bar in result])
+    ).hexdigest()
+    source_digest = _sparse_five_minute_source_digest(
+        validated.input_digest, output_digest
+    )
+    return SparseDerivedFiveMinuteBars(
+        validated.symbol,
+        result,
+        tuple(dict.fromkeys(bar.session_date for bar in result)),
+        validated.input_digest,
+        output_digest,
+        source_digest,
+        _seal=_SPARSE_FIVE_MINUTE_SEAL,
+    )
+
+
+def _validate_sparse_derived_five_minute_bars(
+    bars: SparseDerivedFiveMinuteBars,
+) -> tuple[IntradayBar, ...]:
+    if (
+        type(bars) is not SparseDerivedFiveMinuteBars
+        or bars._authority_seal is not _SPARSE_FIVE_MINUTE_SEAL
+    ):
+        raise Arch150Error("sparse five-minute input must come from exact aggregation")
+    previous: datetime | None = None
+    for bar in bars.bars:
+        if (
+            type(bar) is not IntradayBar
+            or bar.resolution is not BarResolution.FIVE_MINUTE
+        ):
+            raise Arch150Error(
+                "sparse derived input must retain five-minute resolution"
+            )
+        schedule = _SESSION_AUTHORITY.schedule_for(bar.session_date)
+        if schedule is None:
+            raise Arch150Error("derived bar date is not a published XNYS session")
+        elapsed = bar.timestamp - schedule.opens_at
+        if (
+            elapsed.total_seconds() < 0
+            or elapsed.total_seconds() % (5 * 60) != 0
+            or bar.timestamp + timedelta(minutes=5) > schedule.closes_at
+        ):
+            raise Arch150Error("derived bar is not aligned inside its XNYS session")
+        if previous is not None and bar.timestamp <= previous:
+            raise Arch150Error("derived bars must be strictly chronological")
+        previous = bar.timestamp
+    sessions = tuple(dict.fromkeys(bar.session_date for bar in bars.bars))
+    output_digest = sha256(
+        _canonical_json([_bar_material(bar) for bar in bars.bars])
+    ).hexdigest()
+    source_digest = _sparse_five_minute_source_digest(bars.input_digest, output_digest)
+    if (
+        sessions != bars.sessions
+        or output_digest != bars.output_digest
+        or source_digest != bars.source_digest
+    ):
+        raise Arch150Error("sparse five-minute commitment does not match its bars")
     return bars.bars
 
 
@@ -905,6 +1357,7 @@ class ResearchDataset:
     start: date
     end_exclusive: date
     candidate_freeze: CandidateFreeze | None
+    _sparse_custody_authority: SparseCustodyAuthority | None = field(repr=False)
     _authority_seal: object = field(repr=False, compare=False)
 
     def __init__(
@@ -914,6 +1367,7 @@ class ResearchDataset:
         start: date,
         end_exclusive: date,
         candidate_freeze: CandidateFreeze | None = None,
+        sparse_custody_authority: SparseCustodyAuthority | None = None,
         *,
         _seal: object = None,
     ) -> None:
@@ -936,12 +1390,28 @@ class ResearchDataset:
             raise InformationFirewallError(
                 "discovery cannot be opened with a validation candidate freeze"
             )
+        if sparse_custody_authority is not None:
+            if (
+                stage is not ResearchStage.DISCOVERY
+                or not _sparse_custody_authority_is_valid(sparse_custody_authority)
+            ):
+                raise InformationFirewallError(
+                    "sparse custody authority is invalid for this dataset stage"
+                )
+            if (
+                sparse_custody_authority.authority_kind == "SYNTHETIC_TEST"
+                and sparse_custody_authority._source_input_digest != bars.input_digest
+            ):
+                raise InformationFirewallError(
+                    "synthetic sparse authority does not bind this input stream"
+                )
         for name, value in (
             ("stage", stage),
             ("bars", bars),
             ("start", start),
             ("end_exclusive", end_exclusive),
             ("candidate_freeze", candidate_freeze),
+            ("_sparse_custody_authority", sparse_custody_authority),
         ):
             object.__setattr__(self, name, value)
         object.__setattr__(self, "_authority_seal", _seal)
@@ -987,6 +1457,7 @@ def _open_dataset(
     stage: ResearchStage,
     bars: Iterable[IntradayBar],
     candidate_freeze: CandidateFreeze | None = None,
+    sparse_custody_authority: SparseCustodyAuthority | None = None,
 ) -> ResearchDataset:
     if stage in (ResearchStage.HOLDOUT, ResearchStage.RECENT_EXTENSION):
         raise InformationFirewallError(
@@ -1018,12 +1489,157 @@ def _open_dataset(
         start,
         end,
         candidate_freeze,
+        sparse_custody_authority,
         _seal=_DATASET_SEAL,
     )
 
 
 def open_discovery_dataset(bars: Iterable[IntradayBar]) -> ResearchDataset:
     return _open_dataset(ResearchStage.DISCOVERY, bars)
+
+
+def _synthetic_sparse_custody_authority_for_test(
+    validated: ValidatedUniverseBars,
+) -> SparseCustodyAuthority:
+    """Create deterministic test-only custody binding for synthetic bars."""
+
+    input_digest = validated.input_digest
+    semantic = sha256(
+        _canonical_json(
+            {
+                "schema": SPARSE_CUSTODY_AUTHORITY_SCHEMA,
+                "authority_kind": "SYNTHETIC_TEST",
+                "input_digest": input_digest,
+            }
+        )
+    ).hexdigest()
+    normalized_hashes = []
+    observed_counts = []
+    observed_times = {}
+    for symbol in INITIAL_UNIVERSE:
+        csv_hash = sha256()
+        csv_hash.update(b"timestamp,symbol,resolution,open,high,low,close,volume\n")
+        stream = validated.by_symbol[symbol].bars
+        for bar in stream:
+            csv_hash.update(_normalized_custody_csv_row(bar))
+        normalized_hashes.append((symbol, csv_hash.hexdigest()))
+        observed_counts.append((symbol, len(stream)))
+        observed_times[symbol] = frozenset(bar.timestamp for bar in stream)
+
+    sessions = tuple(
+        sorted(
+            {
+                session
+                for symbol in INITIAL_UNIVERSE
+                for session in validated.by_symbol[symbol].sessions
+            }
+        )
+    )
+    scheduled_slots = 0
+    missing_counts = {symbol: 0 for symbol in INITIAL_UNIVERSE}
+    missing_hashes = {symbol: sha256() for symbol in INITIAL_UNIVERSE}
+    fully_missing_sessions = {symbol: 0 for symbol in INITIAL_UNIVERSE}
+    common_missing = 0
+    union_missing = 0
+    for session in sessions:
+        schedule = _SESSION_AUTHORITY.schedule_for(session)
+        if schedule is None:
+            raise Arch150Error("synthetic sparse session has no XNYS schedule")
+        slot = schedule.opens_at.astimezone(UTC)
+        close = schedule.closes_at.astimezone(UTC)
+        per_session_scheduled = 0
+        per_session_missing = {symbol: 0 for symbol in INITIAL_UNIVERSE}
+        while slot < close:
+            scheduled_slots += 1
+            per_session_scheduled += 1
+            absent = {
+                symbol: slot not in observed_times[symbol]
+                for symbol in INITIAL_UNIVERSE
+            }
+            if all(absent.values()):
+                common_missing += 1
+            if any(absent.values()):
+                union_missing += 1
+            for symbol in INITIAL_UNIVERSE:
+                if absent[symbol]:
+                    missing_counts[symbol] += 1
+                    per_session_missing[symbol] += 1
+                    missing_hashes[symbol].update(
+                        _custody_timestamp_text(slot).encode("ascii") + b"\n"
+                    )
+            slot += timedelta(minutes=1)
+        for symbol in INITIAL_UNIVERSE:
+            if per_session_missing[symbol] == per_session_scheduled:
+                fully_missing_sessions[symbol] += 1
+    return _new_sparse_custody_authority(
+        dataset_id=uuid5(_SPARSE_TEST_DATASET_NAMESPACE, input_digest),
+        dataset_semantic_sha256=semantic,
+        custody_id=uuid5(_SPARSE_TEST_DATASET_NAMESPACE, f"custody:{input_digest}"),
+        custody_semantic_sha256=semantic,
+        normalized_file_sha256_by_symbol=tuple(normalized_hashes),
+        scheduled_slots_per_symbol=scheduled_slots,
+        observed_counts_by_symbol=tuple(observed_counts),
+        missing_counts_by_symbol=tuple(
+            (symbol, missing_counts[symbol]) for symbol in INITIAL_UNIVERSE
+        ),
+        missing_timestamp_sha256_by_symbol=tuple(
+            (symbol, missing_hashes[symbol].hexdigest()) for symbol in INITIAL_UNIVERSE
+        ),
+        common_missing_count=common_missing,
+        union_missing_count=union_missing,
+        fully_missing_session_counts_by_symbol=tuple(
+            (symbol, fully_missing_sessions[symbol]) for symbol in INITIAL_UNIVERSE
+        ),
+        authority_kind="SYNTHETIC_TEST",
+        source_input_digest=input_digest,
+    )
+
+
+def _open_sparse_discovery_dataset_for_test(
+    bars: Iterable[IntradayBar],
+) -> ResearchDataset:
+    """Private fake-only seam; not used by an official G1 evaluation."""
+
+    materialized = tuple(bars)
+    if any(
+        type(bar) is not IntradayBar
+        or not DISCOVERY_START <= bar.session_date < DISCOVERY_END
+        for bar in materialized
+    ):
+        raise InformationFirewallError("synthetic sparse input must be discovery-only")
+    validated = validate_universe_minute_bars(materialized)
+    authority = _synthetic_sparse_custody_authority_for_test(validated)
+    return ResearchDataset(
+        ResearchStage.DISCOVERY,
+        validated,
+        DISCOVERY_START,
+        DISCOVERY_END,
+        sparse_custody_authority=authority,
+        _seal=_DATASET_SEAL,
+    )
+
+
+def open_sparse_discovery_dataset(
+    bars: Iterable[IntradayBar],
+) -> ResearchDataset:
+    """Bind a materialized 2016-2023 stream to the accepted D1R commitments."""
+
+    validated = _validate_accepted_sparse_custody(bars)
+    discovery_bars = tuple(
+        bar
+        for symbol in INITIAL_UNIVERSE
+        for bar in validated.by_symbol[symbol].bars
+        if DISCOVERY_START <= bar.session_date < DISCOVERY_END
+    )
+    discovery = validate_universe_minute_bars(discovery_bars)
+    return ResearchDataset(
+        ResearchStage.DISCOVERY,
+        discovery,
+        DISCOVERY_START,
+        DISCOVERY_END,
+        sparse_custody_authority=_ACCEPTED_SPARSE_CUSTODY_AUTHORITY,
+        _seal=_DATASET_SEAL,
+    )
 
 
 def open_validation_dataset(
@@ -1083,6 +1699,7 @@ class Fill:
     fill_id: UUID
     side: FillSide
     timestamp: datetime
+    reference_bar_timestamp: datetime
     reference_price: Decimal
     execution_price: Decimal
     quantity: Decimal
@@ -1125,14 +1742,14 @@ class ReplayResult:
         return self.cost_case is not CostCase.ZERO
 
 
-def _vwap_through(bars: Sequence[IntradayBar], index: int) -> Decimal:
-    """Compute VWAP through the current completed bar, never using a future bar."""
+def _vwap_through(bars: Sequence[IntradayBar], index: int) -> Decimal | None:
+    """Compute VWAP from observed positive-volume bars through this index."""
 
     with localcontext(_DECIMAL_CONTEXT):
-        visible = bars[: index + 1]
+        visible = tuple(bar for bar in bars[: index + 1] if bar.volume > 0)
         volume = sum(bar.volume for bar in visible)
         if volume == 0:
-            return bars[index].close
+            return None
         return sum(
             ((bar.high + bar.low + bar.close) / Decimal("3")) * bar.volume
             for bar in visible
@@ -1173,8 +1790,12 @@ def _lagged_noise_band_bps(
             )
             if matching is None:
                 return None
+            if prior_bars[matching].volume == 0:
+                return None
             prior_close = prior_bars[matching].close
             prior_vwap = _vwap_through(prior_bars, matching)
+            if prior_vwap is None:
+                return None
             deviations.append(
                 abs(prior_close - prior_vwap) / prior_vwap * Decimal("10000")
             )
@@ -1197,6 +1818,8 @@ def _a_signal_at(
     if noise_band is None:
         return None
     vwap = _vwap_through(bars, index)
+    if vwap is None:
+        return None
     with localcontext(_DECIMAL_CONTEXT):
         scale = noise_band / Decimal("10000")
         if bars[index].close > vwap * (Decimal("1") + scale):
@@ -1212,6 +1835,8 @@ def _b_signal_at(
     index: int,
 ) -> TradeDirection | None:
     vwap = _vwap_through(bars, index)
+    if vwap is None:
+        return None
     with localcontext(_DECIMAL_CONTEXT):
         displacement = program.displacement_bps / Decimal("10000")
         current = bars[index].close
@@ -1279,6 +1904,8 @@ def _entry_signal(
     prior_sessions: Mapping[date, Sequence[IntradayBar]],
     resolution: BarResolution,
 ) -> TradeDirection | None:
+    if bars[index].volume == 0:
+        return None
     if type(program) is OpeningRangeBreakoutReversalProgram:
         return _opening_range_signal(program, bars, index, resolution)
     confirmation = program.confirmation_bars
@@ -1288,6 +1915,8 @@ def _entry_signal(
     if any(
         bars[right].timestamp - bars[left].timestamp
         != timedelta(minutes=int(resolution))
+        or bars[right].volume == 0
+        or bars[left].volume == 0
         for left, right in zip(
             range(first_index, index),
             range(first_index + 1, index + 1),
@@ -1349,22 +1978,29 @@ def _fill(
     filled_at = bar.timestamp + timedelta(minutes=int(bar.resolution))
     fill_id = uuid5(
         _FILL_NAMESPACE,
-        f"{REPLAY_SCHEMA}:{trade_material}:{side.value}:{filled_at.isoformat()}",
+        f"{REPLAY_SCHEMA}:{trade_material}:{side.value}:{filled_at.isoformat()}:"
+        f"{bar.timestamp.isoformat()}",
     )
     return Fill(
-        fill_id,
-        side,
-        filled_at,
-        reference,
-        execution,
-        quantity,
-        model.adverse_slippage_bps,
+        fill_id=fill_id,
+        side=side,
+        timestamp=filled_at,
+        reference_bar_timestamp=bar.timestamp,
+        reference_price=reference,
+        execution_price=execution,
+        quantity=quantity,
+        slippage_bps=model.adverse_slippage_bps,
     )
 
 
 def replay_program(
     program: IntradayProgram,
-    bars: ValidatedMinuteBars | DerivedFiveMinuteBars | Iterable[IntradayBar],
+    bars: (
+        ValidatedMinuteBars
+        | DerivedFiveMinuteBars
+        | SparseDerivedFiveMinuteBars
+        | Iterable[IntradayBar]
+    ),
     *,
     cost_case: CostCase | CostModel = CostCase.STRESS,
     initial_equity: Decimal = Decimal("1"),
@@ -1381,7 +2017,12 @@ def replay_program(
         OpeningRangeBreakoutReversalProgram,
     ):
         raise UnsupportedProgramError("replay accepts only the closed typed grammar")
-    if type(bars) is DerivedFiveMinuteBars:
+    if type(bars) is SparseDerivedFiveMinuteBars:
+        validated_bars = _validate_sparse_derived_five_minute_bars(bars)
+        symbol = bars.symbol
+        input_digest = bars.source_digest
+        resolution = BarResolution.FIVE_MINUTE
+    elif type(bars) is DerivedFiveMinuteBars:
         validated_bars = _validate_derived_five_minute_bars(bars)
         symbol = bars.symbol
         input_digest = bars.input_digest
@@ -1430,7 +2071,9 @@ def replay_program(
                     prior_sessions,
                     resolution,
                 )
-                if signal is not None:
+                if signal is not None and any(
+                    candidate.volume > 0 for candidate in session_bars[index + 1 :]
+                ):
                     entry_index = index
                     direction = signal
                     break
@@ -1469,12 +2112,21 @@ def replay_program(
                 model,
             )
             target_exit_at = entry.timestamp + timedelta(minutes=hold_minutes)
-            exit_index = len(session_bars) - 1
+            exit_index = max(
+                index
+                for index in range(entry_index + 1, len(session_bars))
+                if session_bars[index].volume > 0
+            )
             for candidate_index in range(entry_index + 1, len(session_bars)):
                 candidate = session_bars[candidate_index]
+                if candidate.volume == 0:
+                    continue
                 candidate_vwap = _vwap_through(session_bars, candidate_index)
                 should_exit = False
-                if type(program) is VwapTrendReversalProgram:
+                if (
+                    type(program) is VwapTrendReversalProgram
+                    and candidate_vwap is not None
+                ):
                     if program.mode is VwapStrategyMode.BOUNDED_REVERSAL:
                         should_exit = (
                             candidate.close >= candidate_vwap
@@ -1642,6 +2294,58 @@ def compute_frequency_diagnostics(
         fraction,
         per_active,
         median_value,
+    )
+
+
+def _compute_published_stage_frequency_diagnostics(
+    trades: Iterable[Trade],
+    *,
+    stage: ResearchStage,
+    cost_case: CostCase = CostCase.STRESS,
+) -> FrequencyDiagnostics:
+    if stage not in (
+        ResearchStage.VALIDATION,
+        ResearchStage.HOLDOUT,
+        ResearchStage.RECENT_EXTENSION,
+    ):
+        raise InformationFirewallError(
+            "frequency diagnostics require an authorized stage"
+        )
+    start, end = _stage_window(stage)
+    sessions = tuple(
+        session
+        for session in _SESSION_AUTHORITY.published.sessions
+        if start <= session < end
+    )
+    if not sessions:
+        raise Arch150Error("published stage has no regular XNYS sessions")
+    session_set = frozenset(sessions)
+    materialized = tuple(trades)
+    if any(
+        type(trade) is not Trade or trade.session not in session_set
+        for trade in materialized
+    ):
+        raise InformationFirewallError("trade falls outside the frozen stage sessions")
+    years = tuple(sorted({session.year for session in sessions}))
+    return compute_frequency_diagnostics(
+        materialized,
+        validation_years=years,
+        regular_sessions=len(sessions),
+        cost_case=cost_case,
+    )
+
+
+def compute_validation_frequency_diagnostics(
+    trades: Iterable[Trade],
+    *,
+    cost_case: CostCase = CostCase.STRESS,
+) -> FrequencyDiagnostics:
+    """Use all published 2021-2023 sessions as the official denominator."""
+
+    return _compute_published_stage_frequency_diagnostics(
+        trades,
+        stage=ResearchStage.VALIDATION,
+        cost_case=cost_case,
     )
 
 
@@ -2337,11 +3041,12 @@ class TrialLedger:
         )
 
 
-def evaluate_frozen_trial(
+def _evaluate_frozen_trial_common(
     ledger: TrialLedger,
     slot: FrozenTrialSlot,
     discovery_dataset: ResearchDataset,
     *,
+    require_accepted_sparse_custody: bool,
     source_symbol: str = "SPY",
     cost_case: CostCase | CostModel = CostCase.STRESS,
     initial_equity: Decimal = Decimal("1"),
@@ -2357,6 +3062,14 @@ def evaluate_frozen_trial(
     ):
         raise InformationFirewallError(
             "official G1 evaluation requires an opened discovery dataset"
+        )
+    if (
+        require_accepted_sparse_custody
+        and discovery_dataset._sparse_custody_authority
+        is not _ACCEPTED_SPARSE_CUSTODY_AUTHORITY
+    ):
+        raise InformationFirewallError(
+            "official G1 evaluation requires accepted sparse custody binding"
         )
     if type(source_symbol) is not str or source_symbol not in INITIAL_UNIVERSE:
         raise InformationFirewallError(
@@ -2437,12 +3150,69 @@ def evaluate_frozen_trial(
     )
 
 
+def evaluate_frozen_trial(
+    ledger: TrialLedger,
+    slot: FrozenTrialSlot,
+    discovery_dataset: ResearchDataset,
+    *,
+    source_symbol: str = "SPY",
+    cost_case: CostCase | CostModel = CostCase.STRESS,
+    initial_equity: Decimal = Decimal("1"),
+) -> G1TrialEvaluation:
+    """Official G1 evaluation requires the accepted D1R sparse custody bind."""
+
+    return _evaluate_frozen_trial_common(
+        ledger,
+        slot,
+        discovery_dataset,
+        require_accepted_sparse_custody=True,
+        source_symbol=source_symbol,
+        cost_case=cost_case,
+        initial_equity=initial_equity,
+    )
+
+
+def _evaluate_frozen_trial_for_test(
+    ledger: TrialLedger,
+    slot: FrozenTrialSlot,
+    discovery_dataset: ResearchDataset,
+    *,
+    source_symbol: str = "SPY",
+    cost_case: CostCase | CostModel = CostCase.STRESS,
+    initial_equity: Decimal = Decimal("1"),
+) -> G1TrialEvaluation:
+    """Private synthetic-only G1 seam for deterministic contract tests."""
+
+    return _evaluate_frozen_trial_common(
+        ledger,
+        slot,
+        discovery_dataset,
+        require_accepted_sparse_custody=False,
+        source_symbol=source_symbol,
+        cost_case=cost_case,
+        initial_equity=initial_equity,
+    )
+
+
 def _discovery_dataset_id(discovery_dataset: ResearchDataset) -> UUID:
+    custody = discovery_dataset._sparse_custody_authority
     discovery_material = {
         "stage": discovery_dataset.stage.value,
         "start": discovery_dataset.start.isoformat(),
         "end_exclusive": discovery_dataset.end_exclusive.isoformat(),
         "input_digest": discovery_dataset.bars.input_digest,
+        "sparse_custody": (
+            None
+            if custody is None
+            else {
+                "dataset_id": str(custody.dataset_id),
+                "dataset_semantic_sha256": custody.dataset_semantic_sha256,
+                "custody_id": str(custody.custody_id),
+                "custody_semantic_sha256": custody.custody_semantic_sha256,
+                "authority_kind": custody.authority_kind,
+                "source_input_digest": custody._source_input_digest,
+            }
+        ),
     }
     return uuid5(
         _DISCOVERY_DATASET_NAMESPACE,

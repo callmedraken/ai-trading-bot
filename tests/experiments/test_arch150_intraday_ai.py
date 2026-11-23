@@ -11,7 +11,9 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from trading_bot.experiments.arch148_intraday import HistoricalIntradaySessionAuthority
 from trading_bot.experiments.arch150_intraday_ai import (
+    _ACCEPTED_SPARSE_CUSTODY_AUTHORITY,
     BASE_COST,
     DISCOVERY_END,
     DISCOVERY_START,
@@ -40,6 +42,7 @@ from trading_bot.experiments.arch150_intraday_ai import (
     OpeningRangeDirection,
     ResearchDataset,
     ResearchStage,
+    SparseCustodyAuthority,
     StrategyFamily,
     TradeDirection,
     TrialBudgetExceeded,
@@ -49,7 +52,14 @@ from trading_bot.experiments.arch150_intraday_ai import (
     VwapReferenceSide,
     VwapStrategyMode,
     VwapTrendReversalProgram,
+    _discovery_dataset_id,
+    _entry_signal,
+    _evaluate_frozen_trial_for_test,
+    _open_sparse_discovery_dataset_for_test,
+    _vwap_through,
     aggregate_five_minute_bars,
+    aggregate_sparse_five_minute_bars,
+    compute_validation_frequency_diagnostics,
     evaluate_frozen_trial,
     finalize_discovery_population,
     foundation_help,
@@ -146,7 +156,7 @@ def _frozen_candidates(
     manifest = freeze_g1_population(programs)
     ledger = TrialLedger(manifest)
     for slot in manifest.slots:
-        evaluation = evaluate_frozen_trial(ledger, slot, discovery)
+        evaluation = _evaluate_frozen_trial_for_test(ledger, slot, discovery)
         disposition = (
             TrialDisposition.SHORTLISTED
             if evaluation.replay_result is not None and evaluation.replay_result.trades
@@ -274,6 +284,52 @@ def test_aggregation_fails_closed_for_partial_or_nonconsecutive_minutes() -> Non
             aggregate_five_minute_bars(validate_1_minute_bars(source))
 
 
+def test_sparse_five_minute_aggregation_omits_only_incomplete_bucket() -> None:
+    day = date(2022, 1, 3)
+    source = [_bar("SPY", day, offset, str(100 + offset)) for offset in range(15)]
+    source = [bar for bar in source if bar.local_timestamp.minute != 37]
+    sparse = aggregate_sparse_five_minute_bars(source)
+    assert [bar.local_timestamp.time() for bar in sparse] == [
+        time(9, 30),
+        time(9, 40),
+    ]
+    assert sparse[0].open == Decimal("100")
+    assert sparse[0].close == Decimal("104")
+    assert sparse[1].open == Decimal("110")
+    assert sparse[1].close == Decimal("114")
+
+    changed_incomplete_bucket = [
+        _bar("SPY", day, offset, "999" if offset == 6 else str(100 + offset))
+        for offset in range(15)
+        if offset != 7
+    ]
+    changed = aggregate_sparse_five_minute_bars(changed_incomplete_bucket)
+    assert changed.output_digest == sparse.output_digest
+    assert changed.input_digest != sparse.input_digest
+    assert changed.source_digest != sparse.source_digest
+    changed_complete_bucket = aggregate_sparse_five_minute_bars(
+        [
+            _bar("SPY", day, offset, "101" if offset == 0 else str(100 + offset))
+            for offset in range(15)
+            if offset != 7
+        ]
+    )
+    assert changed_complete_bucket.output_digest != sparse.output_digest
+    assert changed_complete_bucket.source_digest != sparse.source_digest
+    assert (
+        replay_program(
+            OpeningRangeBreakoutReversalProgram(
+                opening_range_minutes=5,
+                direction=OpeningRangeDirection.CONTINUATION,
+                entry_delay_bars=0,
+                max_hold_minutes=5,
+            ),
+            sparse,
+        ).input_digest
+        == sparse.source_digest
+    )
+
+
 def test_aggregation_stays_inside_an_early_close_session() -> None:
     early_close = date(2023, 11, 24)
     source = [_bar("SPY", early_close, offset) for offset in range(210)]
@@ -388,6 +444,99 @@ def test_public_dataset_construction_and_later_stages_cannot_bypass_firewall() -
             HOLDOUT_START,
             date(2026, 1, 1),
         )
+
+
+def test_sparse_custody_binding_is_immutable_and_required_for_official_g1() -> None:
+    day = date(2020, 1, 2)
+    source = [
+        _bar("SPY", day, 0),
+        _bar("SPY", day, 2),
+        _bar("QQQ", day, 0),
+        _bar("QQQ", day, 2),
+    ]
+    sparse_dataset = _open_sparse_discovery_dataset_for_test(source)
+    authority = sparse_dataset._sparse_custody_authority
+    assert authority is not None
+    assert authority.authority_kind == "SYNTHETIC_TEST"
+    assert authority._source_input_digest == sparse_dataset.bars.input_digest
+    assert authority.scheduled_slots_per_symbol == 390
+    assert authority.observed_counts_by_symbol == (("SPY", 2), ("QQQ", 2))
+    assert authority.missing_counts_by_symbol == (("SPY", 388), ("QQQ", 388))
+    assert authority.common_missing_count == authority.union_missing_count == 388
+    assert authority.dataset_id.int != 0
+    assert len(authority.dataset_semantic_sha256) == 64
+    assert authority.custody_id.int != 0
+    assert len(authority.custody_semantic_sha256) == 64
+    assert not hasattr(authority, "missing_timestamps")
+    assert _discovery_dataset_id(sparse_dataset) != _discovery_dataset_id(
+        open_discovery_dataset(source)
+    )
+    changed_source = [
+        _bar("SPY", day, 0),
+        _bar("SPY", day, 2, "101"),
+        _bar("QQQ", day, 0),
+        _bar("QQQ", day, 2),
+    ]
+    changed_dataset = _open_sparse_discovery_dataset_for_test(changed_source)
+    assert _discovery_dataset_id(changed_dataset) != _discovery_dataset_id(
+        sparse_dataset
+    )
+    with pytest.raises(AttributeError):
+        authority.dataset_id = authority.custody_id  # type: ignore[misc]
+    with pytest.raises(InformationFirewallError, match="source-owned binding"):
+        SparseCustodyAuthority(
+            authority.dataset_id,
+            authority.dataset_semantic_sha256,
+            authority.custody_id,
+            authority.custody_semantic_sha256,
+            authority.normalized_file_sha256_by_symbol,
+            authority.scheduled_slots_per_symbol,
+            authority.observed_counts_by_symbol,
+            authority.missing_counts_by_symbol,
+            authority.missing_timestamp_sha256_by_symbol,
+            authority.common_missing_count,
+            authority.union_missing_count,
+            authority.fully_missing_session_counts_by_symbol,
+            authority.authority_kind,
+        )
+
+    program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("1"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    manifest = freeze_g1_population((program,))
+    with pytest.raises(InformationFirewallError, match="accepted sparse custody"):
+        evaluate_frozen_trial(TrialLedger(manifest), manifest.slots[0], sparse_dataset)
+
+
+def test_accepted_sparse_custody_identity_is_pinned_without_gap_locations() -> None:
+    authority = _ACCEPTED_SPARSE_CUSTODY_AUTHORITY
+    assert str(authority.dataset_id) == "ff5a3847-09c2-5902-b174-9e77eebf7d53"
+    assert (
+        authority.dataset_semantic_sha256
+        == "0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd"
+    )
+    assert str(authority.custody_id) == "21e121dc-a9da-538f-bc88-c15fe7ea7f50"
+    assert (
+        authority.custody_semantic_sha256
+        == "5b6ac554eda73b588f2f6d664c14e5c7fca3c151966cb546c17621d0c7e6ad83"
+    )
+    assert authority.scheduled_slots_per_symbol == 781980
+    assert authority.observed_counts_by_symbol == (("SPY", 781876), ("QQQ", 781865))
+    assert authority.missing_counts_by_symbol == (("SPY", 104), ("QQQ", 115))
+    assert authority.missing_timestamp_sha256_by_symbol == (
+        ("SPY", "d6da92e26196d00a25355ebb83e58d16ef767d9a4c476ee848070727a9780eba"),
+        ("QQQ", "7f4eab086290576208f1d47887b32413de5015634da9e551aa9f8eecc385a0d4"),
+    )
+    assert authority.normalized_file_sha256_by_symbol == (
+        ("SPY", "f7c1a708db72f9f73bd0d05c45dfffed26f5b5fa36c9428c8069af28d897c8ed"),
+        ("QQQ", "c9c95664f1a0112d410cdc01273be8146f0136ca57591b18ddb6a7f1fbd3c471"),
+    )
+    assert authority.common_missing_count == 64
+    assert authority.union_missing_count == 155
+    assert authority.fully_missing_session_counts_by_symbol == (("SPY", 0), ("QQQ", 0))
 
 
 def test_family_a_uses_prior_session_noise_vwap_confirmation_and_elapsed_hold() -> None:
@@ -590,6 +739,160 @@ def test_five_minute_view_preserves_opening_range_and_hold_minutes() -> None:
     )
 
 
+def test_sparse_confirmation_and_vwap_use_only_observed_eligible_bars() -> None:
+    day = date(2022, 1, 3)
+    source = [
+        _bar("SPY", day, 0, "110", high="110", low="100"),
+        _bar("SPY", day, 2, "110", high="110", low="100"),
+        _bar("SPY", day, 3, "110", high="110", low="100"),
+        _bar("SPY", day, 4, "100"),
+    ]
+    program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("1"),
+        confirmation_bars=2,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    result = replay_program(program, source)
+    assert len(result.trades) == 1
+    trade = result.trades[0]
+    assert trade.entry.reference_bar_timestamp == _bar("SPY", day, 3).timestamp
+    assert trade.entry.reference_bar_timestamp != _bar("SPY", day, 1).timestamp
+    assert tuple(bar.timestamp for bar in validate_1_minute_bars(source).bars) == tuple(
+        bar.timestamp for bar in source
+    )
+
+    sparse_vwap_source = [
+        _bar("SPY", day, 0, "100", volume=100),
+        _bar("SPY", day, 2, "200", volume=100),
+        _bar("SPY", day, 3, "1000", volume=0),
+    ]
+    assert _vwap_through(sparse_vwap_source, 2) == Decimal("150")
+
+
+def test_family_a_and_opening_range_fail_closed_on_missing_exact_minutes() -> None:
+    prior = date(2022, 1, 3)
+    current = date(2022, 1, 4)
+    family_a = NoiseAreaVwapMomentumProgram(
+        lookback_sessions=1,
+        noise_band_bps=Decimal("1"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+    )
+    sparse_prior_and_current = [
+        _bar("SPY", prior, 0),
+        _bar("SPY", prior, 1),
+        _bar("SPY", current, 2, "120"),
+        _bar("SPY", current, 3, "120"),
+    ]
+    assert not replay_program(family_a, sparse_prior_and_current).trades
+
+    opening_range_bars = [
+        _bar("SPY", current, offset, "110" if offset >= 5 else "100")
+        for offset in (0, 1, 3, 4, 5, 6, 7)
+    ]
+    opening_range_program = OpeningRangeBreakoutReversalProgram(
+        opening_range_minutes=5,
+        direction=OpeningRangeDirection.CONTINUATION,
+        entry_delay_bars=0,
+        max_hold_minutes=1,
+    )
+    assert not replay_program(opening_range_program, opening_range_bars).trades
+
+
+def test_elapsed_hold_exits_on_next_observed_bar_and_records_fill_provenance() -> None:
+    day = date(2022, 1, 3)
+    source = [
+        _bar("SPY", day, 0, "110", high="110", low="100"),
+        _bar("SPY", day, 5, "100"),
+    ]
+    program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("1"),
+        mode=VwapStrategyMode.BOUNDED_REVERSAL,
+        reference_side=VwapReferenceSide.ABOVE,
+        confirmation_bars=1,
+        max_hold_minutes=3,
+        cooldown_bars=0,
+    )
+    trades = replay_program(program, source).trades
+    assert len(trades) == 1
+    trade = trades[0]
+    expected_source_times = {bar.timestamp for bar in source}
+    assert trade.entry.reference_bar_timestamp == source[0].timestamp
+    assert trade.exit.reference_bar_timestamp == source[1].timestamp
+    assert trade.exit.reference_bar_timestamp in expected_source_times
+    assert trade.entry.reference_price == source[0].close
+    assert trade.exit.reference_price == source[1].close
+    assert trade.entry.timestamp == source[0].timestamp + timedelta(minutes=1)
+    assert trade.exit.timestamp == source[1].timestamp + timedelta(minutes=1)
+    assert trade.entry.timestamp == _bar("SPY", day, 1).timestamp
+    assert trade.entry.reference_bar_timestamp != trade.entry.timestamp
+    assert trade.exit.timestamp == _bar("SPY", day, 6).timestamp
+    assert trade.exit.reference_bar_timestamp != trade.exit.timestamp
+    assert trade.exit.timestamp != _bar("SPY", day, 4).timestamp
+    assert trade.session == day
+
+
+def test_replay_closes_each_session_and_resets_cooldown_between_sessions() -> None:
+    first = date(2022, 1, 3)
+    second = date(2022, 1, 4)
+    source = [
+        _bar("SPY", first, 0, "110", high="110", low="100"),
+        _bar("SPY", first, 1, "100"),
+        _bar("SPY", second, 0, "110", high="110", low="100"),
+        _bar("SPY", second, 1, "100"),
+    ]
+    program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("1"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=30,
+    )
+    trades = replay_program(program, source).trades
+    assert tuple(trade.session for trade in trades) == (first, second)
+    observed = {bar.timestamp for bar in source}
+    for trade in trades:
+        assert trade.entry.reference_bar_timestamp in observed
+        assert trade.exit.reference_bar_timestamp in observed
+        assert trade.entry.reference_bar_timestamp.date() == trade.session
+        assert trade.exit.reference_bar_timestamp.date() == trade.session
+
+
+def test_confirmation_cannot_bridge_an_xnys_session_boundary() -> None:
+    first = date(2022, 1, 3)
+    second = date(2022, 1, 4)
+    source = [
+        _bar("SPY", first, 388, "110", high="110", low="100"),
+        _bar("SPY", first, 389, "110", high="110", low="100"),
+        _bar("SPY", second, 0, "110", high="110", low="100"),
+        _bar("SPY", second, 1, "100"),
+    ]
+    program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("1"),
+        confirmation_bars=2,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    assert (
+        _entry_signal(
+            program,
+            source[:3],
+            2,
+            second,
+            {},
+            BarResolution.ONE_MINUTE,
+        )
+        is None
+    )
+    trades = replay_program(program, source).trades
+    assert all(trade.session in (first, second) for trade in trades)
+    assert all(
+        trade.entry.reference_bar_timestamp.date() == trade.session
+        and trade.exit.reference_bar_timestamp.date() == trade.session
+        for trade in trades
+    )
+
+
 def test_long_and_short_fills_use_adverse_stress_slippage() -> None:
     up = _prices(date(2022, 1, 3), [str(100 + index) for index in range(8)])
     down = _prices(date(2022, 1, 4), [str(108 - index) for index in range(8)])
@@ -675,6 +978,41 @@ def test_frequency_advancement_is_stress_only_for_all_promotion_policies() -> No
         )
 
 
+def test_official_validation_frequency_uses_full_published_session_denominator() -> (
+    None
+):
+    sessions = HistoricalIntradaySessionAuthority().published.sessions
+    expected_denominator = sum(2021 <= session.year <= 2023 for session in sessions)
+    no_trade = compute_validation_frequency_diagnostics(())
+    assert no_trade.regular_sessions == expected_denominator
+    assert no_trade.active_sessions == 0
+    assert no_trade.active_session_fraction == Decimal("0")
+
+    day = date(2022, 1, 3)
+    program = VwapTrendReversalProgram(
+        displacement_bps=Decimal("1"),
+        confirmation_bars=1,
+        max_hold_minutes=1,
+        cooldown_bars=0,
+    )
+    observed_trade = replay_program(
+        program,
+        [
+            _bar("SPY", day, 0, "110", high="110", low="100"),
+            _bar("SPY", day, 1, "100"),
+        ],
+    ).trades
+    assert len(observed_trade) == 1
+    one_trade = compute_validation_frequency_diagnostics(observed_trade)
+    assert one_trade.regular_sessions == expected_denominator
+    assert one_trade.active_sessions == 1
+    with localcontext(Context(prec=60)):
+        assert one_trade.active_session_fraction == Decimal(1) / Decimal(
+            expected_denominator
+        )
+    assert one_trade.annual_completed_round_trips == ((2021, 0), (2022, 1), (2023, 0))
+
+
 def test_g1_manifest_freezes_ordered_proposals_before_any_result() -> None:
     first = NoiseAreaVwapMomentumProgram()
     second = VwapTrendReversalProgram()
@@ -746,10 +1084,10 @@ def test_g1_evaluation_requires_exact_next_slot_and_cannot_be_consumed_twice() -
     discovery = _discovery_dataset(trend_bars)
 
     with pytest.raises(InformationFirewallError, match="exact next frozen"):
-        evaluate_frozen_trial(ledger, manifest.slots[1], discovery)
+        _evaluate_frozen_trial_for_test(ledger, manifest.slots[1], discovery)
     with pytest.raises(InformationFirewallError, match="opened discovery dataset"):
-        evaluate_frozen_trial(ledger, manifest.slots[0], trend_bars)  # type: ignore[arg-type]
-    first_result = evaluate_frozen_trial(ledger, manifest.slots[0], discovery)
+        _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], trend_bars)  # type: ignore[arg-type]
+    first_result = _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], discovery)
     assert first_result.replay_result is not None
     assert first_result.replay_result.trades
     with pytest.raises(InformationFirewallError, match="not authorized"):
@@ -759,10 +1097,12 @@ def test_g1_evaluation_requires_exact_next_slot_and_cannot_be_consumed_twice() -
         first_result, TrialDisposition.ECONOMICALLY_REJECTED
     )
     with pytest.raises(InformationFirewallError, match="exact next frozen"):
-        evaluate_frozen_trial(ledger_after_first, manifest.slots[0], discovery)
+        _evaluate_frozen_trial_for_test(
+            ledger_after_first, manifest.slots[0], discovery
+        )
     with pytest.raises(InformationFirewallError, match="next frozen population slot"):
         ledger_after_first.consume(first_result)
-    second_result = evaluate_frozen_trial(
+    second_result = _evaluate_frozen_trial_for_test(
         ledger_after_first,
         manifest.slots[1],
         discovery,
@@ -771,7 +1111,7 @@ def test_g1_evaluation_requires_exact_next_slot_and_cannot_be_consumed_twice() -
     assert completed.is_complete
     assert len(completed.records) == len(manifest.slots)
     with pytest.raises(TrialBudgetExceeded, match="all frozen"):
-        evaluate_frozen_trial(completed, manifest.slots[1], discovery)
+        _evaluate_frozen_trial_for_test(completed, manifest.slots[1], discovery)
 
 
 def test_invalid_and_duplicate_proposals_consume_their_frozen_slots() -> None:
@@ -787,12 +1127,14 @@ def test_invalid_and_duplicate_proposals_consume_their_frozen_slots() -> None:
     ledger = TrialLedger(manifest)
     bars = _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
     discovery = _discovery_dataset(bars)
-    first = evaluate_frozen_trial(ledger, manifest.slots[0], discovery)
+    first = _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], discovery)
     ledger = ledger.consume(first, TrialDisposition.SHORTLISTED)
-    duplicate = evaluate_frozen_trial(ledger, manifest.slots[1], discovery)
+    duplicate = _evaluate_frozen_trial_for_test(ledger, manifest.slots[1], discovery)
     assert duplicate.fixed_disposition is TrialDisposition.DUPLICATE
     ledger = ledger.consume(duplicate)
-    invalid_result = evaluate_frozen_trial(ledger, manifest.slots[2], discovery)
+    invalid_result = _evaluate_frozen_trial_for_test(
+        ledger, manifest.slots[2], discovery
+    )
     assert invalid_result.fixed_disposition is TrialDisposition.INVALID
     ledger = ledger.consume(invalid_result)
     assert tuple(record.disposition for record in ledger.records) == (
@@ -813,7 +1155,7 @@ def test_frozen_slot_and_ledger_cannot_be_rebound_or_accept_absent_programs() ->
     ledger = TrialLedger(manifest)
     discovery = _discovery_dataset(_flat(date(2020, 1, 2)))
     with pytest.raises(InformationFirewallError, match="exact next frozen"):
-        evaluate_frozen_trial(ledger, other_manifest.slots[0], discovery)
+        _evaluate_frozen_trial_for_test(ledger, other_manifest.slots[0], discovery)
     with pytest.raises(InformationFirewallError, match="not authorized"):
         ledger.consume(
             VwapTrendReversalProgram(displacement_bps=Decimal(31)),
@@ -845,9 +1187,9 @@ def test_completed_discovery_freeze_gates_candidates_and_validation() -> None:
 
     candidate = manifest.slots[0]._program
     assert candidate is not None
-    first = evaluate_frozen_trial(ledger, manifest.slots[0], discovery)
+    first = _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], discovery)
     ledger = ledger.consume(first, TrialDisposition.SHORTLISTED)
-    second = evaluate_frozen_trial(ledger, manifest.slots[1], discovery)
+    second = _evaluate_frozen_trial_for_test(ledger, manifest.slots[1], discovery)
     ledger = ledger.consume(second)
     with pytest.raises(InformationFirewallError, match="different discovery dataset"):
         finalize_discovery_population(
@@ -868,7 +1210,7 @@ def test_completed_discovery_freeze_gates_candidates_and_validation() -> None:
     validation = open_validation_dataset(_universe_bars(date(2022, 1, 3)), freeze)
     assert validation
     with pytest.raises(InformationFirewallError, match="opened discovery dataset"):
-        evaluate_frozen_trial(ledger, manifest.slots[0], validation)
+        _evaluate_frozen_trial_for_test(ledger, manifest.slots[0], validation)
 
 
 def test_selection_bias_binds_every_completed_frozen_attempt() -> None:
@@ -894,7 +1236,7 @@ def test_selection_bias_binds_every_completed_frozen_attempt() -> None:
         _prices(date(2020, 1, 2), ["100", "110", "110", "90", "90"])
     )
     for slot in manifest.slots:
-        evaluation = evaluate_frozen_trial(
+        evaluation = _evaluate_frozen_trial_for_test(
             ledger,
             slot,
             discovery,
@@ -934,7 +1276,7 @@ def test_selection_bias_and_effect_free_arch150_surface_leave_arch149_untouched(
     manifest = freeze_g1_population((NoiseAreaVwapMomentumProgram(),))
     ledger = TrialLedger(manifest)
     discovery = _discovery_dataset(_flat(date(2020, 1, 2)))
-    zero_trade = evaluate_frozen_trial(
+    zero_trade = _evaluate_frozen_trial_for_test(
         ledger,
         manifest.slots[0],
         discovery,

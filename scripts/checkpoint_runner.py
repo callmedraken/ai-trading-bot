@@ -49,6 +49,8 @@ if str(_SRC_ROOT) not in sys.path:
 
 SCHEMA: Final = "ai-trading-bot-checkpoint-runner/v1"
 REMOTE_LOOKUP_TIMEOUT_SECONDS: Final = 30
+# Leave headroom below CreateProcessW's 32,767 UTF-16 code unit limit.
+_WINDOWS_RUFF_COMMAND_BUDGET: Final = 30_000
 R5_TRADING_PID_ENV: Final = "AI_TRADING_BOT_ARCH128_R5_TRADING_PID"
 R5_TRADING_REMOTE_HEAD_ENV: Final = "AI_TRADING_BOT_ARCH128_R5_ADMIN_REMOTE_HEAD"
 R5_PRODUCTION_PYTHON: Final = Path(r"F:\AITradingBot\runtime\python.exe")
@@ -25138,6 +25140,38 @@ def _safe_step_name(name: str) -> str:
     return "".join(character if character.isalnum() else "-" for character in name)
 
 
+def _windows_ruff_commands(argv: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
+    def command_units(arguments: Sequence[str]) -> int:
+        return len(subprocess.list2cmdline(arguments).encode("utf-16-le")) // 2
+
+    if command_units(argv) <= _WINDOWS_RUFF_COMMAND_BUDGET:
+        return (argv,)
+
+    # Runner-owned Ruff commands place all options before the path operands.
+    path_start = 4  # python -m ruff check|format
+    while path_start < len(argv) and argv[path_start].startswith("-"):
+        path_start += 1
+    prefix = argv[:path_start]
+    prefix_units = command_units(prefix)
+    units = prefix_units
+    paths: list[str] = []
+    commands = []
+    for path in argv[path_start:]:
+        path_units = 1 + command_units((path,))
+        if prefix_units + path_units > _WINDOWS_RUFF_COMMAND_BUDGET:
+            raise ValueError("Ruff path cannot fit in a Windows command")
+        if units + path_units > _WINDOWS_RUFF_COMMAND_BUDGET:
+            commands.append((*prefix, *paths))
+            paths = []
+            units = prefix_units
+        paths.append(path)
+        units += path_units
+    if not paths:
+        raise ValueError("Ruff command cannot fit in a Windows command")
+    commands.append((*prefix, *paths))
+    return tuple(commands)
+
+
 def _execute_step(
     step: Step,
     *,
@@ -25162,23 +25196,32 @@ def _execute_step(
             environment.pop(variable, None)
 
     started = time.monotonic()
-    completed = subprocess.run(
-        argv,
-        cwd=repo_root,
-        capture_output=True,
-        check=False,
-        env=environment,
+    commands = (
+        _windows_ruff_commands(argv)
+        if os.name == "nt" and step.name in {"ruff_check", "ruff_format"}
+        else (argv,)
     )
+    results = [
+        subprocess.run(
+            command,
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+            env=environment,
+        )
+        for command in commands
+    ]
     elapsed_seconds = time.monotonic() - started
-    stdout = completed.stdout
-    stderr = completed.stderr
+    exit_code = next((result.returncode for result in results if result.returncode), 0)
+    stdout = b"".join(result.stdout for result in results)
+    stderr = b"".join(result.stderr for result in results)
     prefix = f"{index:02d}-{_safe_step_name(label)}"
     stdout_path = command_dir / f"{prefix}.stdout.txt"
     stderr_path = command_dir / f"{prefix}.stderr.txt"
     stdout_path.write_bytes(stdout)
     stderr_path.write_bytes(stderr)
 
-    if completed.returncode != 0:
+    if exit_code != 0:
         if stdout:
             sys.stdout.buffer.write(stdout)
         if stderr:
@@ -25187,7 +25230,7 @@ def _execute_step(
     return CommandOutcome(
         name=label,
         argv=tuple(argv),
-        exit_code=int(completed.returncode),
+        exit_code=exit_code,
         stdout_bytes=len(stdout),
         stderr_bytes=len(stderr),
         stdout_sha256=hashlib.sha256(stdout).hexdigest(),

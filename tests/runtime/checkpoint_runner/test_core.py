@@ -4,6 +4,7 @@ import ast
 import hashlib
 import json
 import subprocess
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -1538,6 +1539,48 @@ def test_single_verify_report_and_command_selection_unchanged(tmp_path, monkeypa
         "ruff_format",
         "pytest",
     ]
+
+
+@pytest.mark.parametrize("options", [("check", "--no-cache"), ("format", "--diff")])
+def test_oversized_windows_ruff_command_preserves_every_path(options):
+    prefix = (r"C:\Program Files\Python314\python.exe", "-m", "ruff", *options)
+    paths = tuple(
+        f"tests/{index}/{'😀' * 15} a checkpoint module.py" for index in range(600)
+    )
+    commands = runner._windows_ruff_commands((*prefix, *paths))
+    assert len(commands) > 1
+    assert all(command[: len(prefix)] == prefix for command in commands)
+    assert (
+        tuple(path for command in commands for path in command[len(prefix) :]) == paths
+    )
+    assert all(
+        len(subprocess.list2cmdline(command).encode("utf-16-le")) // 2 < 32_767
+        for command in commands
+    )
+    short = (*prefix, paths[0])
+    assert runner._windows_ruff_commands(short) == (short,)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows subprocess batching")
+def test_execute_step_preserves_ruff_batch_failure_and_output(tmp_path, monkeypatch):
+    prefix = ("python", "-m", "ruff", "check", "--no-cache")
+    paths = tuple(f"tests/{index:03d}.py" for index in range(20))
+    monkeypatch.setattr(runner, "_WINDOWS_RUFF_COMMAND_BUDGET", 100)
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, int(len(calls) == 2), b"out\n", b"")
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    step = runner.Step("ruff_check", (*prefix, *paths))
+    outcome = runner._execute_step(
+        step, repo_root=tmp_path, command_dir=tmp_path, index=1
+    )
+    assert len(calls) > 2
+    assert tuple(path for call in calls for path in call[len(prefix) :]) == paths
+    assert outcome.exit_code == 1
+    assert Path(outcome.stdout_path).read_bytes() == b"out\n" * len(calls)
 
 
 @pytest.mark.parametrize("diagnostic", [False, True])

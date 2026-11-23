@@ -154,16 +154,12 @@ The G1 population freeze/C1 correction is accepted and integrated at HEAD
 certification was reused, identity was stable, and canonical FULL did not run
 again.
 
-The one-shot offline G1 discovery observer is implemented in
-`trading_bot.experiments.arch150_g1_discovery`; its source review and
-certification are pending. It pins the accepted D1R files and semantic custody,
-then uses the canonical 24-slot manifest, sparse-custody opener, and official
-STRESS evaluator. Source tests use synthetic inputs only. No real custody file
-has been read and no G1 strategy result has been consumed by this operator
-checkpoint. After exact-source acceptance and integration, the immediate next
-action is one offline discovery invocation over `[2016-01-01, 2021-01-01)`;
-there is no intervening strategy-design checkpoint. Validation
-`[2021-01-01, 2024-01-01)` stays unopened and 2024+ remains sealed.
+The one-shot 2016–2020 discovery observation is consumed under the frozen
+24-slot manifest. The accepted report and validation observer are recorded
+in the [validation record](../validation/arch150-intraday-ai-day-trading-campaign.md).
+The validation observer authenticates the complete D1R custody and opens
+only the 2021–2023 projection for the slots frozen by discovery. Slot ID,
+source symbol and resolution remain bound even when programs are shared.
 
 ## Historical research chronology
 
@@ -409,13 +405,10 @@ returns.
 
 ## Immediate milestone
 
-After exact-source review and acceptance of the frozen G1 population, the next
-milestone is the one-shot offline 2016-2020 discovery evaluation of that exact
-24-slot manifest against the accepted sparse dataset. It must not open
-2021-2023 validation or 2024+ data.
-
-The G1 evaluation is a separate real-data/P&L boundary; source acceptance alone
-does not consume or authorize a trial.
+After exact-source review and integration of V1, the next milestone is one
+separately reviewed offline 2021–2023 validation observation over the full
+accepted discovery candidate set. No validation result can directly authorize
+holdout; the complete-trial selection-bias review remains mandatory.
 
 Do not implement live execution.
 

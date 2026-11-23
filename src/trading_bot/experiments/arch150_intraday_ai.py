@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Context, Decimal, InvalidOperation, localcontext
@@ -1434,9 +1434,9 @@ class ResearchDataset:
                 "discovery cannot be opened with a validation candidate freeze"
             )
         if sparse_custody_authority is not None:
-            if (
-                stage is not ResearchStage.DISCOVERY
-                or not _sparse_custody_authority_is_valid(sparse_custody_authority)
+            if not _sparse_custody_authority_is_valid(sparse_custody_authority) or (
+                stage is ResearchStage.VALIDATION
+                and sparse_custody_authority is not _ACCEPTED_SPARSE_CUSTODY_AUTHORITY
             ):
                 raise InformationFirewallError(
                     "sparse custody authority is invalid for this dataset stage"
@@ -1680,28 +1680,68 @@ def open_sparse_discovery_dataset(
 ) -> ResearchDataset:
     """Bind a materialized 2016-2023 stream to the accepted D1R commitments."""
 
-    validated = _validate_accepted_sparse_custody(bars)
-    discovery_bars = tuple(
+    return _project_accepted_sparse_stage(
+        _validate_accepted_sparse_custody(bars), ResearchStage.DISCOVERY
+    )
+
+
+def _project_accepted_sparse_stage(
+    validated: ValidatedUniverseBars,
+    stage: ResearchStage,
+    candidate_freeze: CandidateFreeze | None = None,
+) -> ResearchDataset:
+    start, end = _stage_window(stage)
+    projected = (
         bar
         for symbol in INITIAL_UNIVERSE
         for bar in validated.by_symbol[symbol].bars
-        if DISCOVERY_START <= bar.session_date < DISCOVERY_END
+        if start <= bar.session_date < end
     )
-    discovery = validate_universe_minute_bars(discovery_bars)
     return ResearchDataset(
-        ResearchStage.DISCOVERY,
-        discovery,
-        DISCOVERY_START,
-        DISCOVERY_END,
+        stage,
+        validate_universe_minute_bars(projected),
+        start,
+        end,
+        candidate_freeze,
         sparse_custody_authority=_ACCEPTED_SPARSE_CUSTODY_AUTHORITY,
         _seal=_DATASET_SEAL,
     )
+
+
+def _open_sparse_validation(
+    bars: Iterable[IntradayBar],
+    bind_candidates: Callable[[ResearchDataset], CandidateFreeze],
+) -> ResearchDataset:
+    validated = _validate_accepted_sparse_custody(bars)
+    discovery = _project_accepted_sparse_stage(validated, ResearchStage.DISCOVERY)
+    candidates = bind_candidates(discovery)
+    if (
+        not _candidate_freeze_is_valid(candidates)
+        or candidates.population_manifest_id != freeze_g1_population().manifest_id
+        or candidates.discovery_dataset_id != _discovery_dataset_id(discovery)
+    ):
+        raise InformationFirewallError(
+            "validation candidates do not bind accepted discovery"
+        )
+    return _project_accepted_sparse_stage(
+        validated, ResearchStage.VALIDATION, candidates
+    )
+
+
+def open_sparse_validation_dataset(
+    bars: Iterable[IntradayBar], candidate_freeze: CandidateFreeze
+) -> ResearchDataset:
+    """Open only the validation window of the accepted complete D1R custody."""
+    if not _candidate_freeze_is_valid(candidate_freeze):
+        raise InformationFirewallError("validation requires a valid candidate freeze")
+    return _open_sparse_validation(bars, lambda _: candidate_freeze)
 
 
 def open_validation_dataset(
     bars: Iterable[IntradayBar],
     candidate_freeze: CandidateFreeze | None = None,
 ) -> ResearchDataset:
+    """Open generic research input without accepted campaign custody authority."""
     return _open_dataset(ResearchStage.VALIDATION, bars, candidate_freeze)
 
 
@@ -2649,7 +2689,11 @@ class ValidationRankingMetrics:
 
 @dataclass(frozen=True, slots=True)
 class ValidationRankingRecord:
+    slot_id: UUID
     program_id: UUID
+    semantic_fingerprint: str
+    source_symbol: str
+    bar_resolution: BarResolution
     metrics: ValidationRankingMetrics
 
 
@@ -2660,16 +2704,16 @@ def validation_rank_key(record: ValidationRankingRecord) -> tuple[object, ...]:
     if metrics.cost_case is CostCase.ZERO:
         raise Arch150Error("zero-friction metrics are diagnostic only")
     return (
-        -metrics.net_return,
-        -metrics.sharpe,
+        metrics.net_return.copy_negate(),
+        metrics.sharpe.copy_negate(),
         metrics.maximum_drawdown,
-        -metrics.profit_factor,
-        -metrics.median_trade_expectancy,
-        -metrics.positive_month_breadth,
-        -metrics.active_session_fraction,
+        metrics.profit_factor.copy_negate(),
+        metrics.median_trade_expectancy.copy_negate(),
+        metrics.positive_month_breadth.copy_negate(),
+        metrics.active_session_fraction.copy_negate(),
         metrics.turnover,
-        -metrics.worst_calendar_year_return,
-        str(record.program_id),
+        metrics.worst_calendar_year_return.copy_negate(),
+        str(record.slot_id),
     )
 
 
@@ -3337,14 +3381,33 @@ class TrialLedger:
             if evaluation.replay_result is not None
             else None
         )
+        return self._append_result(
+            slot,
+            evaluation.discovery_dataset_id,
+            evaluation.evaluation_id,
+            replay_id,
+            terminal_disposition,
+            diagnostic_code,
+        )
+
+    def _append_result(
+        self,
+        slot: FrozenTrialSlot,
+        discovery_dataset_id: UUID,
+        evaluation_id: UUID,
+        replay_id: UUID | None,
+        terminal_disposition: TrialDisposition,
+        diagnostic_code: str | None,
+    ) -> TrialLedger:
+        """Build the canonical record after evaluation or evidence authentication."""
         result_material = {
             "schema": G1_RESULT_SCHEMA,
             "manifest_id": str(self._manifest.manifest_id),
             "slot_id": str(slot.slot_id),
-            "discovery_dataset_id": str(evaluation.discovery_dataset_id),
-            "source_symbol": evaluation.source_symbol,
-            "bar_resolution": evaluation.bar_resolution.name,
-            "evaluation_id": str(evaluation.evaluation_id),
+            "discovery_dataset_id": str(discovery_dataset_id),
+            "source_symbol": slot.source_symbol,
+            "bar_resolution": slot.bar_resolution.name,
+            "evaluation_id": str(evaluation_id),
             "replay_id": str(replay_id) if replay_id else None,
             "disposition": terminal_disposition.value,
             "diagnostic_code": diagnostic_code,
@@ -3368,14 +3431,14 @@ class TrialLedger:
             slot.ordinal,
             trial_id,
             slot.slot_id,
-            evaluation.discovery_dataset_id,
-            evaluation.source_symbol,
-            evaluation.bar_resolution,
+            discovery_dataset_id,
+            slot.source_symbol,
+            slot.bar_resolution,
             slot.family,
             slot.program_id,
             slot.semantic_fingerprint,
             result_id,
-            evaluation.evaluation_id,
+            evaluation_id,
             replay_id,
             terminal_disposition,
             diagnostic_code,

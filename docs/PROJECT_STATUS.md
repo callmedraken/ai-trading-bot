@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 G1 discovery observer source review; one offline evaluation follows acceptance
+## Current milestone - Architecture 150 G1 validation observer source review
 
 The G1 population freeze/C1 correction is accepted and integrated at HEAD
 `b6b811bae33a8423e0f6ad588b0f124eb3630591` / tree
@@ -9,16 +9,11 @@ The G1 population freeze/C1 correction is accepted and integrated at HEAD
 `DEVELOP_CERTIFICATION_REUSE=True` for `exact_feature_certification`,
 `IDENTITY_STABLE=True`, and no duplicate canonical FULL ran.
 
-The source checkpoint currently implements the offline-only Arch150 G1
-discovery observer. Exact-source review/certification is pending; the real D1R
-files remain unread for strategy use and no real G1 slot has been consumed.
-After acceptance and integration, the next action is one offline 2016-2020 G1
-discovery observation. Validation and 2024+ data remain unopened.
-
-The observer source and its synthetic tests are in
-`src/trading_bot/experiments/arch150_g1_discovery.py` and
-`tests/experiments/test_arch150_g1_discovery.py`; it uses the existing Arch150
-source-only mapped certification route.
+G1 discovery is consumed and accepted. All 24 frozen slots mechanically
+advanced from discovery. The offline V1 validation observer is implemented
+for exact-source review. See the [Architecture 150 validation record](validation/arch150-intraday-ai-day-trading-campaign.md)
+for the accepted discovery evidence and the next separately reviewed
+2021–2023 observation. Real validation has not run and 2024+ stays sealed.
 
 ---
 
@@ -291,10 +286,9 @@ The canonical G1 population is now frozen in source under
 family, 12 SPY and 12 QQQ. Each slot binds program semantics, source symbol and
 resolution. A unique STRESS discovery trial with any trade advances to
 SHORTLISTED; discovery metrics and BASE/ZERO diagnostics do not choose winners.
-No real G1 trial is consumed and no real strategy P&L has been opened.
-Validation and all 2024+ data remain sealed. After exact-source review, the next
-milestone is the one-shot offline 2016-2020 G1 discovery evaluation against the
-accepted sparse dataset.
+Real G1 discovery is consumed. The validation observer authenticates that
+report and takes its complete frozen candidate set. Real validation and all
+2024+ observations remain unopened.
 
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,

@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 G1 discovery observer source review; one offline evaluation follows acceptance
+## Current milestone: Architecture 150 G1 validation observer source review
 
 G1 population freeze/C1 is accepted and integrated at HEAD
 `b6b811bae33a8423e0f6ad588b0f124eb3630591` / tree
@@ -9,17 +9,12 @@ G1 population freeze/C1 is accepted and integrated at HEAD
 `DEVELOP_CERTIFICATION_REUSE=True` / `exact_feature_certification`,
 `IDENTITY_STABLE=True`, and no duplicate canonical FULL.
 
-The offline-only G1 discovery observer is implemented in the current source
-checkpoint, with exact-source review/certification pending. The source tests
-use synthetic inputs; the accepted real D1R custody files have not been read
-for strategy evaluation and all 24 real G1 trials remain unconsumed. After
-acceptance and integration, immediately perform one real offline 2016-2020
-discovery observation. Do not insert another strategy-design checkpoint.
-Validation replay remains zero and 2024+ stays sealed.
-
-Operator: `src/trading_bot/experiments/arch150_g1_discovery.py`.
-Synthetic tests: `tests/experiments/test_arch150_g1_discovery.py`.
-
+The real G1 discovery report is accepted and immutable. The V1 source-only
+checkpoint adds the offline validation observer and uses synthetic tests.
+Review and integrate the exact source before the separately reviewed
+2021–2023 validation observation. Follow the output-path and stop rules in
+the [Architecture 150 validation record](validation/arch150-intraday-ai-day-trading-campaign.md).
+Do not rerun discovery. Validation replay remains zero and 2024+ stays sealed.
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
 
@@ -322,11 +317,9 @@ resolution; identical programs on different symbols are separate trials. A
 valid unique STRESS discovery trial with any trade is shortlisted; discovery
 economic metrics and BASE/ZERO diagnostics do not decide advancement.
 
-No real G1 trial is consumed and no real strategy P&L is open. The accepted
-sparse D1R artifacts were not read for strategy evaluation, validation remains
-unopened, and 2024+ remains sealed. After exact-source review and acceptance,
-the next milestone is the separately reviewed one-shot offline 2016-2020 G1
-discovery evaluation of this exact manifest.
+All 24 real G1 discovery trials are consumed and all advanced under the
+frozen mechanical rule. The V1 validation observer is pending exact-source
+review. Validation and 2024+ remain unopened.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,

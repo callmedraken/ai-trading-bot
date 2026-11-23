@@ -458,6 +458,7 @@ ARCH150_INTRADAY_AI_TESTS: Final = (
     "tests/runtime/checkpoint_runner/test_core.py",
     "tests/experiments/test_arch150_intraday_ai.py",
     "tests/experiments/test_arch150_g1_discovery.py",
+    "tests/experiments/test_arch150_g1_validation.py",
 )
 ARCH150_INTRADAY_AI_RUFF: Final = (
     *COMMON_RUFF_PATHS,
@@ -467,6 +468,8 @@ ARCH150_INTRADAY_AI_RUFF: Final = (
     "tests/experiments/test_arch150_intraday_ai.py",
     "src/trading_bot/experiments/arch150_g1_discovery.py",
     "tests/experiments/test_arch150_g1_discovery.py",
+    "src/trading_bot/experiments/arch150_g1_validation.py",
+    "tests/experiments/test_arch150_g1_validation.py",
 )
 ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE: Final = "arch150-intraday-data-custody-source"
 ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME: Final = (
@@ -508,6 +511,8 @@ ARCH150_INTRADAY_AI_PATHS: Final = (
     "tests/experiments/test_arch150_intraday_ai.py",
     "src/trading_bot/experiments/arch150_g1_discovery.py",
     "tests/experiments/test_arch150_g1_discovery.py",
+    "src/trading_bot/experiments/arch150_g1_validation.py",
+    "tests/experiments/test_arch150_g1_validation.py",
 )
 AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: Final = "arch-ai-strategy-discovery-g1-engine"
 AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH: Final = (
@@ -28819,6 +28824,8 @@ def _arch150_intraday_ai_authority_check(repo_root: Path) -> tuple[str, ...]:
         "src/trading_bot/experiments/arch150_g1_discovery.py",
         "tests/experiments/test_arch150_g1_discovery.py",
         "tests/runtime/checkpoint_runner/test_core.py",
+        "src/trading_bot/experiments/arch150_g1_validation.py",
+        "tests/experiments/test_arch150_g1_validation.py",
     )
     for relative in required_paths:
         if not (repo_root / relative).is_file():

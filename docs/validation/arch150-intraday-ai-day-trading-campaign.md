@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION + D1 + D1R + D1R-C1 + D2 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; CANONICAL G1 POPULATION FROZEN IN SOURCE; REAL G1 RESULTS NOT OPENED**.
+Status: **FOUNDATION + D1 + D1R + D1R-C1 + D2 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; REAL G1 DISCOVERY ACCEPTED AND CONSUMED; VALIDATION SOURCE REVIEW PENDING**.
 
 Normative design:
 
@@ -282,8 +282,8 @@ includes every SHORTLISTED slot in manifest ordinal order, with no
 caller-selected subset. An empty SHORTLISTED set raises
 `NO_VALIDATION_CANDIDATES` and cannot authorize validation.
 
-No real G1 trial has been consumed, no real sparse custody file was read for
-strategy evaluation, and no strategy P&L was generated. Validation
+The freeze was established before any real G1 trial or result was visible.
+The completed discovery observation is recorded below. Validation
 `[2021-01-01, 2024-01-01)` remains unopened. 2024+ remains sealed.
 
 ## G1 one-shot discovery observer source checkpoint
@@ -312,16 +312,48 @@ was interrupted because the replay repeatedly scanned VWAP prefixes and historic
 sessions. Preserve the attempt. It produced no terminal G1 report and supplies no
 selection evidence. The replay performance correction keeps the same frozen 24
 slots and adds flushed stage and slot progress without economic results.
-The correction uses synthetic tests. A fresh offline 2016–2020 observation
-requires separate review of the exact corrective source and a new output path:
+The performance correction was tested with synthetic inputs and the separate
+real 2016–2020 observation then completed at source
+`dc4ed895a370036fd49c45e7ec50929eaf214fe4`. Its accepted immutable report is at
+`F:\AI\temp\arch150-g1-discovery-3dc75767-c48c-4a99-8624-c25ccd67cbe8\discovery.json`.
+The report identity is `ec23c374-e069-59e9-9167-14b2adf3fb16`, its discovery
+freeze is `88a7e148-cbf7-5f6b-9ef0-a9858d9396cd`, and its candidate freeze is
+`84367c0f-74d4-5125-a2f3-71f5a9ad6014`. All 24 slots generated trades and
+advanced under the mechanical discovery rule. Shortlisting carries no economic
+qualification. Discovery is consumed and must not be rerun.
+
+## G1 validation source checkpoint
+
+The offline validation observer authenticates the accepted discovery report,
+reconstitutes both freezes, validates the full D1R input, and replays only the
+frozen candidates against `[2021-01-01, 2024-01-01)` at STRESS, starting each
+slot at equity 1. It keeps SPY and QQQ slots distinct even when they share a
+program ID. Interim progress includes stage and slot position only.
+
+Ranking uses session-close drawdown and daily returns with zero risk-free rate
+and 252-session annualization of sample Sharpe. All scheduled sessions enter
+the daily series, with flat equity on sessions without completed trades.
+Turnover is the sum of executed fill notionals divided by average session-close
+equity. Median trade expectancy uses net return on equity before each trade.
+Positive-month breadth includes all 36 months and worst annual return includes
+all three calendar years. No-loss positive profit factor is reported as
+`"Infinity"`. A zero-variance daily series has Sharpe zero. These metrics are
+descriptive and ranking ties end with the immutable slot ID.
+
+Qualification requires positive net return, profit factor above 1, and all
+published frequency gates under STRESS. The observer produces
+`NO_HOLDOUT_CANDIDATES` if none pass. Otherwise it freezes the qualifying
+slot identities before the separate selection-bias review. In both cases,
+holdout and extension remain sealed. No validation observation was performed
+during source publication. Following exact-source review and integration, the
+separately reviewed real validation invocation takes only a fresh output path:
 
 ```powershell
-python -B -m trading_bot.experiments.arch150_g1_discovery `
-  --output-directory F:\AI\temp\arch150-g1-discovery-<fresh-UUID>
+python -B -m trading_bot.experiments.arch150_g1_validation `
+  --output-directory F:\AI\temp\arch150-g1-validation-<fresh-UUID>
 ```
 
-Do not retry an interrupted or blocked invocation automatically. No terminal real
-G1 results are available. Validation replay remains zero and 2024+ remains sealed.
+Do not retry an interrupted or blocked invocation automatically.
 
 ## Initial implementation scope
 

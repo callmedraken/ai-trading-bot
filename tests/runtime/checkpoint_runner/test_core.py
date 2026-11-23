@@ -378,6 +378,9 @@ def test_arch150_intraday_ai_checkpoint_is_source_only_and_mapped():
     assert "tests/experiments/test_arch150_g1_discovery.py" in spec.tests
     assert "src/trading_bot/experiments/arch150_g1_discovery.py" in spec.ruff_paths
     assert "tests/experiments/test_arch150_g1_discovery.py" in spec.ruff_paths
+    assert "tests/experiments/test_arch150_g1_validation.py" in spec.tests
+    assert "src/trading_bot/experiments/arch150_g1_validation.py" in spec.ruff_paths
+    assert "tests/experiments/test_arch150_g1_validation.py" in spec.ruff_paths
     assert spec.authority_check is runner._arch150_intraday_ai_authority_check
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert runner.ARCH150_INTRADAY_AI_NAME not in runner.ACTIVE_CI_CHECKPOINTS

@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 D1R-C1 accepted/integrated; corrected real offline requalification next
+## Current milestone - Architecture 150 sparse 2016-2023 custody accepted; sparse-replay source checkpoint next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -248,11 +248,17 @@ avoid Windows Python-literal escaping. D1R-C1 is SOURCE/CERTIFICATION ACCEPTED a
 `f393498786060a6e55eed545f6fdd44ecea49f4d`. Feature mapped FULL
 `45087988867`, attempt 1, is terminal SUCCESS. Develop run `45100486575`,
 attempt 1, is terminal SUCCESS with exact feature-certification reuse,
-`IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL. The next
-milestone is one separately reviewed corrected real offline D1R observation
-using the accepted CLI boundary and a fresh output directory. No provider,
-credential, Robinhood, broker, order, strategy-P&L, holdout or extension effect
-is authorized.
+`IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL. The corrected real offline D1R observation is now CONSUMED /
+`OFFLINE_SPARSE_CUSTODY_READY_FOR_INDEPENDENT_REVIEW` and sparse custody is
+accepted. Dataset `ff5a3847-09c2-5902-b174-9e77eebf7d53` /
+`0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd`
+contains the preserved 2016-2023 SPY/QQQ regular-session observations with
+explicit gaps only: SPY 104 missing, QQQ 115 missing, 64 common / 155 union,
+across 9 affected sessions, with no fully missing sessions and zero
+duplicates/malformed bars. All requalifier protected-effect counters were zero
+and the original D1 custody remained unchanged. The next milestone is the
+source-only/fake-only sparse-replay semantics checkpoint. Real G1 population
+freeze/evaluation and strategy P&L remain closed.
 
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,

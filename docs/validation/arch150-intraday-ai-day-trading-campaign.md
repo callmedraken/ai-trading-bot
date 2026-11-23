@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION + D1 + D1R + D1R-C1 SOURCE ACCEPTED/INTEGRATED; D1 ACQUISITION CONSUMED/BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY; FIRST REAL D1R OFFLINE INVOCATION CONSUMED/BLOCKED / OUTPUT_CREATE_FAILED / NO AUTOMATIC RETRY; CORRECTED REAL OFFLINE D1R OBSERVATION NEXT**.
+Status: **FOUNDATION + D1 + D1R + D1R-C1 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; SPARSE-REPLAY SOURCE CHECKPOINT NEXT; G1 FREEZE/EVALUATION NOT YET AUTHORIZED**.
 
 Normative design:
 
@@ -190,16 +190,46 @@ and exposes a CLI boundary:
 
 `python -B -m trading_bot.experiments.arch150_d1_requalify --output-directory <output-directory>`
 
-The next boundary is one separately reviewed corrected real offline D1R
-observation using that CLI against the same immutable consumed D1 attempt. It
-may create one fresh output directory but must perform zero credential,
-network/provider, Robinhood, broker, order, strategy-P&L, holdout, extension, or
-production-state effects. The failed first D1R observation remains immutable and
-must not be reused or overwritten.
+The corrected real offline D1R observation is now CONSUMED and independently
+accepted as sparse custody READY:
 
-The requalification result, if the corrected observation succeeds, can
-establish custody suitability only. It cannot freeze/evaluate G1. A separate
-accepted sparse-replay source checkpoint remains required before any real
+- output:
+  `F:\AI\temp\arch150-d1r-offline-requalification-a46c4ad1-4287-4e51-8741-0316f784f1de`;
+- classification:
+  `OFFLINE_SPARSE_CUSTODY_READY_FOR_INDEPENDENT_REVIEW`;
+- dataset identity / semantic SHA-256:
+  `ff5a3847-09c2-5902-b174-9e77eebf7d53` /
+  `0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd`;
+- custody identity / semantic SHA-256:
+  `21e121dc-a9da-538f-bc88-c15fe7ea7f50` /
+  `5b6ac554eda73b588f2f6d664c14e5c7fca3c151966cb546c17621d0c7e6ad83`;
+- evidence identity / semantic SHA-256:
+  `c31bb29d-3d53-5e2f-a01f-55a42ec96295` /
+  `e58a6e5d95c44b33eb34311f705e6cc26982120689f98ddb207768dc304b4ecd`;
+- scheduled slots per symbol: 781,980;
+- SPY: 781,876 observed / 104 missing;
+- QQQ: 781,865 observed / 115 missing;
+- common missing: 64; union missing: 155;
+- affected sessions: 9; fully missing sessions: 0 for both symbols;
+- sessions affected in both symbols: 5;
+- per-session commitment records: 2,012;
+- duplicates/malformed: 0 for both symbols;
+- both pagination streams: `NULL_TOKEN_EXHAUSTED`;
+- discovery/validation counts reconcile exactly to each symbol's observed total;
+- all new credential/network/provider/Robinhood/broker/order/strategy-P&L/
+  holdout/extension/production-state effect counters: zero;
+- the immutable original D1 attempt and failed first D1R observation remain
+  unchanged.
+
+The sparse evidence is internally consistent:
+`781876 + 104 = 781980`, `781865 + 115 = 781980`, and
+`104 + 115 - 64 = 155`. The accepted contract intentionally uses no
+post-result numeric missing-count threshold; missing minutes remain explicit
+absence and no OHLCV was synthesized.
+
+Sparse custody acceptance does not authorize strategy P&L. The next checkpoint
+is a source-only/fake-only sparse-replay semantics implementation. It must be
+accepted before the complete G1 population is frozen and before any real
 discovery P&L is opened.
 
 ## Initial implementation scope

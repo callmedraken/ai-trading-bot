@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 D1R-C1 accepted/integrated; corrected real offline requalification next
+## Current milestone: Architecture 150 sparse 2016-2023 custody accepted; sparse-replay source checkpoint next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -279,11 +279,20 @@ lanes passing. Develop run `45100486575`, attempt 1, is terminal SUCCESS with
 The correction canonicalizes/returns the validated production output Path,
 rejects control characters before any create attempt, and adds the CLI:
 `python -B -m trading_bot.experiments.arch150_d1_requalify --output-directory <output-directory>`.
-The immediate continuation is one separately reviewed corrected real offline
-D1R observation using that CLI with a fresh output directory. It may read the
-immutable consumed D1 raw pages and write one fresh create-once sparse-custody
-output. It must make zero credential/network/provider/Robinhood/broker/order/
-strategy-P&L/holdout/extension effects.
+
+The corrected real offline D1R observation is now CONSUMED and sparse custody
+is ACCEPTED. Output:
+`F:\AI\temp\arch150-d1r-offline-requalification-a46c4ad1-4287-4e51-8741-0316f784f1de`.
+Dataset identity `ff5a3847-09c2-5902-b174-9e77eebf7d53`, semantic SHA-256
+`0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd`.
+SPY has 781,876 observed / 104 missing scheduled slots; QQQ has 781,865 /
+115. Common missing is 64, union 155, across 9 affected sessions, with no fully
+missing sessions. The original consumed D1 attempt remains unchanged and every
+new protected-effect counter is zero.
+
+The immediate continuation is the separately frozen source-only/fake-only
+sparse-replay semantics checkpoint. Do not freeze G1 or open real strategy P&L
+until that source is accepted/integrated.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,

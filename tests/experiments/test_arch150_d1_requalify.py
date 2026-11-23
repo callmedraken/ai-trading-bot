@@ -322,11 +322,13 @@ def _run_fixture(
         list[datetime],
         dict[str, list[IntradayBar]],
     ],
+    *,
+    output_directory: Path | None = None,
 ):
     attempt_root, output, expected, authority, slots, bars = fixture
     return requal._requalify_arch150_d1_for_test(
         attempt_root=attempt_root,
-        output_directory=output,
+        output_directory=output if output_directory is None else output_directory,
         expected=expected,
         source_head=_SOURCE_HEAD,
         source_tree=_SOURCE_TREE,
@@ -407,6 +409,141 @@ def test_default_production_output_boundary_rejects_non_f_drive(tmp_path: Path):
             attempt_root=tmp_path / f"arch150-d1-{_ATTEMPT_ID}",
             private_test_root=None,
         )
+
+
+@pytest.mark.parametrize("codepoint", [0x09, 0x0D, 0x0A, 0x00, 0x01, 0x1F, 0x7F])
+def test_control_characters_are_rejected_before_any_output_create(
+    tmp_path: Path, monkeypatch, codepoint: int
+):
+    fixture = _make_fixture(tmp_path)
+    invalid_text = str(fixture[1]) + chr(codepoint)
+    invalid_output = Path(invalid_text)
+    write_calls: list[Path] = []
+
+    def forbidden_write(path: Path, artifacts: dict[str, bytes]) -> None:
+        write_calls.append(path)
+        pytest.fail("create-once writer ran for invalid output path text")
+
+    def forbidden_mkdir(_path: Path, *args, **kwargs) -> None:
+        pytest.fail("mkdir ran for invalid output path text")
+
+    monkeypatch.setattr(requal, "_write_output_once", forbidden_write)
+    monkeypatch.setattr(Path, "mkdir", forbidden_mkdir)
+    with pytest.raises(
+        requal.Arch150D1RequalificationError, match="OUTPUT_PATH_TEXT_INVALID"
+    ):
+        _run_fixture(fixture, output_directory=invalid_output)
+    assert write_calls == []
+
+
+@pytest.mark.parametrize("invalid_character", ["<", ">", ":", '"', "|", "?", "*"])
+def test_windows_invalid_filename_characters_are_rejected(
+    tmp_path: Path, invalid_character: str
+):
+    invalid_output = Path(f"{tmp_path}{chr(92)}output{invalid_character}")
+    with pytest.raises(
+        requal.Arch150D1RequalificationError, match="OUTPUT_PATH_TEXT_INVALID"
+    ):
+        requal._validate_output_directory(
+            invalid_output,
+            attempt_root=tmp_path / f"arch150-d1-{_ATTEMPT_ID}",
+            private_test_root=tmp_path,
+        )
+
+
+def test_validator_writer_and_result_share_canonical_output_path(
+    tmp_path: Path, monkeypatch
+):
+    fixture = _make_fixture(tmp_path)
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    requested = nested / ".." / "canonical-output"
+    canonical = tmp_path.resolve(strict=True) / "canonical-output"
+    validate = requal._validate_output_directory
+    write = requal._write_output_once
+    validated_paths: list[Path] = []
+    written_paths: list[Path] = []
+
+    def capture_validation(root: Path, **kwargs) -> Path:
+        validated = validate(root, **kwargs)
+        validated_paths.append(validated)
+        return validated
+
+    def capture_write(root: Path, artifacts: dict[str, bytes]) -> None:
+        written_paths.append(root)
+        write(root, artifacts)
+
+    monkeypatch.setattr(requal, "_validate_output_directory", capture_validation)
+    monkeypatch.setattr(requal, "_write_output_once", capture_write)
+    result = _run_fixture(fixture, output_directory=requested)
+
+    assert validated_paths == [canonical]
+    assert written_paths == validated_paths
+    assert result.output_directory == validated_paths[0]
+    assert result.output_directory.is_dir()
+
+
+def test_cli_uses_exact_argv_path_and_returns_sanitized_result(
+    tmp_path: Path, monkeypatch, capsys
+):
+    argument_text = f"{tmp_path}{chr(92)}t-output"
+    received: list[Path] = []
+
+    def fake_requalify(path: Path) -> requal.RequalificationResult:
+        received.append(path)
+        return requal.RequalificationResult(
+            requal.OUTPUT_CLASSIFICATION,
+            "dataset-id",
+            "a" * 64,
+            "custody-id",
+            "b" * 64,
+            "evidence-id",
+            "c" * 64,
+            path,
+        )
+
+    monkeypatch.setattr(requal, "requalify_arch150_d1", fake_requalify)
+    assert requal.main(["--output-directory", argument_text]) == 0
+    assert len(received) == 1
+    assert str(received[0]) == argument_text
+    assert "CLASSIFICATION=" + requal.OUTPUT_CLASSIFICATION in capsys.readouterr().out
+
+
+def test_cli_help_is_effect_free(monkeypatch, capsys):
+    def forbidden(_path: Path) -> requal.RequalificationResult:
+        pytest.fail("--help invoked the production requalifier")
+
+    monkeypatch.setattr(requal, "requalify_arch150_d1", forbidden)
+    with pytest.raises(SystemExit) as raised:
+        requal.main(["--help"])
+    assert raised.value.code == 0
+    assert "--output-directory" in capsys.readouterr().out
+
+
+def test_cli_reports_only_sanitized_requalification_error(monkeypatch, capsys):
+    def fail(_path: Path) -> requal.RequalificationResult:
+        raise requal.Arch150D1RequalificationError("OUTPUT_PATH_TEXT_INVALID")
+
+    monkeypatch.setattr(requal, "requalify_arch150_d1", fail)
+    assert requal.main(["--output-directory", "synthetic-output"]) == 1
+    assert capsys.readouterr().out.strip() == "FAILURE_CODE=OUTPUT_PATH_TEXT_INVALID"
+
+
+def test_cli_rejects_duplicate_output_directory_arguments(monkeypatch):
+    def forbidden(_path: Path) -> requal.RequalificationResult:
+        pytest.fail("CLI accepted multiple output-directory arguments")
+
+    monkeypatch.setattr(requal, "requalify_arch150_d1", forbidden)
+    with pytest.raises(SystemExit) as raised:
+        requal.main(
+            [
+                "--output-directory",
+                "first-output",
+                "--output-directory",
+                "second-output",
+            ]
+        )
+    assert raised.value.code == 2
 
 
 def test_sparse_requalification_commits_absence_early_close_and_no_fill(tmp_path: Path):

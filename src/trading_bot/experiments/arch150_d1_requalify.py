@@ -7,6 +7,7 @@ provider, credential, broker, Robinhood, or strategy execution boundary.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -270,7 +271,7 @@ def _requalify(
 ) -> RequalificationResult:
     _validate_source_identity(source)
     original_evidence, commitments = _validate_attempt(expected)
-    _validate_output_directory(
+    validated_output_directory = _validate_output_directory(
         output_directory,
         attempt_root=expected.attempt_root,
         private_test_root=private_test_root,
@@ -365,7 +366,7 @@ def _requalify(
         "normalized/SPY.csv": bytes(scans["SPY"].normalized),
         "normalized/QQQ.csv": bytes(scans["QQQ"].normalized),
     }
-    _write_output_once(output_directory, outputs)
+    _write_output_once(validated_output_directory, outputs)
     return RequalificationResult(
         OUTPUT_CLASSIFICATION,
         dataset_id,
@@ -374,7 +375,7 @@ def _requalify(
         custody_hash,
         evidence_id,
         evidence_hash,
-        output_directory,
+        validated_output_directory,
     )
 
 
@@ -1178,8 +1179,9 @@ def _write_output_once(root: Path, artifacts: dict[str, bytes]) -> None:
 
 def _validate_output_directory(
     root: Path, *, attempt_root: Path, private_test_root: Path | None
-) -> None:
-    absolute = Path(os.path.abspath(root))
+) -> Path:
+    raw_path = _validate_output_path_text(root)
+    absolute = Path(os.path.abspath(raw_path))
     protected = (
         attempt_root,
         Path(r"F:\AI\ai-trading-bot"),
@@ -1199,12 +1201,45 @@ def _validate_output_directory(
             raise Arch150D1RequalificationError("TEST_OUTPUT_OUTSIDE_FIXTURE_ROOT")
         if _is_within(attempt_root, absolute) or _is_within(absolute, attempt_root):
             raise Arch150D1RequalificationError("OUTPUT_OVERLAPS_ATTEMPT")
-    if absolute.exists():
-        raise Arch150D1RequalificationError("OUTPUT_ALREADY_EXISTS")
     parent = absolute.parent
     if not parent.is_dir():
         raise Arch150D1RequalificationError("OUTPUT_PARENT_INVALID")
     _check_no_reparse_chain(parent)
+    try:
+        canonical_parent = parent.resolve(strict=True)
+    except (OSError, RuntimeError):
+        raise Arch150D1RequalificationError("OUTPUT_PARENT_INVALID") from None
+    candidate = canonical_parent / absolute.name
+    for protected_path in protected:
+        if _is_within(candidate, protected_path) or _is_within(
+            protected_path, candidate
+        ):
+            raise Arch150D1RequalificationError("OUTPUT_OVERLAPS_PROTECTED_PATH")
+    if private_test_root is not None and not _is_within(candidate, test_root):
+        raise Arch150D1RequalificationError("TEST_OUTPUT_OUTSIDE_FIXTURE_ROOT")
+    if candidate.exists() or _is_reparse(candidate):
+        raise Arch150D1RequalificationError("OUTPUT_ALREADY_EXISTS")
+    return candidate
+
+
+def _validate_output_path_text(root: Path) -> str:
+    try:
+        raw_path = os.fspath(root)
+    except TypeError:
+        raise Arch150D1RequalificationError("OUTPUT_PATH_TEXT_INVALID") from None
+    if type(raw_path) is not str or any(
+        ord(character) < 0x20 or ord(character) == 0x7F for character in raw_path
+    ):
+        raise Arch150D1RequalificationError("OUTPUT_PATH_TEXT_INVALID")
+    if os.name == "nt":
+        for index, character in enumerate(raw_path):
+            if character in '<>"|?*':
+                raise Arch150D1RequalificationError("OUTPUT_PATH_TEXT_INVALID")
+            if character == ":" and not (
+                index == 1 and raw_path[0].isascii() and raw_path[0].isalpha()
+            ):
+                raise Arch150D1RequalificationError("OUTPUT_PATH_TEXT_INVALID")
+    return raw_path
 
 
 def _require_directory(path: Path, code: str) -> None:
@@ -1357,6 +1392,38 @@ def _bar_row(bar: object) -> bytes:
     )
 
 
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Requalify the pinned Architecture-150 D1 attempt offline."
+    )
+    parser.add_argument(
+        "--output-directory",
+        action="append",
+        required=True,
+        help="fresh output directory for sparse custody artifacts",
+    )
+    arguments = parser.parse_args(argv)
+    if len(arguments.output_directory) != 1:
+        parser.error("pass --output-directory exactly once")
+    try:
+        result = requalify_arch150_d1(Path(arguments.output_directory[0]))
+    except Arch150D1RequalificationError as error:
+        print(f"FAILURE_CODE={error.code}")
+        return 1
+    if result.classification != OUTPUT_CLASSIFICATION:
+        print("FAILURE_CODE=UNEXPECTED_CLASSIFICATION")
+        return 1
+    print(f"CLASSIFICATION={result.classification}")
+    print(f"DATASET_IDENTITY={result.dataset_identity}")
+    print(f"DATASET_SHA256={result.dataset_sha256}")
+    print(f"CUSTODY_IDENTITY={result.custody_identity}")
+    print(f"CUSTODY_SHA256={result.custody_sha256}")
+    print(f"EVIDENCE_IDENTITY={result.evidence_identity}")
+    print(f"EVIDENCE_SHA256={result.evidence_sha256}")
+    print(f"OUTPUT_DIRECTORY={result.output_directory}")
+    return 0
+
+
 __all__ = [
     "ATTEMPT_ID",
     "ATTEMPT_DIRECTORY",
@@ -1364,5 +1431,10 @@ __all__ = [
     "EVIDENCE_SCHEMA",
     "OUTPUT_CLASSIFICATION",
     "RequalificationResult",
+    "main",
     "requalify_arch150_d1",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

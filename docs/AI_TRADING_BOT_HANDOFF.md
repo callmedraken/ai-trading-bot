@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 first real D1R invocation consumed/blocked; output-boundary correction next
+## Current milestone: Architecture 150 D1R-C1 accepted/integrated; corrected real offline requalification next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
@@ -266,14 +266,24 @@ output. The retained D1 artifact hashes and SPY/QQQ raw filename counts remained
 unchanged. New credential/network/provider/Robinhood/broker/order/strategy-P&L/
 holdout/extension effects were all zero.
 
-Do not invoke D1R again unchanged. The sanitized failure does not prove the
-underlying OS exception. Exact-source review identified a bounded correction
-surface: canonicalize and return the validated production output Path for the
-writer, reject Windows-incompatible control characters before any create
-attempt, and expose a simple CLI/operator path boundary so an F:\ path is not
-embedded in Python source text. The correction is source-only/fake-only; it may
-not read the real consumed attempt. After that correction is accepted/integrated,
-a later real offline invocation requires a new explicit review boundary.
+Do not invoke the original D1R observation unchanged. D1R-C1
+output-boundary correction is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
+INTEGRATED at HEAD `3afcc5b24845c6ed4e50dd4bbfe34d9deb076d5d` /
+tree `f393498786060a6e55eed545f6fdd44ecea49f4d`, direct parent
+`b769a3a5565bdbda18b0fd2ff76eadbd7b1f6071`. Feature mapped FULL
+`45087988867`, attempt 1, is terminal SUCCESS with all seven canonical FULL
+lanes passing. Develop run `45100486575`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`,
+`IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL.
+
+The correction canonicalizes/returns the validated production output Path,
+rejects control characters before any create attempt, and adds the CLI:
+`python -B -m trading_bot.experiments.arch150_d1_requalify --output-directory <output-directory>`.
+The immediate continuation is one separately reviewed corrected real offline
+D1R observation using that CLI with a fresh output directory. It may read the
+immutable consumed D1 raw pages and write one fresh create-once sparse-custody
+output. It must make zero credential/network/provider/Robinhood/broker/order/
+strategy-P&L/holdout/extension effects.
 
 Architecture 149 now owns the next frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,

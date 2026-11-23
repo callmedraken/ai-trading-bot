@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION + D1 + D1R SOURCE ACCEPTED/INTEGRATED; D1 ACQUISITION CONSUMED/BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY; FIRST REAL D1R OFFLINE INVOCATION CONSUMED/BLOCKED / OUTPUT_CREATE_FAILED / NO AUTOMATIC RETRY; OUTPUT-BOUNDARY CORRECTION NEXT**.
+Status: **FOUNDATION + D1 + D1R + D1R-C1 SOURCE ACCEPTED/INTEGRATED; D1 ACQUISITION CONSUMED/BLOCKED / MISSING_EXPECTED_SLOT / NO RETRY; FIRST REAL D1R OFFLINE INVOCATION CONSUMED/BLOCKED / OUTPUT_CREATE_FAILED / NO AUTOMATIC RETRY; CORRECTED REAL OFFLINE D1R OBSERVATION NEXT**.
 
 Normative design:
 
@@ -171,10 +171,36 @@ boundary to avoid Python string-literal escaping on Windows. This is a
 source-only correction checkpoint; it must use synthetic tests and perform no
 read of the real consumed D1 attempt.
 
-The requalification result, if a later separately reviewed invocation succeeds,
-can establish custody suitability only. It cannot freeze/evaluate G1. A
-separate accepted sparse-replay source checkpoint remains required before any
-real discovery P&L is opened.
+D1R-C1 output-boundary correction is SOURCE/CERTIFICATION ACCEPTED and
+FAST-FORWARD INTEGRATED at:
+
+- HEAD: `3afcc5b24845c6ed4e50dd4bbfe34d9deb076d5d`;
+- tree: `f393498786060a6e55eed545f6fdd44ecea49f4d`;
+- direct parent: `b769a3a5565bdbda18b0fd2ff76eadbd7b1f6071`;
+- feature mapped FULL: `45087988867`, attempt 1, terminal SUCCESS with
+  source-static, active-tests, source-gates and all seven canonical FULL lanes
+  passing;
+- develop run: `45100486575`, attempt 1, terminal SUCCESS with
+  `DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`,
+  `IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL.
+
+The correction canonicalizes the validated output path once and uses that exact
+Path for write/result, rejects control characters before any create attempt,
+and exposes a CLI boundary:
+
+`python -B -m trading_bot.experiments.arch150_d1_requalify --output-directory <output-directory>`
+
+The next boundary is one separately reviewed corrected real offline D1R
+observation using that CLI against the same immutable consumed D1 attempt. It
+may create one fresh output directory but must perform zero credential,
+network/provider, Robinhood, broker, order, strategy-P&L, holdout, extension, or
+production-state effects. The failed first D1R observation remains immutable and
+must not be reused or overwritten.
+
+The requalification result, if the corrected observation succeeds, can
+establish custody suitability only. It cannot freeze/evaluate G1. A separate
+accepted sparse-replay source checkpoint remains required before any real
+discovery P&L is opened.
 
 ## Initial implementation scope
 

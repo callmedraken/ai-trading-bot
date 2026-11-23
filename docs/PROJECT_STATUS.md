@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 first real D1R invocation consumed/blocked; output-boundary correction next
+## Current milestone - Architecture 150 D1R-C1 accepted/integrated; corrected real offline requalification next
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree
@@ -243,9 +243,16 @@ were zero. The sanitized observation does not prove the exact OS exception.
 Source review identified a bounded output-path boundary defect class: the
 validator canonicalizes only for checking while the writer uses the original
 Path, control characters are not rejected, and there is no CLI path boundary to
-avoid Windows Python-literal escaping. The next milestone is a source-only
-synthetic correction of that boundary. No real D1R rerun and no strategy P&L
-are authorized until the correction is independently accepted/integrated.
+avoid Windows Python-literal escaping. D1R-C1 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`3afcc5b24845c6ed4e50dd4bbfe34d9deb076d5d` / tree
+`f393498786060a6e55eed545f6fdd44ecea49f4d`. Feature mapped FULL
+`45087988867`, attempt 1, is terminal SUCCESS. Develop run `45100486575`,
+attempt 1, is terminal SUCCESS with exact feature-certification reuse,
+`IDENTITY_STABLE=True`, `OVERALL=PASS`, and no duplicate FULL. The next
+milestone is one separately reviewed corrected real offline D1R observation
+using the accepted CLI boundary and a fresh output directory. No provider,
+credential, Robinhood, broker, order, strategy-P&L, holdout or extension effect
+is authorized.
 
 Architecture 149 now owns the next independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,

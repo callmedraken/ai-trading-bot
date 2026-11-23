@@ -124,6 +124,170 @@ def _flat(day: date, count: int = 12, price: str = "100") -> list[IntradayBar]:
     return _prices(day, [price] * count)
 
 
+def _sparse_replay_fixture(symbol):
+    sessions = tuple(date(2020, 11, day) for day in (23, 24, 25, 27, 30))
+    bars = {}
+    for ordinal, session in enumerate(sessions):
+        offsets = range(210 if session.day == 27 else 36)
+        bars[session] = [
+            _bar(
+                symbol,
+                session,
+                offset,
+                price,
+                high=str(Decimal(price) + Decimal("0.013")),
+                volume=0 if offset in (0, 13, 209) else 97 + offset % 3,
+            )
+            for offset in offsets
+            if not (offset == 11 or (ordinal == 1 and offset == 9))
+            for price in (
+                "101.002"
+                if ordinal < 2 or offset < 5
+                else ("103.123" if offset % 8 < 4 else "98.765"),
+            )
+        ]
+    return bars
+
+
+@pytest.mark.parametrize("symbol", INITIAL_UNIVERSE)
+def test_cached_sparse_replay_matches_original_scans(symbol):
+    a = NoiseAreaVwapMomentumProgram(2, Decimal("5"), 2, 3)
+    b = VwapTrendReversalProgram(
+        displacement_bps=Decimal("5"), confirmation_bars=2, max_hold_minutes=3
+    )
+    c = OpeningRangeBreakoutReversalProgram(
+        opening_range_minutes=5, entry_delay_bars=1, max_hold_minutes=3
+    )
+    programs = (
+        a,
+        b,
+        replace(b, mode=VwapStrategyMode.BOUNDED_REVERSAL),
+        c,
+        replace(c, direction=OpeningRangeDirection.REVERSAL),
+    )
+    sessions = _sparse_replay_fixture(symbol)
+    resolution = BarResolution.ONE_MINUTE
+    minutes = validate_1_minute_bars(bar for bars in sessions.values() for bar in bars)
+    for program in programs:
+        prior = {}
+        prior_prepared = {}
+        has_noise_lookup = type(program) is NoiseAreaVwapMomentumProgram
+        published = arch150_ai._SESSION_AUTHORITY.published.sessions
+        for day, bars in sessions.items():
+            prepared = arch150_ai._prepare_replay_session(
+                day, bars, program, resolution
+            )
+            index = published.index(day)
+            preceding = tuple(
+                prior_prepared.get(previous)
+                for previous in published[index - a.lookback_sessions : index]
+            )
+            for i, offset in enumerate(prepared.offsets):
+                assert prepared.vwaps[i] == _vwap_through(bars, i)
+                assert (i < prepared.last_positive_index) == any(
+                    bar.volume > 0 for bar in bars[i + 1 :]
+                )
+                if has_noise_lookup:
+                    assert arch150_ai._cached_noise_band_bps(
+                        a, offset, preceding
+                    ) == arch150_ai._lagged_noise_band_bps(a, day, offset, prior)
+                cached_signal = _entry_signal(
+                    program,
+                    bars,
+                    i,
+                    day,
+                    prior,
+                    resolution,
+                    prepared=prepared,
+                    preceding=preceding,
+                )
+                assert cached_signal == _entry_signal(
+                    program, bars, i, day, prior, resolution
+                )
+                if type(program) is not OpeningRangeBreakoutReversalProgram and (
+                    offset in (12, 13, 14)
+                ):
+                    assert cached_signal is None
+            prior[day] = bars
+            prior_prepared[day] = prepared
+
+        reference = arch150_ai._replay_validated(
+            program,
+            minutes.bars,
+            symbol,
+            minutes.input_digest,
+            resolution,
+            cost_case=CostCase.STRESS,
+            initial_equity=Decimal("1"),
+            use_cache=False,
+        )
+        optimized = replay_program(program, minutes)
+        assert optimized == reference  # Full fills, trades, P&L, equity and identities.
+        assert len(optimized.trades) > 1
+        assert all(trade.session.day not in (23, 24) for trade in optimized.trades)
+        early_close = [trade for trade in optimized.trades if trade.session.day == 27]
+        assert early_close
+        assert all(
+            trade.exit.timestamp.astimezone(_NY).time() <= time(13, 0)
+            for trade in early_close
+        )
+
+        manifest = _freeze_g1_population_for_test(
+            _specifications((program,), source_symbol=symbol)
+        )
+        dataset = _discovery_dataset(
+            list(minutes.bars) if symbol == "SPY" else None,
+            list(minutes.bars) if symbol == "QQQ" else None,
+        )
+        ledger = TrialLedger(manifest)
+        slot = manifest.slots[0]
+        evaluation = _evaluate_frozen_trial_for_test(ledger, slot, dataset)
+        expected = arch150_ai._make_g1_evaluation(
+            slot,
+            _discovery_dataset_id(dataset),
+            reference,
+            None if reference.trades else TrialDisposition.ZERO_TRADE,
+            None,
+        )
+        assert evaluation == expected
+        assert ledger.consume(evaluation).records == ledger.consume(expected).records
+
+
+def test_official_replay_uses_sealed_bars_and_cached_lookups(monkeypatch):
+    bars = _sparse_replay_fixture("SPY")
+    dataset = _open_sparse_discovery_dataset_for_test(
+        (
+            *(bar for session in bars.values() for bar in session),
+            _bar("QQQ", date(2020, 11, 23), 0),
+        )
+    )
+    monkeypatch.setattr(
+        arch150_ai,
+        "_ACCEPTED_SPARSE_CUSTODY_AUTHORITY",
+        dataset._sparse_custody_authority,
+    )
+    manifest = freeze_g1_population()
+    slot = manifest.slots[0]
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("official replay called a naive scan or repeated bar validation")
+
+    for name in (
+        "_vwap_through",
+        "_lagged_noise_band_bps",
+        "_bar_offset_minutes",
+        "validate_1_minute_bars",
+    ):
+        monkeypatch.setattr(arch150_ai, name, forbidden)
+    evaluation = evaluate_frozen_trial(TrialLedger(manifest), slot, dataset)
+    assert evaluation.replay_result is not None
+    assert evaluation.replay_result.trades
+    assert (
+        evaluation.replay_result.input_digest
+        == dataset.bars.by_symbol["SPY"].input_digest
+    )
+
+
 def _universe_bars(day: date) -> list[IntradayBar]:
     return [_bar(symbol, day, 0) for symbol in INITIAL_UNIVERSE]
 

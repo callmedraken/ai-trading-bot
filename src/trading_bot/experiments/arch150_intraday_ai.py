@@ -1819,6 +1819,102 @@ def _bar_offset_minutes(bar: IntradayBar) -> int:
     return int((bar.timestamp - schedule.opens_at).total_seconds() // 60)
 
 
+@dataclass(frozen=True, slots=True)
+class _ReplaySession:
+    bars: tuple[IntradayBar, ...]
+    offsets: tuple[int, ...]
+    index_by_offset: Mapping[int, int]
+    cumulative_volume: tuple[int, ...]
+    cumulative_weighted_price: tuple[Decimal, ...]
+    vwaps: tuple[Decimal | None, ...]
+    deviations: tuple[Decimal | None, ...]
+    last_positive_index: int
+    opening_range: tuple[Decimal, Decimal] | None
+
+
+def _prepare_replay_session(
+    session: date,
+    bars: Sequence[IntradayBar],
+    program: IntradayProgram,
+    resolution: BarResolution,
+) -> _ReplaySession:
+    schedule = _SESSION_AUTHORITY.schedule_for(session)
+    if schedule is None:
+        raise Arch150Error("bar date is not a published regular XNYS session")
+    offsets = tuple(
+        int((bar.timestamp - schedule.opens_at).total_seconds() // 60) for bar in bars
+    )
+    volumes = []
+    weighted_prices = []
+    vwaps = []
+    deviations = []
+    last_positive = -1
+    volume = 0
+    weighted_price = Decimal("0")
+    with localcontext(_DECIMAL_CONTEXT):
+        for index, bar in enumerate(bars):
+            if bar.volume > 0:
+                last_positive = index
+                volume += bar.volume
+                weighted_price += (
+                    (bar.high + bar.low + bar.close) / Decimal("3")
+                ) * bar.volume
+            vwap = weighted_price / Decimal(volume) if volume else None
+            volumes.append(volume)
+            weighted_prices.append(weighted_price)
+            vwaps.append(vwap)
+            deviations.append(
+                abs(bar.close - vwap) / vwap * Decimal("10000")
+                if type(program) is NoiseAreaVwapMomentumProgram
+                and bar.volume > 0
+                and vwap is not None
+                else None
+            )
+    opening_range = None
+    if type(program) is OpeningRangeBreakoutReversalProgram:
+        opening_count = program.opening_range_minutes // int(resolution)
+        if offsets[:opening_count] == tuple(
+            range(0, program.opening_range_minutes, int(resolution))
+        ):
+            opening = bars[:opening_count]
+            opening_range = (
+                max(bar.high for bar in opening),
+                min(bar.low for bar in opening),
+            )
+    return _ReplaySession(
+        tuple(bars),
+        offsets,
+        MappingProxyType({offset: index for index, offset in enumerate(offsets)}),
+        tuple(volumes),
+        tuple(weighted_prices),
+        tuple(vwaps),
+        tuple(deviations),
+        last_positive,
+        opening_range,
+    )
+
+
+def _cached_noise_band_bps(
+    program: NoiseAreaVwapMomentumProgram,
+    offset: int,
+    preceding: Sequence[_ReplaySession | None],
+) -> Decimal | None:
+    if len(preceding) != program.lookback_sessions:
+        return None
+    with localcontext(_DECIMAL_CONTEXT):
+        total = Decimal("0")
+        for session in preceding:
+            index = session.index_by_offset.get(offset) if session is not None else None
+            if index is None or session is None:
+                return None
+            deviation = session.deviations[index]
+            if deviation is None:
+                return None
+            total += deviation
+        historical_width = total / Decimal(len(preceding))
+        return max(program.noise_band_bps, historical_width)
+
+
 def _lagged_noise_band_bps(
     program: NoiseAreaVwapMomentumProgram,
     current_session: date,
@@ -1867,13 +1963,20 @@ def _a_signal_at(
     index: int,
     current_session: date,
     prior_sessions: Mapping[date, Sequence[IntradayBar]],
+    *,
+    prepared: _ReplaySession | None = None,
+    preceding: Sequence[_ReplaySession | None] = (),
 ) -> TradeDirection | None:
-    noise_band = _lagged_noise_band_bps(
-        program, current_session, _bar_offset_minutes(bars[index]), prior_sessions
+    noise_band = (
+        _cached_noise_band_bps(program, prepared.offsets[index], preceding)
+        if prepared is not None
+        else _lagged_noise_band_bps(
+            program, current_session, _bar_offset_minutes(bars[index]), prior_sessions
+        )
     )
     if noise_band is None:
         return None
-    vwap = _vwap_through(bars, index)
+    vwap = prepared.vwaps[index] if prepared is not None else _vwap_through(bars, index)
     if vwap is None:
         return None
     with localcontext(_DECIMAL_CONTEXT):
@@ -1889,8 +1992,10 @@ def _b_signal_at(
     program: VwapTrendReversalProgram,
     bars: Sequence[IntradayBar],
     index: int,
+    *,
+    prepared: _ReplaySession | None = None,
 ) -> TradeDirection | None:
-    vwap = _vwap_through(bars, index)
+    vwap = prepared.vwaps[index] if prepared is not None else _vwap_through(bars, index)
     if vwap is None:
         return None
     with localcontext(_DECIMAL_CONTEXT):
@@ -1918,25 +2023,32 @@ def _opening_range_signal(
     bars: Sequence[IntradayBar],
     index: int,
     resolution: BarResolution,
+    *,
+    prepared: _ReplaySession | None = None,
 ) -> TradeDirection | None:
     if program.opening_range_minutes % int(resolution):
         raise Arch150Error("opening range must align to the selected bar resolution")
-    if not bars or _bar_offset_minutes(bars[0]) != 0:
-        return None
     entry_offset = program.opening_range_minutes + program.entry_delay_bars * int(
         resolution
     )
-    if _bar_offset_minutes(bars[index]) < entry_offset:
-        return None
-    range_count = program.opening_range_minutes // int(resolution)
-    opening = bars[:range_count]
-    if len(opening) != range_count or any(
-        _bar_offset_minutes(value) != offset * int(resolution)
-        for offset, value in enumerate(opening)
-    ):
-        return None
-    high = max(value.high for value in opening)
-    low = min(value.low for value in opening)
+    if prepared is not None:
+        if prepared.opening_range is None or prepared.offsets[index] < entry_offset:
+            return None
+        high, low = prepared.opening_range
+    else:
+        if not bars or _bar_offset_minutes(bars[0]) != 0:
+            return None
+        if _bar_offset_minutes(bars[index]) < entry_offset:
+            return None
+        range_count = program.opening_range_minutes // int(resolution)
+        opening = bars[:range_count]
+        if len(opening) != range_count or any(
+            _bar_offset_minutes(value) != offset * int(resolution)
+            for offset, value in enumerate(opening)
+        ):
+            return None
+        high = max(value.high for value in opening)
+        low = min(value.low for value in opening)
     if bars[index].close > high:
         return (
             TradeDirection.LONG
@@ -1959,11 +2071,16 @@ def _entry_signal(
     current_session: date,
     prior_sessions: Mapping[date, Sequence[IntradayBar]],
     resolution: BarResolution,
+    *,
+    prepared: _ReplaySession | None = None,
+    preceding: Sequence[_ReplaySession | None] = (),
 ) -> TradeDirection | None:
     if bars[index].volume == 0:
         return None
     if type(program) is OpeningRangeBreakoutReversalProgram:
-        return _opening_range_signal(program, bars, index, resolution)
+        return _opening_range_signal(
+            program, bars, index, resolution, prepared=prepared
+        )
     confirmation = program.confirmation_bars
     if index + 1 < confirmation:
         return None
@@ -1990,10 +2107,14 @@ def _entry_signal(
                     current_index,
                     current_session,
                     prior_sessions,
+                    prepared=prepared,
+                    preceding=preceding,
                 )
             )
         elif type(program) is VwapTrendReversalProgram:
-            observed.append(_b_signal_at(program, bars, current_index))
+            observed.append(
+                _b_signal_at(program, bars, current_index, prepared=prepared)
+            )
         else:
             raise UnsupportedProgramError("program is outside the closed grammar")
     signal = observed[-1]
@@ -2092,6 +2213,28 @@ def replay_program(
         symbol = validated.symbol
         input_digest = validated.input_digest
         resolution = BarResolution.ONE_MINUTE
+    return _replay_validated(
+        program,
+        validated_bars,
+        symbol,
+        input_digest,
+        resolution,
+        cost_case=cost_case,
+        initial_equity=initial_equity,
+    )
+
+
+def _replay_validated(
+    program: IntradayProgram,
+    validated_bars: Sequence[IntradayBar],
+    symbol: str,
+    input_digest: str,
+    resolution: BarResolution,
+    *,
+    cost_case: CostCase | CostModel,
+    initial_equity: Decimal,
+    use_cache: bool = True,
+) -> ReplayResult:
     starting_equity = _positive_decimal(initial_equity, "initial_equity")
     hold_minutes = _max_hold_minutes(program)
     if hold_minutes % int(resolution):
@@ -2109,10 +2252,32 @@ def replay_program(
     for bar in validated_bars:
         grouped[bar.session_date].append(bar)
     prior_sessions: dict[date, Sequence[IntradayBar]] = {}
+    prior_prepared: dict[date, _ReplaySession] = {}
+    published = _SESSION_AUTHORITY.published.sessions
+    positions = (
+        {session: index for index, session in enumerate(published)}
+        if use_cache and type(program) is NoiseAreaVwapMomentumProgram
+        else {}
+    )
+    bound_program_id = program_id(program)
     trades: list[Trade] = []
     maximum_gross_exposure = Decimal("0")
     for session in sorted(grouped):
-        session_bars = grouped[session]
+        prepared = (
+            _prepare_replay_session(session, grouped[session], program, resolution)
+            if use_cache
+            else None
+        )
+        session_bars = prepared.bars if prepared is not None else grouped[session]
+        preceding = ()
+        if prepared is not None and type(program) is NoiseAreaVwapMomentumProgram:
+            position = positions[session]
+            preceding = tuple(
+                prior_prepared.get(day)
+                for day in published[
+                    max(0, position - program.lookback_sessions) : position
+                ]
+            )
         earliest_entry = 0
         trade_ordinal = 0
         while earliest_entry < len(session_bars) and equity > 0:
@@ -2126,9 +2291,13 @@ def replay_program(
                     session,
                     prior_sessions,
                     resolution,
+                    prepared=prepared,
+                    preceding=preceding,
                 )
-                if signal is not None and any(
-                    candidate.volume > 0 for candidate in session_bars[index + 1 :]
+                if signal is not None and (
+                    index < prepared.last_positive_index
+                    if prepared is not None
+                    else any(bar.volume > 0 for bar in session_bars[index + 1 :])
                 ):
                     entry_index = index
                     direction = signal
@@ -2156,7 +2325,7 @@ def replay_program(
                     "entry gross exposure exceeds current portfolio equity"
                 )
             entry_material = (
-                f"{program_id(program)}:{symbol}:{session.isoformat()}:{trade_ordinal}:"
+                f"{bound_program_id}:{symbol}:{session.isoformat()}:{trade_ordinal}:"
                 f"{direction.value}:{entry_index}"
             )
             entry = _fill(
@@ -2168,16 +2337,24 @@ def replay_program(
                 model,
             )
             target_exit_at = entry.timestamp + timedelta(minutes=hold_minutes)
-            exit_index = max(
-                index
-                for index in range(entry_index + 1, len(session_bars))
-                if session_bars[index].volume > 0
+            exit_index = (
+                prepared.last_positive_index
+                if prepared is not None
+                else max(
+                    index
+                    for index in range(entry_index + 1, len(session_bars))
+                    if session_bars[index].volume > 0
+                )
             )
             for candidate_index in range(entry_index + 1, len(session_bars)):
                 candidate = session_bars[candidate_index]
                 if candidate.volume == 0:
                     continue
-                candidate_vwap = _vwap_through(session_bars, candidate_index)
+                candidate_vwap = (
+                    prepared.vwaps[candidate_index]
+                    if prepared is not None
+                    else _vwap_through(session_bars, candidate_index)
+                )
                 should_exit = False
                 if (
                     type(program) is VwapTrendReversalProgram
@@ -2203,6 +2380,8 @@ def replay_program(
                         session,
                         prior_sessions,
                         resolution,
+                        prepared=prepared,
+                        preceding=preceding,
                     )
                     should_exit = opposite is not None and opposite is not direction
                 if should_exit or (
@@ -2255,7 +2434,12 @@ def replay_program(
             )
             earliest_entry = exit_index + 1 + cooldown
         # Later sessions may use only prior-session data for Family A's noise area.
-        prior_sessions[session] = session_bars
+        if prepared is None:
+            prior_sessions[session] = session_bars
+        elif type(program) is NoiseAreaVwapMomentumProgram:
+            prior_prepared[session] = prepared
+            if len(prior_prepared) > program.lookback_sessions:
+                del prior_prepared[next(iter(prior_prepared))]
     with localcontext(_DECIMAL_CONTEXT):
         net_pnl = equity - starting_equity
     equity_material = {
@@ -2273,7 +2457,7 @@ def replay_program(
     }
     equity_digest = sha256(_canonical_json(equity_material)).hexdigest()
     replay_material = {
-        "program_id": str(program_id(program)),
+        "program_id": str(bound_program_id),
         "input_digest": input_digest,
         "cost_case": result_cost_case.value,
         "equity_digest": equity_digest,
@@ -2281,7 +2465,7 @@ def replay_program(
     replay_id = uuid5(_REPLAY_NAMESPACE, _canonical_json(replay_material).decode())
     return ReplayResult(
         replay_id,
-        program_id(program),
+        bound_program_id,
         result_cost_case,
         tuple(trades),
         net_pnl,
@@ -3314,14 +3498,19 @@ def _evaluate_frozen_trial_common(
             "DUPLICATE_SEMANTIC_PROGRAM",
         )
     bars = discovery_dataset.bars.by_symbol[slot.source_symbol]
-    if any(bar.resolution is not slot.bar_resolution for bar in bars.bars):
+    # The sealed dataset's universe validator already checked every bar and
+    # computed the canonical input digest for each one-minute stream.
+    if slot.bar_resolution is not BarResolution.ONE_MINUTE:
         raise InformationFirewallError(
             "G1 trial resolution does not match its discovery source bars"
         )
     try:
-        replay = replay_program(
+        replay = _replay_validated(
             slot._program,
-            bars,
+            bars.bars,
+            bars.symbol,
+            bars.input_digest,
+            slot.bar_resolution,
             cost_case=CostCase.STRESS,
             initial_equity=initial_equity,
         )

@@ -306,20 +306,22 @@ in ordinal order at STRESS with starting equity 1, then finalizes and derives
 all shortlisted candidates. Empty advancement terminates as
 `NO_VALIDATION_CANDIDATES`; this observer does not open validation.
 
-The observer source review/certification is pending. No real D1R file has been
-read for this source checkpoint; all new tests use disposable synthetic input.
-After exact-source acceptance and integration, the very next action is exactly
-one real offline 2016-2020 observation using:
+The real operator attempt at
+`F:\AI\temp\arch150-g1-discovery-1ac514b0-2b03-4bd7-bc3c-00e3f0cdabb1`
+was interrupted because the replay repeatedly scanned VWAP prefixes and historical
+sessions. Preserve the attempt. It produced no terminal G1 report and supplies no
+selection evidence. The replay performance correction keeps the same frozen 24
+slots and adds flushed stage and slot progress without economic results.
+The correction uses synthetic tests. A fresh offline 2016–2020 observation
+requires separate review of the exact corrective source and a new output path:
 
 ```powershell
 python -B -m trading_bot.experiments.arch150_g1_discovery `
   --output-directory F:\AI\temp\arch150-g1-discovery-<fresh-UUID>
 ```
 
-Do not retry that invocation if it fails or returns a blocked classification.
-The operator is not invoked during source publication. Until the later single
-observation, real G1 trial consumption and real discovery P&L remain zero;
-validation replay remains zero and 2024+ remains sealed.
+Do not retry an interrupted or blocked invocation automatically. No terminal real
+G1 results are available. Validation replay remains zero and 2024+ remains sealed.
 
 ## Initial implementation scope
 

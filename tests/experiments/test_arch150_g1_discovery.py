@@ -78,6 +78,7 @@ def _run_fake(
     evaluator=None,
     dataset_opener=arch150._open_sparse_discovery_dataset_for_test,
     source_reader=lambda: _TEST_SOURCE,
+    progress=None,
 ):
     calls = []
 
@@ -107,6 +108,7 @@ def _run_fake(
         source_reader=source_reader,
         dataset_opener=dataset_opener,
         evaluator=evaluate,
+        progress=progress,
     )
     return result, calls
 
@@ -266,6 +268,7 @@ def test_exact_24_slot_stress_discovery_is_reported_deterministically(
     tmp_path,
 ):
     input_reader, input_root = _make_inputs(tmp_path / "input")
+    progress = []
     evaluator_calls = []
     finalization_calls = []
     candidate_calls = []
@@ -304,6 +307,7 @@ def test_exact_24_slot_stress_discovery_is_reported_deterministically(
         input_root,
         input_reader,
         evaluator=evaluator,
+        progress=progress.append,
     )
     second, _ = _run_fake(
         tmp_path / "result-two",
@@ -313,6 +317,18 @@ def test_exact_24_slot_stress_discovery_is_reported_deterministically(
     )
 
     assert calls == [(ordinal - 1, ordinal, Decimal("1")) for ordinal in range(1, 25)]
+    assert progress == [
+        "G1_DISCOVERY_STAGE=INPUT_ACCEPTED",
+        "G1_DISCOVERY_STAGE=SPARSE_DATASET_OPENED",
+        *(
+            line
+            for ordinal in range(1, 25)
+            for line in (
+                f"G1_SLOT_START={ordinal}/24",
+                f"G1_SLOT_COMPLETE={ordinal}/24 DISPOSITION=ZERO_TRADE",
+            )
+        ),
+    ]
     assert evaluator_calls == list(range(1, 25)) * 2
     assert finalization_calls == [24, 24]
     assert [item[1] for item in candidate_calls] == [24, 24]

@@ -125,6 +125,7 @@ def run_arch150_g1_discovery(
         source_reader=_read_source_identity,
         dataset_opener=arch150.open_sparse_discovery_dataset,
         evaluator=arch150.evaluate_frozen_trial,
+        progress=lambda line: print(line, flush=True),
     )
 
 
@@ -139,6 +140,7 @@ def _run_one_shot(
         [tuple[arch150.IntradayBar, ...]], arch150.ResearchDataset
     ],
     evaluator: Callable[..., arch150.G1TrialEvaluation],
+    progress: Callable[[str], None] | None = None,
 ) -> DiscoveryObservationResult:
     output_root = output_validator(output_directory)
     source = source_reader()
@@ -183,6 +185,8 @@ def _run_one_shot(
         raise
     except Exception:
         raise Arch150G1DiscoveryError("INPUT_VALIDATION_FAILED") from None
+    if progress is not None:
+        progress("G1_DISCOVERY_STAGE=INPUT_ACCEPTED")
     try:
         discovery_dataset = dataset_opener(snapshot.bars)
     except Exception:
@@ -198,12 +202,17 @@ def _run_one_shot(
         )
     ):
         raise Arch150G1DiscoveryError("DISCOVERY_DATASET_WINDOW_MISMATCH")
+    if progress is not None:
+        progress("G1_DISCOVERY_STAGE=SPARSE_DATASET_OPENED")
 
     ledger = arch150.TrialLedger(manifest)
     evaluations: list[arch150.G1TrialEvaluation] = []
     for slot in manifest.slots:
         if ledger.next_slot is None or ledger.next_slot.slot_id != slot.slot_id:
             raise Arch150G1DiscoveryError("G1_SLOT_ORDER_MISMATCH")
+        slot_progress = f"{slot.ordinal}/{len(manifest.slots)}"
+        if progress is not None:
+            progress(f"G1_SLOT_START={slot_progress}")
         try:
             evaluation = evaluator(
                 ledger,
@@ -220,6 +229,9 @@ def _run_one_shot(
             ledger = ledger.consume(evaluation)
         except Exception:
             raise Arch150G1DiscoveryError("G1_SLOT_CONSUMPTION_FAILED") from None
+        if progress is not None:
+            disposition = ledger.records[-1].disposition.value
+            progress(f"G1_SLOT_COMPLETE={slot_progress} DISPOSITION={disposition}")
     if not ledger.is_complete or ledger.consumed_trial_count != 24:
         raise Arch150G1DiscoveryError("G1_LEDGER_INCOMPLETE")
 

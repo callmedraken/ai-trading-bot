@@ -1,6 +1,28 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 G1 population source-frozen; one-shot discovery evaluation next after review
+## Current milestone - Architecture 150 G1 discovery observer source review; one offline evaluation follows acceptance
+
+The G1 population freeze/C1 correction is accepted and integrated at HEAD
+`b6b811bae33a8423e0f6ad588b0f124eb3630591` / tree
+`c16fb6d225fb9f1ab97c3bbaf8de3829760fde97`. Develop run `45135927287`, attempt
+1, is terminal SUCCESS: source-static and source-gates passed,
+`DEVELOP_CERTIFICATION_REUSE=True` for `exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate canonical FULL ran.
+
+The source checkpoint currently implements the offline-only Arch150 G1
+discovery observer. Exact-source review/certification is pending; the real D1R
+files remain unread for strategy use and no real G1 slot has been consumed.
+After acceptance and integration, the next action is one offline 2016-2020 G1
+discovery observation. Validation and 2024+ data remain unopened.
+
+The observer source and its synthetic tests are in
+`src/trading_bot/experiments/arch150_g1_discovery.py` and
+`tests/experiments/test_arch150_g1_discovery.py`; it uses the existing Arch150
+source-only mapped certification route.
+
+---
+
+## Prior integrated milestone context
 
 Architecture 148-B2-A-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0ebeaef7ea8ee83677d775fe66d037efa76c8cf1` / tree

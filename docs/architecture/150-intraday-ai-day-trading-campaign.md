@@ -1,6 +1,6 @@
 # Architecture 150 — Intraday AI day-trading research campaign
 
-Status: **DESIGN FROZEN; FOUNDATION + D1 + D1R + D1R-C1 + D2 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; CANONICAL G1 POPULATION SOURCE-FROZEN; REAL STRATEGY P&L REMAINS CLOSED**.
+Status: **DESIGN FROZEN; FOUNDATION + D1 + D1R + D1R-C1 + D2 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; CANONICAL G1 POPULATION SOURCE-FROZEN; DISCOVERY OBSERVER IMPLEMENTED, SOURCE REVIEW PENDING; REAL STRATEGY P&L REMAINS CLOSED**.
 
 ## Product goal
 
@@ -146,6 +146,24 @@ not create validation authorization.
 This population freeze has not consumed a real trial. No real sparse custody
 files have been read for strategy use; the 2021-2023 validation partition and
 all 2024+ data remain unopened.
+
+The G1 population freeze/C1 correction is accepted and integrated at HEAD
+`b6b811bae33a8423e0f6ad588b0f124eb3630591` / tree
+`c16fb6d225fb9f1ab97c3bbaf8de3829760fde97`. Develop run `45135927287`, attempt
+1, is terminal SUCCESS: source-static and source-gates passed, exact feature
+certification was reused, identity was stable, and canonical FULL did not run
+again.
+
+The one-shot offline G1 discovery observer is implemented in
+`trading_bot.experiments.arch150_g1_discovery`; its source review and
+certification are pending. It pins the accepted D1R files and semantic custody,
+then uses the canonical 24-slot manifest, sparse-custody opener, and official
+STRESS evaluator. Source tests use synthetic inputs only. No real custody file
+has been read and no G1 strategy result has been consumed by this operator
+checkpoint. After exact-source acceptance and integration, the immediate next
+action is one offline discovery invocation over `[2016-01-01, 2021-01-01)`;
+there is no intervening strategy-design checkpoint. Validation
+`[2021-01-01, 2024-01-01)` stays unopened and 2024+ remains sealed.
 
 ## Historical research chronology
 

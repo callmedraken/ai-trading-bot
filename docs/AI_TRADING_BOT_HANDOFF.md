@@ -1,6 +1,24 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 G1 population source-frozen; offline discovery next after review
+## Current milestone: Architecture 150 G1 discovery observer source review; one offline evaluation follows acceptance
+
+G1 population freeze/C1 is accepted and integrated at HEAD
+`b6b811bae33a8423e0f6ad588b0f124eb3630591` / tree
+`c16fb6d225fb9f1ab97c3bbaf8de3829760fde97`. Develop run `45135927287`, attempt
+1, is terminal SUCCESS with `source-static` and `source-gates` passing,
+`DEVELOP_CERTIFICATION_REUSE=True` / `exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate canonical FULL.
+
+The offline-only G1 discovery observer is implemented in the current source
+checkpoint, with exact-source review/certification pending. The source tests
+use synthetic inputs; the accepted real D1R custody files have not been read
+for strategy evaluation and all 24 real G1 trials remain unconsumed. After
+acceptance and integration, immediately perform one real offline 2016-2020
+discovery observation. Do not insert another strategy-design checkpoint.
+Validation replay remains zero and 2024+ stays sealed.
+
+Operator: `src/trading_bot/experiments/arch150_g1_discovery.py`.
+Synthetic tests: `tests/experiments/test_arch150_g1_discovery.py`.
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.

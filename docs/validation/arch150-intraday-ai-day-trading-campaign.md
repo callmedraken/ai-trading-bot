@@ -286,6 +286,41 @@ No real G1 trial has been consumed, no real sparse custody file was read for
 strategy evaluation, and no strategy P&L was generated. Validation
 `[2021-01-01, 2024-01-01)` remains unopened. 2024+ remains sealed.
 
+## G1 one-shot discovery observer source checkpoint
+
+The G1 population freeze/C1 correction is accepted and integrated at HEAD
+`b6b811bae33a8423e0f6ad588b0f124eb3630591` / tree
+`c16fb6d225fb9f1ab97c3bbaf8de3829760fde97`. Develop run `45135927287`, attempt
+1, is terminal SUCCESS. `source-static` and `source-gates` succeeded;
+`DEVELOP_CERTIFICATION_REUSE=True` with reason `exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate canonical FULL ran.
+
+The current source checkpoint adds the offline-only
+`trading_bot.experiments.arch150_g1_discovery` operator. Its production entry
+accepts only a fresh output directory, requires a clean committed Arch150
+feature worktree, pins the accepted D1R output at
+`F:\AI\temp\arch150-d1r-offline-requalification-a46c4ad1-4287-4e51-8741-0316f784f1de`,
+and records deterministic `discovery.json` plus a create-once attempt marker.
+It reuses `open_sparse_discovery_dataset()`, evaluates the frozen manifest once
+in ordinal order at STRESS with starting equity 1, then finalizes and derives
+all shortlisted candidates. Empty advancement terminates as
+`NO_VALIDATION_CANDIDATES`; this observer does not open validation.
+
+The observer source review/certification is pending. No real D1R file has been
+read for this source checkpoint; all new tests use disposable synthetic input.
+After exact-source acceptance and integration, the very next action is exactly
+one real offline 2016-2020 observation using:
+
+```powershell
+python -B -m trading_bot.experiments.arch150_g1_discovery `
+  --output-directory F:\AI\temp\arch150-g1-discovery-<fresh-UUID>
+```
+
+Do not retry that invocation if it fails or returns a blocked classification.
+The operator is not invoked during source publication. Until the later single
+observation, real G1 trial consumption and real discovery P&L remain zero;
+validation replay remains zero and 2024+ remains sealed.
+
 ## Initial implementation scope
 
 Implement:

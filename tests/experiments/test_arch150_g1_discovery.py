@@ -368,6 +368,108 @@ def test_exact_24_slot_stress_discovery_is_reported_deterministically(
     assert report["input_artifacts"][-1]["name"] == "evidence.json"
 
 
+def test_nonprefix_shortlists_report_manifest_ordinals_and_unknown_slots_fail_closed(
+    monkeypatch,
+    tmp_path,
+):
+    pins, input_root = _make_inputs(tmp_path / "input")
+    manifest = arch150.freeze_g1_population()
+    eligible_session_dates = tuple(
+        session
+        for session in arch150._SESSION_AUTHORITY.published.sessions
+        if arch150.DISCOVERY_START <= session < arch150.DISCOVERY_END
+    )
+
+    def evaluator(ledger, slot, dataset, *, initial_equity):
+        if slot.ordinal not in (2, 5):
+            return arch150._evaluate_frozen_trial_for_test(
+                ledger,
+                slot,
+                dataset,
+                initial_equity=initial_equity,
+            )
+
+        lookback_sessions = slot._program.lookback_sessions
+        sessions = eligible_session_dates[: lookback_sessions + 1]
+        assert len(sessions) == lookback_sessions + 1
+        bars = []
+        for session_index, session in enumerate(sessions):
+            schedule = arch150._SESSION_AUTHORITY.schedule_for(session)
+            assert schedule is not None
+            opening = schedule.opens_at.astimezone(UTC)
+            prices = (
+                ("100", "100", "100", "100", "100")
+                if session_index < lookback_sessions
+                else ("100", "100", "102.5", "102.5", "102.5")
+            )
+            bars.extend(
+                arch150.IntradayBar(
+                    slot.source_symbol,
+                    opening + timedelta(minutes=minute),
+                    Decimal(price),
+                    Decimal(price),
+                    Decimal(price),
+                    Decimal(price),
+                    100,
+                )
+                for minute, price in enumerate(prices)
+            )
+
+        replay = arch150.replay_program(
+            slot._program,
+            bars,
+            cost_case=arch150.CostCase.STRESS,
+            initial_equity=initial_equity,
+        )
+        assert replay.trades
+        return arch150._make_g1_evaluation(
+            slot,
+            arch150._discovery_dataset_id(dataset),
+            replay,
+            None,
+            None,
+        )
+
+    def input_reader(path):
+        return discovery._read_input_snapshot(path, artifact_pins=pins)
+
+    result, _ = _run_fake(
+        tmp_path / "nonprefix-output",
+        input_root,
+        input_reader,
+        evaluator=evaluator,
+    )
+    report = json.loads((result.output_directory / "discovery.json").read_bytes())
+    assert report["candidate_slots"] == [
+        {"ordinal": 2, "slot_id": str(manifest.slots[1].slot_id)},
+        {"ordinal": 5, "slot_id": str(manifest.slots[4].slot_id)},
+    ]
+    assert report["trials"][0]["disposition"] == "ZERO_TRADE"
+    assert report["trials"][1]["disposition"] == "SHORTLISTED"
+    assert report["trials"][4]["disposition"] == "SHORTLISTED"
+    assert report["effect_counters"]["validation_strategy_replay_count"] == 0
+    assert report["effect_counters"]["2024_plus_data_accessed"] is False
+
+    monkeypatch.setattr(
+        arch150,
+        "freeze_candidate_population",
+        lambda *_args: type(
+            "InvalidCandidateFreeze",
+            (),
+            {"freeze_id": "synthetic-invalid", "candidate_slot_ids": ("unknown",)},
+        )(),
+    )
+    with pytest.raises(discovery.Arch150G1DiscoveryError) as error:
+        _run_fake(
+            tmp_path / "unknown-candidate-output",
+            input_root,
+            input_reader,
+            evaluator=evaluator,
+        )
+    assert error.value.code == "CANDIDATE_SLOT_NOT_IN_FROZEN_MANIFEST"
+    assert not (tmp_path / "unknown-candidate-output" / "discovery.json").exists()
+
+
 def test_source_identity_requires_clean_feature_worktree(monkeypatch, tmp_path):
     values = {
         ("rev-parse", "--show-toplevel"): str(tmp_path),

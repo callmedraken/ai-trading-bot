@@ -467,6 +467,19 @@ def _report_material(
         )
         for disposition in arch150.TrialDisposition
     }
+    candidate_slots: list[dict[str, int | str]] = []
+    if candidate_freeze is not None:
+        slots_by_id = {slot.slot_id: slot for slot in manifest.slots}
+        for slot_id in candidate_freeze.candidate_slot_ids:
+            slot = slots_by_id.get(slot_id)
+            if slot is None:
+                raise Arch150G1DiscoveryError("CANDIDATE_SLOT_NOT_IN_FROZEN_MANIFEST")
+            candidate_slots.append(
+                {
+                    "ordinal": slot.ordinal,
+                    "slot_id": str(slot.slot_id),
+                }
+            )
     return {
         "schema": G1_DISCOVERY_REPORT_SCHEMA,
         "source": _source_material(source),
@@ -500,17 +513,7 @@ def _report_material(
         "candidate_freeze_id": (
             str(candidate_freeze.freeze_id) if candidate_freeze is not None else None
         ),
-        "candidate_slots": (
-            [
-                {
-                    "ordinal": manifest.slots[index].ordinal,
-                    "slot_id": str(slot_id),
-                }
-                for index, slot_id in enumerate(candidate_freeze.candidate_slot_ids)
-            ]
-            if candidate_freeze is not None
-            else []
-        ),
+        "candidate_slots": candidate_slots,
         "terminal_disposition": (
             "NO_VALIDATION_CANDIDATES"
             if candidate_freeze is None

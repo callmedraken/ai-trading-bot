@@ -6,7 +6,7 @@ from dataclasses import FrozenInstanceError, replace
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from functools import cache
-from uuid import UUID
+from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -119,6 +119,12 @@ def _minutes_for_aggregates(
                 )
             )
     return tuple(result)
+
+
+def _verified_test_session(aggregates):
+    materialized = tuple(aggregates)
+    minutes = _minutes_for_aggregates(materialized, materialized[0].resolution)
+    return arch151._test_only_verified_sparse_session(materialized, minute_bars=minutes)
 
 
 def _bar_at(
@@ -503,7 +509,137 @@ def _d_reachable_inputs(
             raise ValueError("gap_symbol must name the target or confirming ETF")
     elif gap_symbol is not None:
         raise ValueError("gap_index is required when a symbol gap is requested")
-    return target, confirming, tuple(confirming_vwaps)
+    final_timestamp = schedule.opens_at + timedelta(
+        minutes=final_index * int(resolution)
+    )
+    target = [bar for bar in target if bar.timestamp <= final_timestamp]
+    confirming = [bar for bar in confirming if bar.timestamp <= final_timestamp]
+    confirming_vwaps = [
+        observation
+        for observation in confirming_vwaps
+        if observation.bar.timestamp <= final_timestamp
+    ]
+    return (
+        target,
+        confirming,
+        tuple(confirming_vwaps),
+        _verified_test_session(target),
+        _verified_test_session(confirming),
+    )
+
+
+def _install_d_setup(program, target, final_index):
+    parameters = program.parameters
+    setup_index = final_index - parameters.reclaim_confirmation_bars
+    peak_start = setup_index - parameters.swing_peak_window_bars
+    swing_peak = max(bar.high for bar in target[peak_start:setup_index])
+    frozen_atr = average_true_range(
+        target[setup_index - parameters.atr_lookback - 1 : setup_index],
+        parameters.atr_lookback,
+    )
+    setup_low = swing_peak - frozen_atr * Decimal("0.5")
+    setup_close = setup_low + frozen_atr * Decimal("0.2")
+    target[setup_index] = _bar_at(
+        _NORMAL_DAY,
+        program.resolution,
+        setup_index,
+        setup_close,
+        open_price=setup_close,
+        high=swing_peak,
+        low=setup_low,
+    )
+    previous_high = target[setup_index].high
+    for index in range(setup_index + 1, final_index + 1):
+        close = previous_high + Decimal("0.02")
+        target[index] = _bar_at(
+            _NORMAL_DAY,
+            program.resolution,
+            index,
+            close,
+            open_price=previous_high + Decimal("0.01"),
+            high=close + Decimal("0.005"),
+            low=previous_high + Decimal("0.001"),
+        )
+        previous_high = target[index].high
+    return setup_index
+
+
+def _d_two_setup_streams(program):
+    first_target, first_other, _, _, _ = _d_reachable_inputs(program)
+    first_final = len(first_target) - 1
+    parameters = program.parameters
+    second_final = (
+        first_final
+        + parameters.reclaim_deadline_bars
+        + parameters.reclaim_confirmation_bars
+        + 3
+    )
+    full_target = list(_flat_aggregate_session(_NORMAL_DAY, program.resolution))
+    full_other = list(
+        _flat_aggregate_session(_NORMAL_DAY, program.resolution, Decimal("100"))
+    )
+    for index in range(len(full_target)):
+        close = Decimal("100") + Decimal(index) * Decimal("0.02")
+        full_target[index] = _bar_at(
+            _NORMAL_DAY,
+            program.resolution,
+            index,
+            close,
+            open_price=close - Decimal("0.005"),
+            high=close + Decimal("0.005"),
+            low=close - Decimal("0.005"),
+        )
+        other_close = Decimal("100") + Decimal(index) * Decimal("0.03")
+        full_other[index] = _bar_at(
+            _NORMAL_DAY,
+            program.resolution,
+            index,
+            other_close,
+            open_price=other_close - Decimal("0.005"),
+            high=other_close + Decimal("0.005"),
+            low=other_close - Decimal("0.005"),
+            symbol="QQQ",
+        )
+    full_target[: len(first_target)] = first_target
+    full_other[: len(first_other)] = first_other
+    for index in range(first_final + 1, second_final + 1):
+        previous = full_target[index - 1]
+        close = previous.close + Decimal("0.02")
+        full_target[index] = _bar_at(
+            _NORMAL_DAY,
+            program.resolution,
+            index,
+            close,
+            open_price=previous.close + Decimal("0.01"),
+            high=close + Decimal("0.005"),
+            low=previous.high + Decimal("0.001"),
+        )
+        other_previous = full_other[index - 1]
+        other_close = other_previous.close + Decimal("0.03")
+        full_other[index] = _bar_at(
+            _NORMAL_DAY,
+            program.resolution,
+            index,
+            other_close,
+            open_price=other_previous.close + Decimal("0.02"),
+            high=other_close + Decimal("0.005"),
+            low=other_previous.high + Decimal("0.001"),
+            symbol="QQQ",
+        )
+    second_setup = _install_d_setup(program, full_target, second_final)
+    assert program.entry_window.contains(full_target[second_final].completed_at)
+    confirming_vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in full_other)
+    return (
+        tuple(full_target[: second_final + 1]),
+        tuple(full_other[: second_final + 1]),
+        confirming_vwaps[: second_final + 1],
+        _verified_test_session(full_target),
+        _verified_test_session(full_other),
+        first_final,
+        second_setup,
+        second_final,
+        tuple(full_target),
+    )
 
 
 def _fold_metrics_for_year(year, profile=None):
@@ -780,17 +916,55 @@ def test_session_vwap_rejects_zero_observed_volume() -> None:
         aggregate_session_vwap(minutes, stream)
 
 
-def test_session_vwap_rejects_any_source_session_that_starts_after_open() -> None:
+def test_session_vwap_requires_exact_evidence_for_post_open_projection() -> None:
     second_session = date(2023, 1, 4)
-    minutes = tuple(_minute("SPY", _NORMAL_DAY, offset) for offset in range(5)) + tuple(
-        _minute("SPY", second_session, offset) for offset in range(1, 10)
+    first_minutes = tuple(_minute("SPY", _NORMAL_DAY, offset) for offset in range(5))
+    post_open_minutes = tuple(
+        _minute(
+            "SPY",
+            second_session,
+            offset,
+            open_price=str(100 + offset),
+            high=str(100 + offset),
+            low=str(100 + offset),
+            close=str(100 + offset),
+            volume=offset + 1,
+        )
+        for offset in range(5, 10)
     )
+    minutes = first_minutes + post_open_minutes
     stream = aggregate_sparse_bars(minutes, BarResolution.FIVE_MINUTE)
 
     with pytest.raises(
         UnavailableIndicatorError, match="begin at the published XNYS open"
     ):
         aggregate_session_vwap(minutes, stream)
+    post_open_bars = tuple(
+        bar for bar in stream.bars if bar.session_date == second_session
+    )
+    evidence = arch151._test_only_verified_sparse_session(
+        post_open_bars, minute_bars=post_open_minutes
+    )
+    observations = aggregate_session_vwap(
+        minutes, stream, verified_sessions=(evidence,)
+    )
+    expected = sum(
+        Decimal(100 + offset) * Decimal(offset + 1) for offset in range(5, 10)
+    ) / Decimal(sum(offset + 1 for offset in range(5, 10)))
+    second_observation = next(
+        observation
+        for observation in observations
+        if observation.bar.session_date == second_session
+    )
+    assert second_observation.vwap == expected
+
+    tampered = (
+        *first_minutes,
+        *post_open_minutes[:-1],
+        replace(post_open_minutes[-1], volume=99),
+    )
+    with pytest.raises(Arch151Error, match="exact minute sources"):
+        aggregate_session_vwap(tampered, stream, verified_sessions=(evidence,))
 
 
 def test_one_minute_bar_has_unambiguous_completion_time() -> None:
@@ -1051,6 +1225,7 @@ def test_all_sixteen_programs_have_behaviorally_reachable_entry_predicates(
             aggregate = aggregate_sparse_bars(minute_stream, program.resolution)
             signal = family_b_entry_signal(program, aggregate.bars)
             assert signal is not None, program.key
+            assert signal.symbol == "SPY"
             assert (
                 len(signal.breakout_confirmation_timestamps)
                 == program.parameters.breakout_confirmation_bars
@@ -1069,8 +1244,12 @@ def test_all_sixteen_programs_have_behaviorally_reachable_entry_predicates(
             assert len(
                 aggregate_sparse_bars(minute_stream, program.resolution).bars
             ) == len(bars)
-            signal = family_c_entry_signal(program, history, current)
+            sparse_session = _verified_test_session(bars)
+            signal = family_c_entry_signal(
+                program, history, current, verified_session=sparse_session
+            )
             assert signal is not None, program.key
+            assert signal.symbol == "SPY"
             assert signal.normalized_deviation < 0
             assert signal.efficiency_ratio <= program.parameters.efficiency_ratio_max
             signal_index = next(
@@ -1080,15 +1259,26 @@ def test_all_sixteen_programs_have_behaviorally_reachable_entry_predicates(
                 program,
                 signal,
                 VwapObservation(bars[signal_index + 1], Decimal("90")),
+                verified_session=sparse_session,
             )
         else:
-            target, other, vwaps = _d_reachable_inputs(program)
+            target, other, vwaps, target_session, other_session = _d_reachable_inputs(
+                program
+            )
             minute_stream = _minutes_for_aggregates(tuple(target), program.resolution)
             assert len(
                 aggregate_sparse_bars(minute_stream, program.resolution).bars
             ) == len(target)
-            signal = family_d_entry_signal(program, target, other, vwaps)
+            signal = family_d_entry_signal(
+                program,
+                target,
+                other,
+                vwaps,
+                target_session=target_session,
+                confirming_session=other_session,
+            )
             assert signal is not None, program.key
+            assert signal.symbol == "SPY"
             assert signal.confirming_symbol == "QQQ"
             assert signal.stop_reference_price < signal.pullback_low < signal.swing_peak
 
@@ -1236,13 +1426,26 @@ def test_family_b_signal_is_bound_to_current_reclaim_completion() -> None:
     assert family_b_entry_signal(program, bars[:10]) is None
 
 
+@pytest.mark.parametrize("symbol", ["SPY", "QQQ"])
+def test_family_b_signal_binds_execution_symbol(symbol: str) -> None:
+    program, bars, level = _b_case()
+    _set_b_valid_setup(bars, program, level, 6, 7, 8)
+    selected = tuple(replace(bar, symbol=symbol) for bar in bars[:9])
+
+    signal = family_b_entry_signal(program, selected)
+
+    assert signal is not None
+    assert signal.symbol == symbol
+
+
 def test_family_c_rejects_insufficient_warmup_and_zero_er_denominator() -> None:
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.C15_02)
     bars = _flat_aggregate_session(_NORMAL_DAY, program.resolution)
+    sparse_session = _verified_test_session(bars)
     current = VwapObservation(bars[20], Decimal("100"))
     short = tuple(VwapObservation(bar, Decimal("100")) for bar in bars[20 - 11 : 20])
     with pytest.raises(UnavailableIndicatorError, match="warmup"):
-        family_c_entry_signal(program, short, current)
+        family_c_entry_signal(program, short, current, verified_session=sparse_session)
     with pytest.raises(UnavailableIndicatorError, match="zero"):
         efficiency_ratio([Decimal("100")] * 11, 10)
     with pytest.raises(UnavailableIndicatorError, match="two values"):
@@ -1251,7 +1454,8 @@ def test_family_c_rejects_insufficient_warmup_and_zero_er_denominator() -> None:
 
 def test_family_c_rejects_off_grid_and_cross_session_history() -> None:
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.C5_01)
-    history, current, _ = _c_reachable_inputs(program)
+    history, current, bars = _c_reachable_inputs(program)
+    sparse_session = _verified_test_session(bars)
     off_grid_history = tuple(
         replace(
             observation,
@@ -1269,7 +1473,12 @@ def test_family_c_rejects_off_grid_and_cross_session_history() -> None:
         ),
     )
     with pytest.raises(Arch151Error, match="session aligned"):
-        family_c_entry_signal(program, off_grid_history, off_grid_current)
+        family_c_entry_signal(
+            program,
+            off_grid_history,
+            off_grid_current,
+            verified_session=sparse_session,
+        )
 
     other_session_history = tuple(
         replace(
@@ -1282,18 +1491,28 @@ def test_family_c_rejects_off_grid_and_cross_session_history() -> None:
         for observation in history
     )
     with pytest.raises(UnavailableIndicatorError, match="gap or session"):
-        family_c_entry_signal(program, other_session_history, current)
+        family_c_entry_signal(
+            program,
+            other_session_history,
+            current,
+            verified_session=sparse_session,
+        )
 
 
 def test_family_c_exit_rejects_earlier_or_different_session_bar() -> None:
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.C5_01)
     history, current, bars = _c_reachable_inputs(program)
-    signal = family_c_entry_signal(program, history, current)
+    sparse_session = _verified_test_session(bars)
+    signal = family_c_entry_signal(
+        program, history, current, verified_session=sparse_session
+    )
     assert signal is not None
     signal_index = next(index for index, bar in enumerate(bars) if bar == current.bar)
     earlier = VwapObservation(bars[signal_index - 1], Decimal("90"))
     with pytest.raises(Arch151Error, match="strictly later"):
-        family_c_reversion_exit(program, signal, earlier)
+        family_c_reversion_exit(
+            program, signal, earlier, verified_session=sparse_session
+        )
 
     other_session = VwapObservation(
         replace(
@@ -1303,7 +1522,135 @@ def test_family_c_exit_rejects_earlier_or_different_session_bar() -> None:
         Decimal("90"),
     )
     with pytest.raises(Arch151Error, match="strictly later"):
-        family_c_reversion_exit(program, signal, other_session)
+        family_c_reversion_exit(
+            program, signal, other_session, verified_session=sparse_session
+        )
+
+
+@pytest.mark.parametrize(
+    ("entry_symbol", "exit_symbol"), [("SPY", "QQQ"), ("QQQ", "SPY")]
+)
+def test_family_c_entry_and_exit_are_bound_to_the_same_instrument(
+    entry_symbol: str, exit_symbol: str
+) -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.C5_01)
+    history, current, bars = _c_reachable_inputs(program)
+    entry_bars = tuple(replace(bar, symbol=entry_symbol) for bar in bars)
+    entry_by_time = {bar.timestamp: bar for bar in entry_bars}
+    entry_history = tuple(
+        replace(observation, bar=entry_by_time[observation.bar.timestamp])
+        for observation in history
+    )
+    entry_current = replace(current, bar=entry_by_time[current.bar.timestamp])
+    entry_evidence = _verified_test_session(entry_bars)
+    signal = family_c_entry_signal(
+        program, entry_history, entry_current, verified_session=entry_evidence
+    )
+    assert signal is not None
+    exit_bar = next(
+        bar for bar in entry_bars if bar.timestamp > entry_current.bar.timestamp
+    )
+    wrong_exit_bar = replace(exit_bar, symbol=exit_symbol)
+    wrong_exit_evidence = _verified_test_session(
+        tuple(replace(bar, symbol=exit_symbol) for bar in entry_bars)
+    )
+    with pytest.raises(Arch151Error, match="instrument or resolution"):
+        family_c_reversion_exit(
+            program,
+            signal,
+            VwapObservation(wrong_exit_bar, Decimal("90")),
+            verified_session=wrong_exit_evidence,
+        )
+
+
+def test_family_c_requires_sealed_sparse_session_and_valid_frozen_sigma() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.C5_01)
+    history, current, bars = _c_reachable_inputs(program)
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="evaluator-owned"):
+        family_c_entry_signal(program, history, current)
+    sparse_session = _verified_test_session(bars)
+    signal = family_c_entry_signal(
+        program, history, current, verified_session=sparse_session
+    )
+    assert signal is not None
+    later = next(bar for bar in bars if bar.timestamp > current.bar.timestamp)
+    with pytest.raises(Arch151Error, match="positive and finite"):
+        family_c_reversion_exit(
+            program,
+            replace(signal, frozen_entry_sigma=Decimal(0)),
+            VwapObservation(later, Decimal("90")),
+            verified_session=sparse_session,
+        )
+    with pytest.raises(Arch151Error, match="canonical entry signal"):
+        family_c_reversion_exit(
+            program,
+            replace(signal, program_id=UUID(int=1)),
+            VwapObservation(later, Decimal("90")),
+            verified_session=sparse_session,
+        )
+
+
+def test_family_c_restarts_from_verified_sparse_projection_after_missing_open() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.C5_02)
+    bars = list(_flat_aggregate_session(_NORMAL_DAY, program.resolution))
+    parameters = program.parameters
+    required = max(
+        parameters.deviation_lookback_bars, parameters.efficiency_ratio_lookback
+    )
+    signal_index = required + 1
+    for index in range(signal_index):
+        close = Decimal("100") if index % 2 == 0 else Decimal("101")
+        bars[index] = _bar_at(
+            _NORMAL_DAY,
+            program.resolution,
+            index,
+            close,
+            open_price=close,
+            high=close + Decimal("0.01"),
+            low=close - Decimal("0.01"),
+        )
+    bars[signal_index] = _bar_at(
+        _NORMAL_DAY,
+        program.resolution,
+        signal_index,
+        Decimal("97"),
+        open_price=Decimal("97"),
+        high=Decimal("97.01"),
+        low=Decimal("96.99"),
+    )
+    assert program.entry_window.contains(bars[signal_index].completed_at)
+    history_bars = tuple(bars[index] for index in range(1, signal_index))
+    history = tuple(
+        VwapObservation(
+            bar,
+            bar.close
+            / (Decimal(1) + (Decimal("0.01") if offset % 2 == 0 else Decimal("-0.01"))),
+        )
+        for offset, bar in enumerate(history_bars)
+    )
+    current = VwapObservation(bars[signal_index], Decimal("97") / Decimal("0.95"))
+    sparse_bars = tuple(bars[1:])
+    sparse_evidence = _verified_test_session(sparse_bars)
+    signal = family_c_entry_signal(
+        program, history, current, verified_session=sparse_evidence
+    )
+    assert signal is not None
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="evaluator-owned"):
+        family_c_entry_signal(program, history, current)
+    forged_history = (
+        replace(
+            history[0],
+            bar=replace(history[0].bar, volume=history[0].bar.volume + 1),
+        ),
+        *history[1:],
+    )
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="source-bound"):
+        family_c_entry_signal(
+            program,
+            forged_history,
+            current,
+            verified_session=sparse_evidence,
+        )
 
 
 def test_family_d_ema_atr_and_cross_confirmation_reset_at_gaps() -> None:
@@ -1356,8 +1703,20 @@ def test_family_d_ema_atr_and_cross_confirmation_reset_at_gaps() -> None:
 
 def test_family_d_vwap_observations_bind_exact_confirming_bars() -> None:
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
-    target, confirming, vwaps = _d_reachable_inputs(program)
-    assert family_d_entry_signal(program, target, confirming, vwaps) is not None
+    target, confirming, vwaps, target_session, confirming_session = _d_reachable_inputs(
+        program
+    )
+    assert (
+        family_d_entry_signal(
+            program,
+            target,
+            confirming,
+            vwaps,
+            target_session=target_session,
+            confirming_session=confirming_session,
+        )
+        is not None
+    )
 
     reordered = tuple(reversed(vwaps))
     wrong_symbol = tuple(
@@ -1373,7 +1732,14 @@ def test_family_d_vwap_observations_bind_exact_confirming_bars() -> None:
     stale = (stale_first, *vwaps[1:])
     for invalid in (reordered, wrong_symbol, stale):
         with pytest.raises(UnavailableIndicatorError, match="not exactly bar aligned"):
-            family_d_entry_signal(program, target, confirming, invalid)
+            family_d_entry_signal(
+                program,
+                target,
+                confirming,
+                invalid,
+                target_session=target_session,
+                confirming_session=confirming_session,
+            )
 
 
 @pytest.mark.parametrize("gap_symbol", ["SPY", "QQQ"])
@@ -1381,11 +1747,18 @@ def test_family_d_reseeds_and_finds_fresh_signal_after_either_symbol_gap(
     gap_symbol: str,
 ) -> None:
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
-    target, confirming, vwaps = _d_reachable_inputs(
+    target, confirming, vwaps, target_session, confirming_session = _d_reachable_inputs(
         program, gap_symbol=gap_symbol, gap_index=1
     )
 
-    signal = family_d_entry_signal(program, target, confirming, vwaps)
+    signal = family_d_entry_signal(
+        program,
+        target,
+        confirming,
+        vwaps,
+        target_session=target_session,
+        confirming_session=confirming_session,
+    )
 
     assert signal is not None
     assert signal.setup_timestamp > target[0].timestamp
@@ -1395,8 +1768,17 @@ def test_family_d_reseeds_and_finds_fresh_signal_after_either_symbol_gap(
 
 def test_family_d_does_not_bridge_cross_confirmation_across_a_gap() -> None:
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
-    target, confirming, vwaps = _d_reachable_inputs(program)
-    original = family_d_entry_signal(program, target, confirming, vwaps)
+    target, confirming, vwaps, target_session, confirming_session = _d_reachable_inputs(
+        program
+    )
+    original = family_d_entry_signal(
+        program,
+        target,
+        confirming,
+        vwaps,
+        target_session=target_session,
+        confirming_session=confirming_session,
+    )
     assert original is not None
     signal_index = next(
         index
@@ -1416,7 +1798,15 @@ def test_family_d_does_not_bridge_cross_confirmation_across_a_gap() -> None:
     )
 
     assert (
-        family_d_entry_signal(program, target, gapped_confirming, gapped_vwaps) is None
+        family_d_entry_signal(
+            program,
+            target,
+            gapped_confirming,
+            gapped_vwaps,
+            target_session=target_session,
+            confirming_session=_verified_test_session(gapped_confirming),
+        )
+        is None
     )
 
 
@@ -1433,7 +1823,286 @@ def test_family_d_gap_near_close_without_fresh_warmup_has_no_signal() -> None:
     del target[gap_index]
     vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in confirming)
 
-    assert family_d_entry_signal(program, target, confirming, vwaps) is None
+    assert (
+        family_d_entry_signal(
+            program,
+            target,
+            confirming,
+            vwaps,
+            target_session=_verified_test_session(target),
+            confirming_session=_verified_test_session(confirming),
+        )
+        is None
+    )
+
+
+def test_family_d_emits_first_valid_signal_only_at_current_decision_bar() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    target_prefix, confirming_prefix, _, _, _ = _d_reachable_inputs(program)
+    full_target = list(_flat_aggregate_session(_NORMAL_DAY, program.resolution))
+    full_confirming = list(
+        tuple(
+            replace(bar, symbol="QQQ")
+            for bar in _flat_aggregate_session(
+                _NORMAL_DAY, program.resolution, Decimal("100")
+            )
+        )
+    )
+    full_target[: len(target_prefix)] = target_prefix
+    full_confirming[: len(confirming_prefix)] = confirming_prefix
+    target_evidence = _verified_test_session(full_target)
+    confirming_evidence = _verified_test_session(full_confirming)
+
+    signal = family_d_entry_signal(
+        program,
+        target_prefix,
+        confirming_prefix,
+        tuple(VwapObservation(bar, Decimal("90")) for bar in confirming_prefix),
+        target_session=target_evidence,
+        confirming_session=confirming_evidence,
+    )
+    assert signal is not None
+    assert signal.signal_timestamp == target_prefix[-1].timestamp
+    assert signal.symbol == "SPY"
+    assert signal.program_id == program_id(program)
+
+    later_target = tuple(full_target[: len(target_prefix) + 1])
+    later_confirming = tuple(full_confirming[: len(confirming_prefix) + 1])
+    assert (
+        family_d_entry_signal(
+            program,
+            later_target,
+            later_confirming,
+            tuple(VwapObservation(bar, Decimal("90")) for bar in later_confirming),
+            target_session=target_evidence,
+            confirming_session=confirming_evidence,
+        )
+        is None
+    )
+
+
+def test_family_d_later_independent_setup_signals_after_first_decision() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    (
+        target,
+        confirming,
+        vwaps,
+        target_session,
+        confirming_session,
+        first_final,
+        second_setup,
+        second_final,
+        full_target,
+    ) = _d_two_setup_streams(program)
+    prefix_target = tuple(full_target[: first_final + 1])
+    full_confirming = confirming_session.bars
+    first_prefix_signal = family_d_entry_signal(
+        program,
+        prefix_target,
+        full_confirming[: first_final + 1],
+        tuple(
+            VwapObservation(bar, Decimal("90"))
+            for bar in full_confirming[: first_final + 1]
+        ),
+        target_session=target_session,
+        confirming_session=confirming_session,
+    )
+    assert first_prefix_signal is not None
+    assert first_prefix_signal.signal_timestamp == prefix_target[-1].timestamp
+
+    second_signal = family_d_entry_signal(
+        program,
+        target,
+        confirming,
+        vwaps,
+        target_session=target_session,
+        confirming_session=confirming_session,
+    )
+    assert second_signal is not None
+    assert second_signal.signal_timestamp == full_target[second_final].timestamp
+    assert second_signal.setup_timestamp == full_target[second_setup].timestamp
+    assert second_signal.setup_timestamp > first_prefix_signal.setup_timestamp
+
+
+def test_family_d_expired_first_entry_does_not_block_later_signal() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    (
+        target,
+        confirming,
+        vwaps,
+        target_session,
+        confirming_session,
+        first_final,
+        _second_setup,
+        second_final,
+        full_target,
+    ) = _d_two_setup_streams(program)
+    all_minutes = list(_minutes_for_aggregates(full_target, program.resolution))
+    first_signal_bar = full_target[first_final]
+    second_signal_bar = full_target[second_final]
+    all_minutes = [
+        minute
+        for minute in all_minutes
+        if minute.timestamp != first_signal_bar.completed_at
+    ]
+    minute_times = {minute.timestamp for minute in all_minutes}
+    assert first_signal_bar.completed_at not in minute_times
+    assert second_signal_bar.completed_at in minute_times
+
+    later_signal = family_d_entry_signal(
+        program,
+        target,
+        confirming,
+        vwaps,
+        target_session=target_session,
+        confirming_session=confirming_session,
+    )
+    assert later_signal is not None
+    assert later_signal.signal_timestamp == second_signal_bar.timestamp
+
+
+def test_family_d_gap_recovery_requires_fresh_warmup_and_verified_projection() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    target, confirming, vwaps, target_session, confirming_session = _d_reachable_inputs(
+        program, gap_symbol="SPY", gap_index=0
+    )
+    recovered = family_d_entry_signal(
+        program,
+        target,
+        confirming,
+        vwaps,
+        target_session=target_session,
+        confirming_session=confirming_session,
+    )
+    assert recovered is not None
+    assert recovered.signal_timestamp == target[-1].timestamp
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="evaluator-owned"):
+        family_d_entry_signal(program, target, confirming, vwaps)
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="source-bound"):
+        family_d_entry_signal(
+            program,
+            target[1:],
+            confirming[1:],
+            vwaps[1:],
+            target_session=target_session,
+            confirming_session=confirming_session,
+        )
+
+    required = max(
+        program.parameters.ema_slow + 2,
+        program.parameters.atr_lookback + 1,
+        program.parameters.swing_peak_window_bars,
+    )
+    short_target = target[: required - 1]
+    short_confirming = confirming[: required - 1]
+    assert (
+        family_d_entry_signal(
+            program,
+            short_target,
+            short_confirming,
+            vwaps[: required - 1],
+            target_session=target_session,
+            confirming_session=confirming_session,
+        )
+        is None
+    )
+
+
+def test_family_d_each_prefix_matches_its_current_decision_result() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    target, confirming, _, _, _ = _d_reachable_inputs(program)
+    full_target = list(_flat_aggregate_session(_NORMAL_DAY, program.resolution))
+    full_confirming = list(
+        tuple(
+            replace(bar, symbol="QQQ")
+            for bar in _flat_aggregate_session(
+                _NORMAL_DAY, program.resolution, Decimal("100")
+            )
+        )
+    )
+    full_target[: len(target)] = target
+    full_confirming[: len(confirming)] = confirming
+    target_evidence = _verified_test_session(full_target)
+    confirming_evidence = _verified_test_session(full_confirming)
+
+    observed = []
+    for length in range(max(1, len(target) - 3), len(target) + 1):
+        target_prefix = tuple(full_target[:length])
+        confirming_prefix = tuple(full_confirming[:length])
+        vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in confirming_prefix)
+        result = family_d_entry_signal(
+            program,
+            target_prefix,
+            confirming_prefix,
+            vwaps,
+            target_session=target_evidence,
+            confirming_session=confirming_evidence,
+        )
+        assert result is None or result.signal_timestamp == target_prefix[-1].timestamp
+        observed.append(result)
+    assert observed[-1] is not None
+    assert all(result is None for result in observed[:-1])
+
+
+def test_family_d_same_bar_signal_tie_break_is_stable() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    timestamp = datetime(2023, 1, 3, 16, 0, tzinfo=ZoneInfo("UTC"))
+    base = arch151.TrendPullbackSignal(
+        program.key,
+        program_id(program),
+        "SPY",
+        _NORMAL_DAY,
+        timestamp,
+        timestamp,
+        Decimal("100"),
+        Decimal("2"),
+        Decimal("99"),
+        Decimal("98"),
+        Decimal("100"),
+        Decimal("99"),
+        "QQQ",
+    )
+    earlier_setup = replace(
+        base,
+        setup_timestamp=timestamp - timedelta(minutes=5),
+        swing_peak=Decimal("99"),
+    )
+    later_setup = replace(base, swing_peak=Decimal("200"))
+    assert arch151._family_d_same_bar_tie_key(earlier_setup) < (
+        arch151._family_d_same_bar_tie_key(later_setup)
+    )
+    higher_peak = replace(base, swing_peak=Decimal("101"))
+    assert arch151._family_d_same_bar_tie_key(higher_peak) < (
+        arch151._family_d_same_bar_tie_key(base)
+    )
+    lower_pullback = replace(base, pullback_low=Decimal("98.5"))
+    assert arch151._family_d_same_bar_tie_key(lower_pullback) < (
+        arch151._family_d_same_bar_tie_key(base)
+    )
+
+
+def test_sparse_session_evidence_has_no_public_boolean_or_constructor_issuer() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    bars = _flat_aggregate_session(_NORMAL_DAY, program.resolution)
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="evaluator-owned"):
+        arch151.VerifiedSparseSession(
+            symbol="SPY",
+            resolution=program.resolution,
+            session_date=_NORMAL_DAY,
+            bars=bars,
+            source_digest="0" * 64,
+        )
+    with pytest.raises(TypeError):
+        arch151.VerifiedSparseSession(
+            symbol="SPY",
+            resolution=program.resolution,
+            session_date=_NORMAL_DAY,
+            bars=bars,
+            source_digest="0" * 64,
+            authenticated=True,
+        )
+    with pytest.raises(UnavailableIndicatorError, match="published open"):
+        ema_series(bars[1:], program.parameters.ema_fast)
 
 
 def test_causal_execution_policy_and_cost_cases_are_closed_contracts() -> None:
@@ -1596,6 +2265,50 @@ def test_fold_evaluation_batch_is_complete_ordered_and_source_bound() -> None:
     )
     with pytest.raises(Arch151Error, match="each fold once"):
         arch151.DevelopmentEvaluationBatch(slot.slot_id, mixed_case)
+
+
+def test_fold_evaluation_identity_uses_v2_schema_and_namespace() -> None:
+    slot = CANONICAL_SLOTS[0]
+    batch = _evaluation_batch_for_slot(slot)
+    repeated_batch = _evaluation_batch_for_slot(slot)
+    record = batch.records[0]
+    material = {
+        "schema": "arch151-fold-evaluation/v2",
+        "semantic_contract_version": arch151.SEMANTIC_CONTRACT_VERSION,
+        "slot_id": str(record.slot_id),
+        "program_id": str(record.program_id),
+        "symbol": record.symbol,
+        "fold_id": str(record.fold.fold_id),
+        "economics_case": record.economics_case.value,
+        "metrics": arch151._fold_metrics_material(record.metrics),
+    }
+    expected_namespace = uuid5(arch151._ROOT_NAMESPACE, "fold-evaluation/v2")
+    expected_id = uuid5(
+        expected_namespace,
+        arch151._canonical_json(material).decode("utf-8"),
+    )
+    legacy_metrics = dict(arch151._fold_metrics_material(record.metrics))
+    legacy_metrics.pop("profit_factor")
+    prior_schema_id = uuid5(
+        uuid5(arch151._ROOT_NAMESPACE, "fold-evaluation/v1"),
+        arch151._canonical_json(
+            {
+                **material,
+                "schema": "arch151-fold-evaluation/v1",
+                "metrics": legacy_metrics,
+            }
+        ).decode("utf-8"),
+    )
+
+    assert arch151._FOLD_EVALUATION_SCHEMA == "arch151-fold-evaluation/v2"
+    assert arch151._EVALUATION_NAMESPACE == expected_namespace
+    assert record.evaluation_id == expected_id
+    assert record.evaluation_id == repeated_batch.records[0].evaluation_id
+    assert record.evaluation_id != prior_schema_id
+    assert batch.batch_digest == repeated_batch.batch_digest
+    qualification = arch151.qualify_development(batch)
+    repeated_qualification = arch151.qualify_development(repeated_batch)
+    assert qualification.qualification_id == repeated_qualification.qualification_id
     with pytest.raises(UnsupportedProgramError, match="canonical slot"):
         replace(batch.records[0], symbol="QQQ")
     with pytest.raises(Arch151Error, match="chronology"):
@@ -1624,7 +2337,7 @@ def test_fold_evaluation_batch_is_complete_ordered_and_source_bound() -> None:
         replace(two_entry_record, metrics=over_cap_metrics)
 
 
-def test_fold_metrics_reject_nonfinite_or_undefined_economics() -> None:
+def test_fold_metrics_reject_invalid_and_preserve_zero_trade_undefined_pf() -> None:
     dates = arch151._published_sessions_for_year(2019)
     zeros = (Decimal(0),) * len(dates)
     trips = (0,) * len(dates)
@@ -1637,10 +2350,12 @@ def test_fold_metrics_reject_nonfinite_or_undefined_economics() -> None:
             Decimal(1),
             Decimal("0.25"),
         )
-    with pytest.raises(UnavailableIndicatorError, match="loss denominator"):
-        arch151.FoldMetrics(
-            dates, zeros, trips, Decimal(1), Decimal(0), Decimal("0.25")
-        )
+    zero_trade = arch151.FoldMetrics(
+        dates, zeros, trips, Decimal(0), Decimal(0), Decimal(0)
+    )
+    assert zero_trade.profit_factor.state is arch151.ProfitFactorState.UNDEFINED
+    with pytest.raises(Arch151Error, match="invalid gross"):
+        arch151.FoldMetrics(dates, zeros, trips, Decimal(-1), Decimal(1), Decimal(0))
     with pytest.raises(ValueError, match="finite"):
         arch151.FoldMetrics(dates, zeros, trips, Decimal(1), Decimal(1), Decimal("NaN"))
     with pytest.raises(ValueError, match="turnover cannot be negative"):
@@ -1651,6 +2366,31 @@ def test_fold_metrics_reject_nonfinite_or_undefined_economics() -> None:
         arch151.FoldMetrics(
             dates, zeros[:-1], trips, Decimal(1), Decimal(1), Decimal("0.25")
         )
+
+
+def test_invalid_fold_evidence_fails_before_undefined_pf_qualification() -> None:
+    slot = CANONICAL_SLOTS[0]
+    batch = _evaluation_batch_for_slot(slot)
+    metrics = batch.records[0].metrics
+    with pytest.raises(Arch151Error, match="invalid gross"):
+        replace(metrics, gross_positive_trade_pnl=Decimal("-1"))
+
+    zero_profiles = {
+        year: {
+            "return_events": (),
+            "active_sessions": 0,
+            "gross_positive": Decimal(0),
+            "gross_negative": Decimal(0),
+            "annual_turnover": Decimal(0),
+        }
+        for year in arch151.SCORED_YEARS
+    }
+    valid_undefined_batch = _evaluation_batch_for_slot(slot, zero_profiles)
+    qualification = arch151.qualify_development(valid_undefined_batch)
+    assert (
+        QualificationRejection.STRESS_PROFIT_FACTOR_NOT_ABOVE_ONE
+        in qualification.economic_rejection_reasons
+    )
 
 
 def test_development_aggregate_uses_summed_pf_and_chained_drawdown() -> None:
@@ -1673,7 +2413,10 @@ def test_development_aggregate_uses_summed_pf_and_chained_drawdown() -> None:
     aggregate = arch151.aggregate_development_economics(
         batch, arch151.FillCostCase.STRESS
     )
-    assert aggregate.profit_factor.quantize(Decimal("0.000001")) == Decimal("0.578571")
+    assert aggregate.profit_factor.state is arch151.ProfitFactorState.FINITE
+    assert aggregate.profit_factor.finite_value.quantize(Decimal("0.000001")) == (
+        Decimal("0.578571")
+    )
     assert aggregate.max_drawdown > Decimal("0.23")
     assert aggregate.max_drawdown > max(
         record.metrics.max_drawdown
@@ -1681,6 +2424,148 @@ def test_development_aggregate_uses_summed_pf_and_chained_drawdown() -> None:
         if record.economics_case is arch151.FillCostCase.STRESS
     )
     assert aggregate.turnover == Decimal("0.21")
+
+
+def test_profit_factor_preserves_zero_trade_win_loss_and_mixed_states() -> None:
+    dates = arch151._published_sessions_for_year(2019)
+    zeros = (Decimal(0),) * len(dates)
+    no_trades = (0,) * len(dates)
+    zero_trade = arch151.FoldMetrics(
+        dates, zeros, no_trades, Decimal(0), Decimal(0), Decimal(0)
+    )
+    all_wins = arch151.FoldMetrics(
+        dates,
+        (Decimal("0.01"), *zeros[1:]),
+        (1, *no_trades[1:]),
+        Decimal("2"),
+        Decimal(0),
+        Decimal("0.1"),
+    )
+    all_losses = arch151.FoldMetrics(
+        dates,
+        (Decimal("-0.01"), *zeros[1:]),
+        (1, *no_trades[1:]),
+        Decimal(0),
+        Decimal("2"),
+        Decimal("0.1"),
+    )
+    mixed = arch151.ProfitFactor.from_gross_totals(Decimal("3"), Decimal("2"))
+
+    assert zero_trade.profit_factor.state is arch151.ProfitFactorState.UNDEFINED
+    assert zero_trade.profit_factor.arch150_report_value() is None
+    zero_gross_trade = arch151.FoldMetrics(
+        dates,
+        (Decimal("-0.01"), *zeros[1:]),
+        (1, *no_trades[1:]),
+        Decimal(0),
+        Decimal(0),
+        Decimal("0.1"),
+    )
+    assert zero_gross_trade.profit_factor.state is arch151.ProfitFactorState.UNDEFINED
+    assert zero_gross_trade.completed_round_trips == 1
+    assert all_wins.profit_factor.state is arch151.ProfitFactorState.POSITIVE_INFINITY
+    assert all_wins.profit_factor.arch150_report_value() == "Infinity"
+    assert all_wins.profit_factor.exceeds_one
+    assert all_losses.profit_factor.state is arch151.ProfitFactorState.FINITE
+    assert all_losses.profit_factor.finite_value == Decimal(0)
+    assert not all_losses.profit_factor.exceeds_one
+    assert mixed.state is arch151.ProfitFactorState.FINITE
+    assert mixed.finite_value == Decimal("1.5")
+    with pytest.raises(Arch151Error, match="invalid gross"):
+        arch151.ProfitFactor.from_gross_totals(Decimal("-1"), Decimal("0"))
+    with pytest.raises(Arch151Error, match="zero-trade fold"):
+        arch151.FoldMetrics(
+            dates, zeros, no_trades, Decimal("1"), Decimal(0), Decimal(0)
+        )
+
+
+def test_undefined_and_positive_infinity_aggregate_pf_are_explicit() -> None:
+    slot = CANONICAL_SLOTS[0]
+    zero_profiles = {
+        year: {
+            "return_events": (),
+            "active_sessions": 0,
+            "gross_positive": Decimal(0),
+            "gross_negative": Decimal(0),
+            "annual_turnover": Decimal(0),
+        }
+        for year in arch151.SCORED_YEARS
+    }
+    zero_batch = _evaluation_batch_for_slot(slot, zero_profiles)
+    zero_aggregate = arch151.aggregate_development_economics(
+        zero_batch, arch151.FillCostCase.STRESS
+    )
+    zero_qualification = arch151.qualify_development(zero_batch)
+    assert zero_aggregate.profit_factor.state is arch151.ProfitFactorState.UNDEFINED
+    assert (
+        QualificationRejection.STRESS_PROFIT_FACTOR_NOT_ABOVE_ONE
+        in zero_qualification.economic_rejection_reasons
+    )
+
+    undefined_trade_profiles = {}
+    for year in arch151.SCORED_YEARS:
+        session_count = len(arch151._published_sessions_for_year(year))
+        undefined_trade_profiles[year] = {
+            "return_events": ((session_count - 1, Decimal("-0.01")),),
+            "active_sessions": 1,
+            "gross_positive": Decimal(0),
+            "gross_negative": Decimal(0),
+            "annual_turnover": Decimal("0.1"),
+        }
+    undefined_trade_batch = _evaluation_batch_for_slot(slot, undefined_trade_profiles)
+    undefined_trade_aggregate = arch151.aggregate_development_economics(
+        undefined_trade_batch, arch151.FillCostCase.STRESS
+    )
+    assert (
+        undefined_trade_aggregate.profit_factor.state
+        is arch151.ProfitFactorState.UNDEFINED
+    )
+    assert (
+        QualificationRejection.STRESS_PROFIT_FACTOR_NOT_ABOVE_ONE
+        in arch151.qualify_development(undefined_trade_batch).economic_rejection_reasons
+    )
+
+    winner_profiles = {
+        year: {
+            "active_sessions": 1,
+            "gross_positive": Decimal("2"),
+            "gross_negative": Decimal(0),
+        }
+        for year in arch151.SCORED_YEARS
+    }
+    winner_batch = _evaluation_batch_for_slot(slot, winner_profiles)
+    winner_aggregate = arch151.aggregate_development_economics(
+        winner_batch, arch151.FillCostCase.STRESS
+    )
+    assert (
+        winner_aggregate.profit_factor.state
+        is arch151.ProfitFactorState.POSITIVE_INFINITY
+    )
+    assert winner_aggregate.profitable_scored_years == 5
+
+
+def test_profit_factor_ranking_orders_infinity_finite_and_undefined() -> None:
+    common = (
+        Decimal("0.95"),
+        Decimal("-0.1"),
+    )
+    suffix = (Decimal("0.5"), Decimal("0.1"), Decimal("0.25"), UUID(int=1))
+    infinite = arch151._ranking_key(
+        *common,
+        arch151.ProfitFactor.from_gross_totals(Decimal(1), Decimal(0)),
+        *suffix,
+    )
+    finite = arch151._ranking_key(
+        *common,
+        arch151.ProfitFactor.from_gross_totals(Decimal(1), Decimal(2)),
+        *suffix,
+    )
+    undefined = arch151._ranking_key(
+        *common,
+        arch151.ProfitFactor.from_gross_totals(Decimal(0), Decimal(0)),
+        *suffix,
+    )
+    assert infinite < finite < undefined
 
 
 def test_development_qualification_rejections_are_independently_testable() -> None:

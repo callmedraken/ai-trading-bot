@@ -29,6 +29,7 @@ BAR_SCHEMA = "arch151-intraday-walkforward-bar/v1"
 AGGREGATION_SCHEMA = "arch151-sparse-aggregate/v1"
 CALIBRATION_SCHEMA = "arch151-family-a-calibration/v2"
 EXECUTION_POLICY_SCHEMA = "arch151-causal-execution-policy/v1"
+_FOLD_EVALUATION_SCHEMA = "arch151-fold-evaluation/v2"
 SEMANTIC_CONTRACT_VERSION = "arch151-frozen-design-2026-11-23/v1"
 IDENTITY_NAMESPACE_SEED = (
     "urn:ai-trading-bot:arch151:intraday-walkforward-foundation:v1"
@@ -49,13 +50,14 @@ _MANIFEST_NAMESPACE = uuid5(_ROOT_NAMESPACE, "population-identity/v1")
 _AGGREGATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "sparse-aggregation/v1")
 _CALIBRATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "family-a-calibration/v2")
 _FOLD_NAMESPACE = uuid5(_ROOT_NAMESPACE, "walk-forward-fold/v1")
-_EVALUATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "fold-evaluation/v1")
+_EVALUATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "fold-evaluation/v2")
 _LEDGER_NAMESPACE = uuid5(_ROOT_NAMESPACE, "prior-trial-ledger/v1")
 _SELECTION_INPUT_NAMESPACE = uuid5(_ROOT_NAMESPACE, "selection-bias-input/v1")
 _QUALIFICATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "development-qualification/v1")
 _FINAL_FREEZE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "final-candidate-freeze/v1")
 _FAMILY_A_MEASURE_SEAL = object()
 _FAMILY_A_CALIBRATION_SEAL = object()
+_VERIFIED_SPARSE_SESSION_SEAL = object()
 _PRIOR_LEDGER_SEAL = object()
 _SELECTION_INPUT_SEAL = object()
 _FINAL_FREEZE_SEAL = object()
@@ -1053,6 +1055,49 @@ class AggregateStream:
     source_digest: str
 
 
+@dataclass(frozen=True, slots=True, init=False)
+class VerifiedSparseSession:
+    """Evaluator-owned seal for one complete sparse session projection.
+
+    The source foundation has no production issuer. Its constructor is closed;
+    Family C and D accept only a seal issued by the later evaluator/auth layer.
+    """
+
+    symbol: str
+    resolution: BarResolution
+    session_date: date
+    bars: tuple[AggregateBar, ...]
+    minute_source_digest: str | None
+    source_digest: str
+    _seal: object
+
+    def __init__(
+        self,
+        *,
+        symbol: str,
+        resolution: BarResolution,
+        session_date: date,
+        bars: tuple[AggregateBar, ...],
+        source_digest: str,
+        minute_source_digest: str | None = None,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _VERIFIED_SPARSE_SESSION_SEAL:
+            raise AuthorizationUnavailableError(
+                "verified sparse-session evidence is evaluator-owned and unavailable"
+            )
+        for name, value in (
+            ("symbol", symbol),
+            ("resolution", resolution),
+            ("session_date", session_date),
+            ("bars", bars),
+            ("minute_source_digest", minute_source_digest),
+            ("source_digest", source_digest),
+            ("_seal", _seal),
+        ):
+            object.__setattr__(self, name, value)
+
+
 def _bar_material(bar: OneMinuteBar | AggregateBar) -> dict[str, object]:
     return {
         "schema": BAR_SCHEMA,
@@ -1170,7 +1215,10 @@ def aggregate_sparse_bars(
 
 
 def aggregate_session_vwap(
-    minute_bars: Iterable[OneMinuteBar], aggregate_stream: AggregateStream
+    minute_bars: Iterable[OneMinuteBar],
+    aggregate_stream: AggregateStream,
+    *,
+    verified_sessions: Sequence[VerifiedSparseSession] = (),
 ) -> tuple[VwapObservation, ...]:
     """Derive bucket-end session VWAP from exact observed one-minute inputs.
 
@@ -1197,14 +1245,56 @@ def aggregate_session_vwap(
         minutes_by_session[minute.session_date].append(minute)
     for aggregate in aggregate_stream.bars:
         aggregates_by_session[aggregate.session_date].append(aggregate)
+    evidence_by_session: dict[date, VerifiedSparseSession] = {}
+    for evidence in tuple(verified_sessions):
+        if (
+            type(evidence) is not VerifiedSparseSession
+            or getattr(evidence, "_seal", None) is not _VERIFIED_SPARSE_SESSION_SEAL
+        ):
+            raise AuthorizationUnavailableError(
+                "post-open VWAP requires evaluator-owned verified session evidence"
+            )
+        if evidence.session_date in evidence_by_session:
+            raise Arch151Error("verified sparse-session evidence is duplicated")
+        evidence_by_session[evidence.session_date] = evidence
+    if not set(evidence_by_session).issubset(minutes_by_session):
+        raise AuthorizationUnavailableError(
+            "verified VWAP evidence does not match a supplied source session"
+        )
     for session, session_minutes in minutes_by_session.items():
         schedule = _SESSION_AUTHORITY.schedule_for(session)
-        if schedule is None or session_minutes[0].timestamp != (
-            schedule.opens_at.astimezone(UTC)
-        ):
+        if schedule is None:
+            raise Arch151Error("VWAP source session is outside the published calendar")
+        starts_at_open = session_minutes[0].timestamp == schedule.opens_at.astimezone(
+            UTC
+        )
+        evidence = evidence_by_session.get(session)
+        if not starts_at_open and evidence is None:
             raise UnavailableIndicatorError(
                 "session VWAP source must begin at the published XNYS open"
             )
+        if evidence is not None:
+            source_digest = sha256(
+                _canonical_json([_bar_material(bar) for bar in session_minutes])
+            ).hexdigest()
+            session_aggregates = tuple(aggregates_by_session.get(session, ()))
+            if (
+                evidence.symbol != session_minutes[0].symbol
+                or evidence.resolution is not aggregate_stream.resolution
+                or evidence.minute_source_digest != source_digest
+                or evidence.bars != session_aggregates
+                or evidence.source_digest
+                != _verified_sparse_session_digest(
+                    evidence.symbol,
+                    evidence.resolution,
+                    evidence.session_date,
+                    evidence.bars,
+                    evidence.minute_source_digest,
+                )
+            ):
+                raise AuthorizationUnavailableError(
+                    "VWAP source is not bound to the exact verified sparse projection"
+                )
 
     observations: list[VwapObservation] = []
     for session, aggregate_bars in aggregates_by_session.items():
@@ -1776,6 +1866,7 @@ def family_a_entry_signal(
 @dataclass(frozen=True, slots=True)
 class OpeningRangeRetestSignal:
     program_key: ProgramKey
+    symbol: str
     session_date: date
     signal_timestamp: datetime
     breakout_level: Decimal
@@ -1887,6 +1978,123 @@ def _validated_session_aggregate_bars(
     return materialized
 
 
+def _verified_sparse_session_digest(
+    symbol: str,
+    resolution: BarResolution,
+    session: date,
+    bars: tuple[AggregateBar, ...],
+    minute_source_digest: str | None,
+) -> str:
+    return sha256(
+        _canonical_json(
+            {
+                "schema": "arch151-verified-sparse-session/v1",
+                "symbol": symbol,
+                "resolution_minutes": int(resolution),
+                "session_date": session.isoformat(),
+                "bars": [_bar_material(bar) for bar in bars],
+                "minute_source_digest": minute_source_digest,
+            }
+        )
+    ).hexdigest()
+
+
+def _test_only_verified_sparse_session(
+    bars: Sequence[AggregateBar],
+    *,
+    minute_bars: Sequence[OneMinuteBar] | None = None,
+) -> VerifiedSparseSession:
+    """Private synthetic seam; production code has no sparse-session issuer."""
+
+    materialized = tuple(bars)
+    if any(type(bar) is not AggregateBar for bar in materialized):
+        raise TypeError("synthetic sparse-session input must contain aggregate bars")
+    validated = _validated_sparse_session_aggregate_bars(
+        materialized, require_open=False
+    )
+    first = validated[0]
+    minute_source_digest: str | None = None
+    if minute_bars is not None:
+        minutes = _validated_minutes(minute_bars)
+        if any(
+            bar.symbol != first.symbol or bar.session_date != first.session_date
+            for bar in minutes
+        ):
+            raise Arch151Error("synthetic minute evidence must bind one sparse session")
+        recomputed = aggregate_sparse_bars(minutes, first.resolution)
+        if recomputed.bars != validated:
+            raise Arch151Error("synthetic minute and aggregate evidence do not match")
+        minute_source_digest = sha256(
+            _canonical_json([_bar_material(bar) for bar in minutes])
+        ).hexdigest()
+    digest = _verified_sparse_session_digest(
+        first.symbol,
+        first.resolution,
+        first.session_date,
+        validated,
+        minute_source_digest,
+    )
+    return VerifiedSparseSession(
+        symbol=first.symbol,
+        resolution=first.resolution,
+        session_date=first.session_date,
+        bars=validated,
+        source_digest=digest,
+        minute_source_digest=minute_source_digest,
+        _seal=_VERIFIED_SPARSE_SESSION_SEAL,
+    )
+
+
+def _require_verified_sparse_projection(
+    evidence: VerifiedSparseSession | None,
+    requested_bars: tuple[AggregateBar, ...],
+    program: Arch151Program,
+    *,
+    allow_prefix: bool,
+) -> tuple[AggregateBar, ...]:
+    if (
+        type(evidence) is not VerifiedSparseSession
+        or getattr(evidence, "_seal", None) is not _VERIFIED_SPARSE_SESSION_SEAL
+    ):
+        raise AuthorizationUnavailableError(
+            "Family C/D require evaluator-owned verified sparse-session evidence"
+        )
+    verified = _validated_sparse_session_aggregate_bars(
+        evidence.bars, program.resolution, require_open=False
+    )
+    if (
+        evidence.symbol != verified[0].symbol
+        or evidence.resolution is not program.resolution
+        or evidence.session_date != verified[0].session_date
+        or evidence.minute_source_digest is None
+        or evidence.source_digest
+        != _verified_sparse_session_digest(
+            evidence.symbol,
+            evidence.resolution,
+            evidence.session_date,
+            verified,
+            evidence.minute_source_digest,
+        )
+    ):
+        raise AuthorizationUnavailableError("sparse-session evidence seal is invalid")
+    if any(type(bar) is not AggregateBar for bar in requested_bars):
+        raise TypeError("sparse-session projection requires AggregateBar values")
+    if allow_prefix:
+        bound = verified[: len(requested_bars)] == requested_bars
+    else:
+        starts = tuple(
+            index
+            for index in range(len(verified))
+            if verified[index : index + len(requested_bars)] == requested_bars
+        )
+        bound = bool(starts)
+    if not bound:
+        raise AuthorizationUnavailableError(
+            "requested bars are not a source-bound sparse-session projection"
+        )
+    return verified
+
+
 def family_b_entry_signal(
     program: Arch151Program, session_bars: Sequence[AggregateBar]
 ) -> OpeningRangeRetestSignal | None:
@@ -1974,6 +2182,7 @@ def family_b_entry_signal(
         stop = swing_low * (Decimal(1) - parameters.stop_buffer_bps / Decimal(10000))
         return OpeningRangeRetestSignal(
             program.key,
+            final_bar.symbol,
             final_bar.session_date,
             final_bar.completed_at,
             level,
@@ -1989,6 +2198,10 @@ def family_b_entry_signal(
 @dataclass(frozen=True, slots=True)
 class VwapMeanReversionSignal:
     program_key: ProgramKey
+    program_id: UUID
+    symbol: str
+    resolution: BarResolution
+    session_date: date
     signal_timestamp: datetime
     normalized_deviation: Decimal
     frozen_entry_sigma: Decimal
@@ -1999,6 +2212,8 @@ def family_c_entry_signal(
     program: Arch151Program,
     preceding: Sequence[VwapObservation],
     signal: VwapObservation,
+    *,
+    verified_session: VerifiedSparseSession | None = None,
 ) -> VwapMeanReversionSignal | None:
     """Evaluate the completed-bar downside sigma plus low-directionality gate."""
 
@@ -2024,6 +2239,14 @@ def family_c_entry_signal(
     _validated_session_aggregate_bars(
         program, tuple(item.bar for item in (*history, signal)), from_open=False
     )
+    if signal.bar.symbol not in INITIAL_UNIVERSE:
+        raise Arch151Error("Family C signal symbol is outside frozen SPY/QQQ")
+    _require_verified_sparse_projection(
+        verified_session,
+        tuple(item.bar for item in (*history, signal)),
+        program,
+        allow_prefix=False,
+    )
     if not program.entry_window.contains(signal.bar.completed_at):
         return None
     sigma_pairs = tuple(
@@ -2047,12 +2270,24 @@ def family_c_entry_signal(
     if deviation > threshold or er > parameters.efficiency_ratio_max:
         return None
     return VwapMeanReversionSignal(
-        program.key, signal.bar.timestamp, deviation, sigma, er
+        program.key,
+        program_id(program),
+        signal.bar.symbol,
+        signal.bar.resolution,
+        signal.bar.session_date,
+        signal.bar.timestamp,
+        deviation,
+        sigma,
+        er,
     )
 
 
 def family_c_reversion_exit(
-    program: Arch151Program, signal: VwapMeanReversionSignal, current: VwapObservation
+    program: Arch151Program,
+    signal: VwapMeanReversionSignal,
+    current: VwapObservation,
+    *,
+    verified_session: VerifiedSparseSession | None = None,
 ) -> bool:
     """Check the VWAP exit against current VWAP and frozen entry sigma."""
 
@@ -2061,6 +2296,7 @@ def family_c_reversion_exit(
         or type(program.parameters) is not VwapMeanReversionParameters
         or type(signal) is not VwapMeanReversionSignal
         or signal.program_key is not program.key
+        or signal.program_id != program_id(program)
         or type(current) is not VwapObservation
     ):
         raise Arch151Error("Family C exit is not bound to its canonical entry signal")
@@ -2072,6 +2308,17 @@ def family_c_reversion_exit(
         raise Arch151Error("Family C signal timestamp must be timezone aware")
     signal_timestamp = signal.signal_timestamp.astimezone(UTC)
     signal_session = signal_timestamp.astimezone(NEW_YORK).date()
+    sigma = _decimal(signal.frozen_entry_sigma, "frozen entry sigma")
+    if sigma <= 0:
+        raise Arch151Error("Family C frozen entry sigma must be positive and finite")
+    if (
+        signal.symbol not in INITIAL_UNIVERSE
+        or signal.resolution is not program.resolution
+        or signal.session_date != signal_session
+        or current.bar.symbol != signal.symbol
+        or current.bar.resolution is not signal.resolution
+    ):
+        raise Arch151Error("Family C exit instrument or resolution differs from entry")
     schedule = _SESSION_AUTHORITY.schedule_for(signal_session)
     if schedule is None:
         raise Arch151Error("Family C signal is outside the published XNYS schedule")
@@ -2095,10 +2342,15 @@ def family_c_reversion_exit(
         raise Arch151Error(
             "Family C exit must be strictly later and within the signal session"
         )
+    _require_verified_sparse_projection(
+        verified_session,
+        (current_bar,),
+        program,
+        allow_prefix=False,
+    )
     with localcontext(_DECIMAL_CONTEXT):
         threshold = current.vwap * (
-            Decimal(1)
-            + program.parameters.exit_sigma_multiplier * signal.frozen_entry_sigma
+            Decimal(1) + program.parameters.exit_sigma_multiplier * sigma
         )
     return current.bar.close >= threshold
 
@@ -2194,12 +2446,49 @@ def efficiency_ratio(closes: Sequence[Decimal], periods: int) -> Decimal:
     return result
 
 
-def ema_series(bars: Sequence[AggregateBar], period: int) -> tuple[Decimal | None, ...]:
+def ema_series(
+    bars: Sequence[AggregateBar],
+    period: int,
+    *,
+    verified_session: VerifiedSparseSession | None = None,
+) -> tuple[Decimal | None, ...]:
     """Compute session-local EMA, reseeding after each sparse gap."""
 
     if type(period) is not int or period < 1:
         raise ValueError("EMA period must be positive")
-    materialized = _validated_sparse_session_aggregate_bars(bars, require_open=True)
+    materialized = _validated_sparse_session_aggregate_bars(
+        bars, require_open=verified_session is None
+    )
+    if verified_session is not None:
+        if (
+            type(verified_session) is not VerifiedSparseSession
+            or getattr(verified_session, "_seal", None)
+            is not _VERIFIED_SPARSE_SESSION_SEAL
+        ):
+            raise AuthorizationUnavailableError(
+                "EMA recovery after a missing open requires verified session evidence"
+            )
+        verified = _validated_sparse_session_aggregate_bars(
+            verified_session.bars, materialized[0].resolution, require_open=False
+        )
+        if (
+            verified_session.symbol != materialized[0].symbol
+            or verified_session.session_date != materialized[0].session_date
+            or verified_session.resolution is not materialized[0].resolution
+            or verified_session.minute_source_digest is None
+            or verified_session.source_digest
+            != _verified_sparse_session_digest(
+                verified_session.symbol,
+                verified_session.resolution,
+                verified_session.session_date,
+                verified,
+                verified_session.minute_source_digest,
+            )
+            or verified[: len(materialized)] != materialized
+        ):
+            raise AuthorizationUnavailableError(
+                "EMA bars are not a source-bound sparse-session prefix"
+            )
     values: list[Decimal | None] = [None] * len(materialized)
     segment_start = 0
     current: Decimal | None = None
@@ -2297,6 +2586,8 @@ def exact_cross_etf_confirmation(
 @dataclass(frozen=True, slots=True)
 class TrendPullbackSignal:
     program_key: ProgramKey
+    program_id: UUID
+    symbol: str
     session_date: date
     setup_timestamp: datetime
     signal_timestamp: datetime
@@ -2307,6 +2598,17 @@ class TrendPullbackSignal:
     local_ema_fast: Decimal
     local_ema_slow: Decimal
     confirming_symbol: str
+
+
+def _family_d_same_bar_tie_key(
+    signal: TrendPullbackSignal,
+) -> tuple[datetime, Decimal, Decimal, Decimal]:
+    return (
+        signal.setup_timestamp,
+        -signal.swing_peak,
+        signal.pullback_low,
+        signal.stop_reference_price,
+    )
 
 
 def _family_d_contiguous_segment_signal(
@@ -2338,6 +2640,7 @@ def _family_d_contiguous_segment_signal(
         parameters.atr_lookback + 1,
         parameters.swing_peak_window_bars,
     )
+    candidates: list[TrendPullbackSignal] = []
     for setup_index in range(minimum_index, len(local)):
         if local_fast[setup_index] is None or local_slow[setup_index] is None:
             continue
@@ -2417,25 +2720,34 @@ def _family_d_contiguous_segment_signal(
             if not local_trend or not cross_trend:
                 break
             signal_bar = local[index]
-            if not program.entry_window.contains(signal_bar.completed_at):
+            if index != len(local) - 1 or not program.entry_window.contains(
+                signal_bar.completed_at
+            ):
                 break
             stop = pullback_low - parameters.stop_buffer_atr * frozen_atr
             if stop <= 0 or signal_bar.close <= stop:
                 break
-            return TrendPullbackSignal(
-                program.key,
-                signal_bar.session_date,
-                local[setup_index].timestamp,
-                signal_bar.timestamp,
-                swing_peak,
-                frozen_atr,
-                pullback_low,
-                stop,
-                local_fast[index],
-                local_slow[index],
-                other[0].symbol,
+            candidates.append(
+                TrendPullbackSignal(
+                    program.key,
+                    program_id(program),
+                    local[0].symbol,
+                    signal_bar.session_date,
+                    local[setup_index].timestamp,
+                    signal_bar.timestamp,
+                    swing_peak,
+                    frozen_atr,
+                    pullback_low,
+                    stop,
+                    local_fast[index],
+                    local_slow[index],
+                    other[0].symbol,
+                )
             )
-    return None
+            break
+    if not candidates:
+        return None
+    return min(candidates, key=_family_d_same_bar_tie_key)
 
 
 def family_d_entry_signal(
@@ -2443,12 +2755,18 @@ def family_d_entry_signal(
     target_bars: Sequence[AggregateBar],
     confirming_bars: Sequence[AggregateBar],
     confirming_vwaps: Sequence[VwapObservation],
+    *,
+    target_session: VerifiedSparseSession | None = None,
+    confirming_session: VerifiedSparseSession | None = None,
 ) -> TrendPullbackSignal | None:
-    """Evaluate pullback predicates independently inside exact aligned segments.
+    """Evaluate only a qualifying reclaim on the current completed decision bar.
 
     A missing bucket resets both the local setup state and the cross-ETF
     confirmation segment. EMA and ATR warmup must be re-established within a
     fresh contiguous segment; no stale cross-symbol value is substituted.
+    Multiple setups completing on the same bar are resolved by earliest setup
+    timestamp, then highest swing peak, then lowest pullback low, then lowest
+    stop reference. This predicate does not consume entries or synthesize fills.
     """
 
     if (
@@ -2457,13 +2775,26 @@ def family_d_entry_signal(
     ):
         raise UnsupportedProgramError("Family D requires a canonical pullback program")
     local = _validated_sparse_session_aggregate_bars(
-        target_bars, program.resolution, require_open=True
+        target_bars, program.resolution, require_open=False
     )
     other = _validated_sparse_session_aggregate_bars(
-        confirming_bars, program.resolution, require_open=True
+        confirming_bars, program.resolution, require_open=False
+    )
+    _require_verified_sparse_projection(
+        target_session, local, program, allow_prefix=True
+    )
+    _require_verified_sparse_projection(
+        confirming_session, other, program, allow_prefix=True
     )
     if local[0].symbol == other[0].symbol:
         raise Arch151Error("cross-ETF confirmation requires distinct symbols")
+    if (
+        local[0].symbol not in INITIAL_UNIVERSE
+        or other[0].symbol not in INITIAL_UNIVERSE
+    ):
+        raise Arch151Error("cross-ETF symbols are limited to SPY and QQQ")
+    if local[0].session_date != other[0].session_date:
+        raise Arch151Error("cross-ETF streams must belong to the same session")
     vwap_observations = tuple(confirming_vwaps)
     if len(vwap_observations) != len(other) or any(
         type(observation) is not VwapObservation for observation in vwap_observations
@@ -2477,10 +2808,18 @@ def family_d_entry_signal(
             "cross-ETF VWAP observations are not exactly bar aligned"
         )
 
-    local_fast_all = ema_series(local, program.parameters.ema_fast)
-    local_slow_all = ema_series(local, program.parameters.ema_slow)
-    other_fast_all = ema_series(other, program.parameters.ema_fast)
-    other_slow_all = ema_series(other, program.parameters.ema_slow)
+    local_fast_all = ema_series(
+        local, program.parameters.ema_fast, verified_session=target_session
+    )
+    local_slow_all = ema_series(
+        local, program.parameters.ema_slow, verified_session=target_session
+    )
+    other_fast_all = ema_series(
+        other, program.parameters.ema_fast, verified_session=confirming_session
+    )
+    other_slow_all = ema_series(
+        other, program.parameters.ema_slow, verified_session=confirming_session
+    )
 
     other_indexes = {bar.timestamp: index for index, bar in enumerate(other)}
     vwap_by_timestamp = {
@@ -2493,6 +2832,8 @@ def family_d_entry_signal(
     )
     if not pairs:
         raise UnavailableIndicatorError("cross-ETF streams have no exact overlap")
+    if pairs[-1] != (len(local) - 1, len(other) - 1):
+        return None
 
     segments: list[list[tuple[int, int]]] = []
     current_segment: list[tuple[int, int]] = []
@@ -2686,6 +3027,94 @@ def _published_sessions_for_year(year: int) -> tuple[date, ...]:
     return sessions
 
 
+class ProfitFactorState(StrEnum):
+    FINITE = "FINITE"
+    POSITIVE_INFINITY = "POSITIVE_INFINITY"
+    UNDEFINED = "UNDEFINED"
+    INVALID = "INVALID"
+
+
+@dataclass(frozen=True, slots=True)
+class ProfitFactor:
+    """Explicit finite, positive-infinity, or undefined PF evidence."""
+
+    state: ProfitFactorState
+    finite_value: Decimal | None
+
+    def __post_init__(self) -> None:
+        if type(self.state) is not ProfitFactorState:
+            raise TypeError("profit-factor state must be a closed enum")
+        if self.state is ProfitFactorState.INVALID:
+            raise Arch151Error("invalid profit-factor evidence is rejected")
+        if self.state is ProfitFactorState.FINITE:
+            if type(self.finite_value) is not Decimal:
+                raise TypeError("finite profit factor requires a Decimal value")
+            value = _decimal(self.finite_value, "finite profit factor")
+            if value < 0:
+                raise ValueError("finite profit factor cannot be negative")
+            object.__setattr__(self, "finite_value", value)
+        elif self.finite_value is not None:
+            raise Arch151Error(
+                "infinite and undefined profit factors cannot have numeric sentinels"
+            )
+
+    @classmethod
+    def from_gross_totals(
+        cls, gross_positive: Decimal, gross_negative: Decimal
+    ) -> ProfitFactor:
+        if type(gross_positive) is not Decimal or type(gross_negative) is not Decimal:
+            raise TypeError("gross trade P&L totals must be Decimal values")
+        positive = _decimal(gross_positive, "gross positive trade P&L")
+        negative = _decimal(gross_negative, "gross negative trade P&L")
+        if positive < 0 or negative < 0:
+            raise Arch151Error("invalid gross P&L evidence cannot produce a PF metric")
+        if positive == 0 and negative == 0:
+            return cls(ProfitFactorState.UNDEFINED, None)
+        if positive > 0 and negative == 0:
+            return cls(ProfitFactorState.POSITIVE_INFINITY, None)
+        with localcontext(_DECIMAL_CONTEXT):
+            return cls(ProfitFactorState.FINITE, positive / negative)
+
+    @classmethod
+    def finite(cls, value: Decimal) -> ProfitFactor:
+        return cls(ProfitFactorState.FINITE, value)
+
+    @property
+    def exceeds_one(self) -> bool:
+        return self.state is ProfitFactorState.POSITIVE_INFINITY or (
+            self.state is ProfitFactorState.FINITE
+            and self.finite_value is not None
+            and self.finite_value > 1
+        )
+
+    @property
+    def ranking_key(self) -> tuple[int, Decimal]:
+        if self.state is ProfitFactorState.POSITIVE_INFINITY:
+            return (0, Decimal(0))
+        if self.state is ProfitFactorState.FINITE:
+            assert self.finite_value is not None
+            return (1, -self.finite_value)
+        return (2, Decimal(0))
+
+    def canonical_material(self) -> dict[str, str | None]:
+        return {
+            "state": self.state.value,
+            "value": (
+                _decimal_text(self.finite_value)
+                if self.finite_value is not None
+                else None
+            ),
+        }
+
+    def arch150_report_value(self) -> str | None:
+        if self.state is ProfitFactorState.POSITIVE_INFINITY:
+            return "Infinity"
+        if self.state is ProfitFactorState.UNDEFINED:
+            return None
+        assert self.finite_value is not None
+        return _decimal_text(self.finite_value)
+
+
 @dataclass(frozen=True, slots=True)
 class FoldMetrics:
     """Session returns/trades plus evaluator-owned annual turnover.
@@ -2736,12 +3165,19 @@ class FoldMetrics:
             self.gross_negative_trade_pnl, "gross negative trade P&L"
         )
         annual_turnover = _decimal(self.annual_turnover, "annual turnover")
-        if gross_positive < 0 or gross_negative <= 0:
-            raise UnavailableIndicatorError(
-                "gross trade P&L must have a positive loss denominator"
-            )
+        if gross_positive < 0 or gross_negative < 0:
+            raise Arch151Error("invalid gross trade P&L evidence")
         if annual_turnover < 0:
             raise ValueError("annual turnover cannot be negative")
+        if not any(round_trips) and (
+            gross_positive != 0
+            or gross_negative != 0
+            or any(normalized_returns)
+            or annual_turnover != 0
+        ):
+            raise Arch151Error(
+                "zero-trade fold requires zero returns, gross economics, and turnover"
+            )
         object.__setattr__(self, "session_net_returns", normalized_returns)
         object.__setattr__(self, "session_dates", session_dates)
         object.__setattr__(self, "round_trips_by_session", round_trips)
@@ -2758,12 +3194,10 @@ class FoldMetrics:
             return equity - Decimal(1)
 
     @property
-    def profit_factor(self) -> Decimal:
-        with localcontext(_DECIMAL_CONTEXT):
-            result = self.gross_positive_trade_pnl / self.gross_negative_trade_pnl
-        if not result.is_finite():
-            raise UnavailableIndicatorError("fold profit factor is not finite")
-        return result
+    def profit_factor(self) -> ProfitFactor:
+        return ProfitFactor.from_gross_totals(
+            self.gross_positive_trade_pnl, self.gross_negative_trade_pnl
+        )
 
     @property
     def max_drawdown(self) -> Decimal:
@@ -2795,6 +3229,7 @@ def _fold_metrics_material(metrics: FoldMetrics) -> dict[str, object]:
         "round_trips_by_session": list(metrics.round_trips_by_session),
         "gross_positive_trade_pnl": _decimal_text(metrics.gross_positive_trade_pnl),
         "gross_negative_trade_pnl": _decimal_text(metrics.gross_negative_trade_pnl),
+        "profit_factor": metrics.profit_factor.canonical_material(),
         "annual_turnover": _decimal_text(metrics.annual_turnover),
     }
 
@@ -2859,7 +3294,7 @@ class FoldEvaluation:
     @property
     def evaluation_id(self) -> UUID:
         material = {
-            "schema": "arch151-fold-evaluation/v1",
+            "schema": _FOLD_EVALUATION_SCHEMA,
             "semantic_contract_version": SEMANTIC_CONTRACT_VERSION,
             "slot_id": str(self.slot_id),
             "program_id": str(self.program_id),
@@ -2873,7 +3308,12 @@ class FoldEvaluation:
 
 @dataclass(frozen=True, slots=True)
 class DevelopmentEvaluationBatch:
-    """Exactly five expanding folds under BASE, STRESS and ZERO economics."""
+    """Complete, internally consistent folds under BASE, STRESS and ZERO.
+
+    Integrity-invalid records are rejected before economic qualification can
+    classify a candidate. Real replay-integrity failure evidence is evaluator-
+    owned and is not issued by this foundation.
+    """
 
     slot_id: UUID
     records: tuple[FoldEvaluation, ...]
@@ -2933,7 +3373,7 @@ class DevelopmentAggregate:
     slot_id: UUID
     economics_case: FillCostCase
     net_return: Decimal
-    profit_factor: Decimal
+    profit_factor: ProfitFactor | Decimal
     positive_scored_years: int
     profitable_scored_years: int
     worst_scored_year_return: Decimal
@@ -2952,7 +3392,6 @@ class DevelopmentAggregate:
             raise TypeError("development aggregate identity is invalid")
         names = (
             "net_return",
-            "profit_factor",
             "worst_scored_year_return",
             "max_drawdown",
             "average_round_trips_per_year",
@@ -2964,6 +3403,12 @@ class DevelopmentAggregate:
             raise TypeError("development aggregate metrics must be Decimal values")
         for name in names:
             object.__setattr__(self, name, _decimal(getattr(self, name), name))
+        if type(self.profit_factor) is Decimal:
+            object.__setattr__(
+                self, "profit_factor", ProfitFactor.finite(self.profit_factor)
+            )
+        elif type(self.profit_factor) is not ProfitFactor:
+            raise TypeError("development profit factor must have an explicit state")
         if self.sharpe is not None:
             if type(self.sharpe) is not Decimal:
                 raise TypeError("development Sharpe must be a Decimal value")
@@ -2978,7 +3423,6 @@ class DevelopmentAggregate:
         if (
             self.net_return <= -1
             or self.worst_scored_year_return <= -1
-            or self.profit_factor < 0
             or not Decimal(0) <= self.max_drawdown <= Decimal(1)
             or not Decimal(0) <= self.active_session_fraction <= Decimal(1)
             or self.average_round_trips_per_year < 0
@@ -3017,7 +3461,7 @@ def _qualification_rejections(
     rejected: list[QualificationRejection] = []
     if aggregate.net_return <= 0:
         rejected.append(QualificationRejection.STRESS_NET_RETURN_NOT_POSITIVE)
-    if aggregate.profit_factor <= 1:
+    if not aggregate.profit_factor.exceeds_one:
         rejected.append(QualificationRejection.STRESS_PROFIT_FACTOR_NOT_ABOVE_ONE)
     if aggregate.positive_scored_years < 4:
         rejected.append(QualificationRejection.FEWER_THAN_FOUR_POSITIVE_YEARS)
@@ -3108,7 +3552,7 @@ def aggregate_development_economics(
         gross_negative = sum(
             (record.metrics.gross_negative_trade_pnl for record in records), Decimal(0)
         )
-        profit_factor = gross_positive / gross_negative
+        profit_factor = ProfitFactor.from_gross_totals(gross_positive, gross_negative)
         average_round_trips = Decimal(total_round_trips) / Decimal(len(SCORED_YEARS))
         active_fraction = Decimal(active_sessions) / Decimal(total_sessions)
         turnover = sum(
@@ -3140,7 +3584,7 @@ def aggregate_development_economics(
         net_return,
         profit_factor,
         sum(value > 0 for value in annual_returns),
-        sum(value > 1 for value in annual_profit_factors),
+        sum(value.exceeds_one for value in annual_profit_factors),
         min(annual_returns),
         max_drawdown,
         average_round_trips,
@@ -3152,7 +3596,11 @@ def aggregate_development_economics(
 
 
 def qualify_development(batch: DevelopmentEvaluationBatch) -> DevelopmentQualification:
-    """Evaluate frozen STRESS thresholds; DSR absence always blocks selection."""
+    """Qualify a complete valid batch; DSR absence always blocks selection.
+
+    Returned economic rejection reasons apply only to valid complete records.
+    Malformed evidence fails at its typed construction boundary instead.
+    """
 
     aggregate = aggregate_development_economics(batch, FillCostCase.STRESS)
     economic_rejections = _qualification_rejections(aggregate)
@@ -3448,7 +3896,7 @@ def _selection_bias_probability_meets_threshold(probability: Decimal) -> bool:
 def _ranking_key(
     probability: Decimal,
     worst_scored_year_return: Decimal,
-    stress_profit_factor: Decimal,
+    stress_profit_factor: Decimal | ProfitFactor,
     stress_sharpe: Decimal,
     max_drawdown: Decimal,
     turnover: Decimal,
@@ -3458,42 +3906,51 @@ def _ranking_key(
 
     if type(slot_id) is not UUID:
         raise TypeError("ranking slot tie-break requires an immutable UUID")
-    if any(
+    decimal_values = (
         type(value) is not Decimal
         for value in (
             probability,
             worst_scored_year_return,
-            stress_profit_factor,
             stress_sharpe,
             max_drawdown,
             turnover,
         )
-    ):
+    )
+    if any(decimal_values) or type(stress_profit_factor) not in (Decimal, ProfitFactor):
         raise TypeError("ranking metrics must be Decimal values")
     values = tuple(
         _decimal(value, name)
         for name, value in (
             ("probability", probability),
             ("worst-year return", worst_scored_year_return),
-            ("STRESS profit factor", stress_profit_factor),
             ("STRESS Sharpe", stress_sharpe),
             ("maximum drawdown", max_drawdown),
             ("turnover", turnover),
         )
     )
-    probability_value, worst_return, profit_factor, sharpe, drawdown, turnover_value = (
-        values
+    probability_value, worst_return, sharpe, drawdown, turnover_value = values
+    profit_factor = (
+        ProfitFactor.finite(_decimal(stress_profit_factor, "STRESS profit factor"))
+        if type(stress_profit_factor) is Decimal
+        else stress_profit_factor
     )
     if not Decimal(0) <= probability_value <= Decimal(1):
         raise ValueError("ranking probability must be between zero and one")
-    if profit_factor < 0 or not Decimal(0) <= drawdown <= Decimal(1):
+    if (
+        profit_factor.state is ProfitFactorState.INVALID
+        or (
+            profit_factor.state is ProfitFactorState.FINITE
+            and (profit_factor.finite_value is None or profit_factor.finite_value < 0)
+        )
+        or not Decimal(0) <= drawdown <= Decimal(1)
+    ):
         raise ValueError("ranking metrics are invalid")
     if turnover_value < 0:
         raise ValueError("ranking turnover cannot be negative")
     return (
         -probability_value,
         -worst_return,
-        -profit_factor,
+        *profit_factor.ranking_key,
         -sharpe,
         drawdown,
         turnover_value,
@@ -4029,6 +4486,12 @@ __all__ = (
     "FamilyAMeasureScope",
     "FamilyACalibration",
     "FamilyASessionMeasure",
+    "ProfitFactor",
+    "ProfitFactorState",
+    "VerifiedSparseSession",
+    "VwapMeanReversionSignal",
+    "TrendPullbackSignal",
+    "OpeningRangeRetestSignal",
     "FinalObservedBarRule",
     "FinalCandidateFreeze",
     "FinalFreezeStatus",

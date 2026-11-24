@@ -749,6 +749,7 @@ def test_ci_certification_profile_mapping_is_explicit_and_bounded():
         runner.ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME: "full",
         runner.ARCH150_INTRADAY_AI_NAME: "full",
         runner.ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME: "full",
+        runner.ARCH151_INTRADAY_WALKFORWARD_NAME: "full",
         runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
         runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
         runner.ARCH147_P5A_NAME: "full",
@@ -793,6 +794,21 @@ def test_ci_certification_profile_mapping_is_explicit_and_bounded():
         is None
     )
     assert runner.resolve_ci_certification_profile(None) is None
+
+
+def test_arch151_route_is_in_the_current_active_workflow_projection():
+    repo = Path(runner.__file__).resolve().parents[1]
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    name = runner.ARCH151_INTRADAY_WALKFORWARD_NAME
+    row = f"              {name} {chr(96)}\n"
+
+    assert workflow.count(row) == 1
+    assert name in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner._arch147_current_batch_workflow_is_reviewed(workflow)
+    assert runner._arch147_batch_workflow_is_reviewed(workflow)
 
 
 def test_reviewed_active_batch_digest_matches_single_canonical_tuple():

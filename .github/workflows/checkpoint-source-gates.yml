@@ -37,6 +37,7 @@ env:
               arch149-monthly-defensive-rotation-research `
               arch150-intraday-ai-research-foundation `
               arch150-intraday-data-custody-source `
+              arch151-intraday-walkforward-foundation `
               arch-ai-strategy-discovery-foundation `
               arch-ai-strategy-discovery-g1-engine `
               arch146-a-historical-research-dataset-enforcement `

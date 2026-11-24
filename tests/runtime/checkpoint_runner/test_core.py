@@ -395,6 +395,45 @@ def test_arch150_intraday_ai_checkpoint_is_source_only_and_mapped():
     assert runner._arch150_intraday_ai_authority_check(repo) == ()
 
 
+def test_arch151_intraday_walkforward_checkpoint_is_source_only_and_mapped():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    name = runner.ARCH151_INTRADAY_WALKFORWARD_NAME
+    spec = specs[name]
+
+    assert name == "arch151-intraday-walkforward-foundation"
+    assert runner.ARCH151_INTRADAY_WALKFORWARD_BRANCH == (
+        "feature/research-arch151-intraday-walkforward-current"
+    )
+    assert spec.tests == runner.ARCH151_INTRADAY_WALKFORWARD_TESTS
+    assert spec.ruff_paths == runner.ARCH151_INTRADAY_WALKFORWARD_RUFF
+    assert "tests/runtime/checkpoint_runner/test_core.py" in spec.tests
+    assert "tests/runtime/checkpoint_runner/test_ci.py" in spec.tests
+    assert "tests/runtime/checkpoint_runner/test_source_authority.py" in spec.tests
+    assert "tests/experiments/test_arch151_intraday_walkforward.py" in spec.tests
+    assert (
+        "src/trading_bot/experiments/arch151_intraday_walkforward.py" in spec.ruff_paths
+    )
+    assert spec.authority_check is runner._arch151_intraday_walkforward_authority_check
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert name not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CERTIFICATION_PROFILES[name] == "full"
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, runner.ARCH151_INTRADAY_WALKFORWARD_BRANCH, "push"
+        )
+        == name
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, runner.ARCH151_INTRADAY_WALKFORWARD_BRANCH, "pull_request"
+        )
+        is None
+    )
+    assert runner._arch151_intraday_walkforward_authority_check(repo) == ()
+
+
 def test_arch150_d1_data_custody_route_is_source_only_and_diff_selected():
     repo = Path(runner.__file__).resolve().parents[1]
     specs = runner._checkpoint_specs()

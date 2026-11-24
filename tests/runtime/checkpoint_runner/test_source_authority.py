@@ -62,6 +62,11 @@ def test_classification_has_one_current_owner_and_preserves_security_evidence():
         "PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS",
         "PREPUBLICATION_INFRASTRUCTURE_PATHS",
         "PREPUBLICATION_INFRASTRUCTURE_TEST_PREFIXES",
+        "ARCH151_INTRADAY_WALKFORWARD_NAME",
+        "ARCH151_INTRADAY_WALKFORWARD_BRANCH",
+        "ARCH151_INTRADAY_WALKFORWARD_TESTS",
+        "ARCH151_INTRADAY_WALKFORWARD_RUFF",
+        "_arch151_intraday_walkforward_authority_check",
         "_prepublication_admission_tests",
         "_prepublication_requires_infrastructure_coherence",
     ):

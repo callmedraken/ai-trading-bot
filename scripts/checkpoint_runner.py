@@ -514,6 +514,21 @@ ARCH150_INTRADAY_AI_PATHS: Final = (
     "src/trading_bot/experiments/arch150_g1_validation.py",
     "tests/experiments/test_arch150_g1_validation.py",
 )
+ARCH151_INTRADAY_WALKFORWARD_NAME: Final = "arch151-intraday-walkforward-foundation"
+ARCH151_INTRADAY_WALKFORWARD_BRANCH: Final = (
+    "feature/research-arch151-intraday-walkforward-current"
+)
+ARCH151_INTRADAY_WALKFORWARD_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/experiments/test_arch151_intraday_walkforward.py",
+)
+ARCH151_INTRADAY_WALKFORWARD_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "src/trading_bot/experiments/arch151_intraday_walkforward.py",
+    "tests/experiments/test_arch151_intraday_walkforward.py",
+)
 AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: Final = "arch-ai-strategy-discovery-g1-engine"
 AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH: Final = (
     "feature/research-ai-strategy-discovery-g1-engine-current"
@@ -839,6 +854,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
     ARCH150_INTRADAY_AI_NAME,
     ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
+    ARCH151_INTRADAY_WALKFORWARD_NAME,
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
@@ -857,6 +873,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME: "full",
     ARCH150_INTRADAY_AI_NAME: "full",
     ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME: "full",
+    ARCH151_INTRADAY_WALKFORWARD_NAME: "full",
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
     ARCH147_P5A_NAME: "full",
@@ -26981,6 +26998,17 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         remote_branch=ARCH150_INTRADAY_AI_BRANCH,
         remote_head_env=None,
     )
+    values[ARCH151_INTRADAY_WALKFORWARD_NAME] = CheckpointSpec(
+        ARCH151_INTRADAY_WALKFORWARD_NAME,
+        "Source-only Architecture 151 intraday walk-forward foundation",
+        ARCH151_INTRADAY_WALKFORWARD_TESTS,
+        ARCH151_INTRADAY_WALKFORWARD_RUFF,
+        _arch151_intraday_walkforward_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+        remote_head_env=None,
+    )
     values[AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME] = CheckpointSpec(
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         "Source-only G1 daily evaluator and analysis; no campaign authority",
@@ -27640,6 +27668,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
         ARCH150_INTRADAY_AI_NAME,
         ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
+        ARCH151_INTRADAY_WALKFORWARD_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -27683,6 +27712,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH149_MONTHLY_DEFENSIVE_ROTATION_NAME,
         ARCH150_INTRADAY_AI_NAME,
         ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
+        ARCH151_INTRADAY_WALKFORWARD_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -28916,6 +28946,58 @@ def _arch150_d1_intraday_data_custody_authority_check(
         or not _arch147_current_batch_workflow_is_reviewed(workflow)
     ):
         failures.append("Architecture 150 D1 active CI projection drift")
+    return tuple(failures)
+
+
+def _arch151_intraday_walkforward_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Register the source-only Architecture 151 foundation and FULL route."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH151_INTRADAY_WALKFORWARD_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != ARCH151_INTRADAY_WALKFORWARD_TESTS
+        or spec.ruff_paths != ARCH151_INTRADAY_WALKFORWARD_RUFF
+        or spec.authority_check is not _arch151_intraday_walkforward_authority_check
+        or spec.remote_branch != ARCH151_INTRADAY_WALKFORWARD_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH151_INTRADAY_WALKFORWARD_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH151_INTRADAY_WALKFORWARD_NAME) != 1
+        or ARCH151_INTRADAY_WALKFORWARD_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(specs, ARCH151_INTRADAY_WALKFORWARD_BRANCH, "push")
+        != ARCH151_INTRADAY_WALKFORWARD_NAME
+        or resolve_ci_checkpoint(
+            specs, ARCH151_INTRADAY_WALKFORWARD_BRANCH, "pull_request"
+        )
+        is not None
+    ):
+        failures.append("Architecture 151 source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("Architecture 151 experiment tests are not FULL-owned")
+    required_paths = (
+        "src/trading_bot/experiments/arch151_intraday_walkforward.py",
+        "tests/experiments/test_arch151_intraday_walkforward.py",
+        "tests/runtime/checkpoint_runner/test_core.py",
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "tests/runtime/checkpoint_runner/test_source_authority.py",
+    )
+    for relative in required_paths:
+        if not (repo_root / relative).is_file():
+            failures.append("Architecture 151 source route is missing " + relative)
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    row = f"              {ARCH151_INTRADAY_WALKFORWARD_NAME} {chr(96)}\n"
+    if workflow.count(row) != 1 or not _arch147_current_batch_workflow_is_reviewed(
+        workflow
+    ):
+        failures.append("Architecture 151 active CI projection drift")
     return tuple(failures)
 
 

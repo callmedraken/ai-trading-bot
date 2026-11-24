@@ -1,42 +1,28 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 150 G1 terminal closeout; Architecture 151 design next
+## Current milestone - Architecture 151 design frozen; source foundation next
 
-Architecture 150 V1/V1-C1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
-INTEGRATED** at HEAD `4df84db43833edc0d1b644e2116acdfdccc5897b` / tree
-`965f1528fd0011a89696ce633600495f1e04f4d4`. Develop run `45303255286`,
-attempt 1, is terminal SUCCESS with
-`DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`,
-`IDENTITY_STABLE=True`, and no duplicate canonical FULL run.
+Architecture 150 is terminal. Its accepted validation evaluated 24 frozen slots,
+qualified 0 and returned `NO_HOLDOUT_CANDIDATES`; 2024+ remained sealed.
+Terminal coordination closeout is integrated at
+`5a51378a868402e2880da714a8cf4848cb5160c7` / tree
+`f51c641a86870fecbbcfd0f25fb4e76668e27183`; develop run `45307361953`
+is terminal SUCCESS in DOCS_ONLY mode.
 
-The real 2016-2020 G1 discovery report remains immutable at
-`F:\AI\temp\arch150-g1-discovery-3dc75767-c48c-4a99-8624-c25ccd67cbe8\discovery.json`,
-report `ec23c374-e069-59e9-9167-14b2adf3fb16`, SHA-256
-`919a0086c5bc1ba0cf919e4eb9569ef61b3a69f66dd14979ea3bec4f6b7cc34c`.
-All 24 frozen slots advanced mechanically to validation.
+Architecture 151 now owns intraday research continuation. Its frozen design
+reuses 2016-2023 SPY/QQQ sparse custody as development-visible history, scores
+five expanding walk-forward years 2019-2023, and freezes a lower-churn
+5m/15m four-family population of 16 structural programs / 32 ordered slots.
 
-The separately reviewed 2021-2023 validation observation is now CONSUMED and
-terminal at
-`F:\AI\temp\arch150-g1-validation-cb197d11-9779-46e1-8179-81bab0c8806a\validation.json`.
-Report `22f752aa-5dc1-5e42-af29-1c7e2f921175`, SHA-256
-`d3b637f410b9e8bf05d352e50efea95721151543ec6308fc270c804b5aa372c7`,
-validation freeze `5dd43922-0cb9-5f09-a1be-372b0d3dc4f6`: 24 slots evaluated,
-0 qualified, terminal `NO_HOLDOUT_CANDIDATES`, `holdout_authorized=false`.
-Validation performed 24 strategy replays and zero discovery replays, provider
-requests, credential reads, Robinhood calls, broker effects or 2024+ data
-access.
+STRESS remains 5 bps/fill. Selection-bias correction uses at least 64 effective
+search trials. Exactly zero or one final candidate may be frozen. 2024-2025
+remains the untouched local historical holdout; Jan-Oct 2026 remains a later
+recent-regime extension.
 
-Architecture 150 is terminal under its frozen contract. G2 is limited to
-structural recombinations of already frozen G1 survivors; validation produced
-zero survivors, so there is no legal G2 population and no 2024-2025 holdout or
-2026 extension access. Preserve all Arch150 evidence; do not rerun discovery or
-validation and do not mutate the failed population using visible results.
+Immediate next milestone: source-only Architecture 151 foundation and canonical
+manifest with synthetic tests. No real replay, provider/credential access,
+Robinhood/broker effect or 2024+ access is authorized.
 
-Immediate next milestone: Architecture 151 design-only intraday research.
-2016-2023 is now development-visible evidence. Keep 2024-2025 untouched as the
-final historical holdout for the successor campaign; freeze the successor
-search budget, walk-forward procedure, costs, promotion gates and candidate
-grammar before any 2024+ access.
 ---
 
 ## Prior integrated milestone context

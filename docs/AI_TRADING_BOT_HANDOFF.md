@@ -1,40 +1,34 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 G1 terminal closeout; Architecture 151 design next
+## Current milestone: Architecture 151 design frozen; source foundation next
 
-Architecture 150 V1/V1-C1 is accepted and integrated at
-`4df84db43833edc0d1b644e2116acdfdccc5897b` / tree
-`965f1528fd0011a89696ce633600495f1e04f4d4`. Develop run
-`45303255286`, attempt 1, is terminal SUCCESS with exact feature-certification
-reuse, stable identity and no duplicate FULL.
-
-Accepted Arch150 discovery evidence:
-`F:\AI\temp\arch150-g1-discovery-3dc75767-c48c-4a99-8624-c25ccd67cbe8\discovery.json`;
-report `ec23c374-e069-59e9-9167-14b2adf3fb16`; SHA-256
-`919a0086c5bc1ba0cf919e4eb9569ef61b3a69f66dd14979ea3bec4f6b7cc34c`;
-candidate freeze `84367c0f-74d4-5125-a2f3-71f5a9ad6014`. Discovery is consumed
-and must not be rerun.
-
-Accepted Arch150 validation evidence:
+Architecture 150 is terminal and must not be rerun or mutated. Accepted
+validation evidence remains at
 `F:\AI\temp\arch150-g1-validation-cb197d11-9779-46e1-8179-81bab0c8806a\validation.json`;
-report `22f752aa-5dc1-5e42-af29-1c7e2f921175`; SHA-256
-`d3b637f410b9e8bf05d352e50efea95721151543ec6308fc270c804b5aa372c7`;
-86,066 bytes; validation freeze `5dd43922-0cb9-5f09-a1be-372b0d3dc4f6`.
-Exactly 24 frozen slots were evaluated and 0 qualified.
-`TERMINAL_DISPOSITION=NO_HOLDOUT_CANDIDATES`,
-`HOLDOUT_AUTHORIZED=False`, `2024_PLUS_DATA_ACCESSED=False`; provider,
-credential, Robinhood and broker-effect counters are zero.
+report `22f752aa-5dc1-5e42-af29-1c7e2f921175`, SHA-256
+`d3b637f410b9e8bf05d352e50efea95721151543ec6308fc270c804b5aa372c7`,
+24 evaluated / 0 qualified / `NO_HOLDOUT_CANDIDATES`.
 
-Arch150 is terminal. Its G2 contract allows only recombinations of frozen G1
-survivors, and there are none. Do not open 2024-2025, do not run the 2026
-extension, and do not tune/rerun Arch150 from visible discovery or validation
-P&L.
+Architecture 151 is the successor design. Development is limited to accepted
+2016-2023 SPY/QQQ sparse custody. Five scored years 2019-2023 use only earlier
+history for fold calibration. The canonical population is exactly 16 structural
+programs across four families, two 5m and two 15m per family, evaluated SPY then
+QQQ for 32 total slots.
 
-Exact continuation boundary: begin Architecture 151 as a design-only successor
-campaign. Treat 2016-2023 as development-visible. Preserve 2024-2025 as untouched
-final holdout and do not access it until the complete Architecture 151 candidate
-grammar, search budget, walk-forward/development procedure, cost cases,
-selection-bias correction and promotion gates are source-frozen.
+Families: regime-filtered noise/VWAP breakout; opening-range breakout retest;
+VWAP-deviation mean reversion; cross-ETF confirmed trend pullback. All are
+long-or-flat, session-flat and unleveraged. STRESS remains 5 bps/fill and churn
+is capped at two round trips/session.
+
+Selection-bias correction uses at least 64 effective trials and freezes exactly
+zero or one final candidate. 2024-2025 is sealed until that freeze exists;
+Jan-Oct 2026 is sealed until holdout PASS.
+
+Exact continuation boundary: implement source-only Architecture 151 types,
+canonical manifest, deterministic 5m/15m aggregation, walk-forward chronology,
+qualification/selection-bias records and 2024+ firewall with synthetic tests
+only. No real replay or external effect is authorized.
+
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
 
 V1 scope is fixed: intraday-only, long-only, at most one of TQQQ/SQQQ, QQQ as the primary direction reference, two completed-bar confirmation, no same-cycle inverse flip, and forced flat beginning five minutes before official regular-session close. The source-owned hard stop is 3.00% below the reconciled average entry fill and may never be widened. Live readiness requires proving exact full-position stop protection; a broker stop-market order is preferred and software independently treats threshold breach as mandatory EXIT.

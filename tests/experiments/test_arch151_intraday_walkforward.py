@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import FrozenInstanceError, replace
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from functools import cache
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -21,8 +22,10 @@ from trading_bot.experiments.arch151_intraday_walkforward import (
     AggregateBar,
     AmbiguousIntraminuteRule,
     Arch151Error,
+    Arch151Program,
     BarResolution,
     CausalExecutionPolicy,
+    FamilyAMeasureScope,
     FillCostApplicationRule,
     FillCostCase,
     FinalObservedBarRule,
@@ -49,6 +52,7 @@ from trading_bot.experiments.arch151_intraday_walkforward import (
     exact_cross_etf_confirmation,
     family_a_breakout_level,
     family_a_entry_signal,
+    family_a_historical_session_measure,
     family_a_initial_risk,
     family_a_session_measure,
     family_b_entry_signal,
@@ -156,7 +160,31 @@ def _flat_aggregate_session(
     ]
 
 
-def _a_history_measures(scored_year: int = 2023):
+@cache
+def _full_session_minutes(
+    session: date,
+    symbol: str = "SPY",
+    *,
+    first_30m_close: str = "100.1",
+) -> tuple[OneMinuteBar, ...]:
+    schedule = _AUTHORITY.schedule_for(session)
+    assert schedule is not None
+    session_minutes = int(
+        (schedule.closes_at - schedule.opens_at).total_seconds() // 60
+    )
+    return tuple(
+        _minute(
+            symbol,
+            session,
+            offset,
+            close=first_30m_close if offset == 29 else "100",
+        )
+        for offset in range(session_minutes)
+    )
+
+
+@cache
+def _a_history_measures(scored_year: int = 2023, symbol: str = "SPY"):
     sessions = tuple(
         session
         for session in _AUTHORITY.published.sessions
@@ -164,20 +192,13 @@ def _a_history_measures(scored_year: int = 2023):
     )[-60:]
     records = []
     for session in sessions:
-        bars = tuple(
-            _minute(
-                "SPY",
-                session,
-                offset,
-                close="100.1" if offset == 29 else "100",
-            )
-            for offset in range(30)
+        records.append(
+            family_a_historical_session_measure(_full_session_minutes(session, symbol))
         )
-        records.append(family_a_session_measure(bars))
     return tuple(records)
 
 
-def _a_reachable_inputs(program):
+def _a_reachable_inputs(program, symbol: str = "SPY"):
     schedule = _AUTHORITY.schedule_for(_NORMAL_DAY)
     assert schedule is not None
     start = program.entry_window.start
@@ -195,6 +216,7 @@ def _a_reachable_inputs(program):
             open_price=Decimal("100.9"),
             high=Decimal("101.1"),
             low=Decimal("100.8"),
+            symbol=symbol,
         )
     confirmation = tuple(
         VwapObservation(
@@ -202,9 +224,9 @@ def _a_reachable_inputs(program):
         )
         for index in range(first_index, first_index + count)
     )
-    first_30 = tuple(_minute("SPY", _NORMAL_DAY, offset) for offset in range(30))
+    first_30 = tuple(_minute(symbol, _NORMAL_DAY, offset) for offset in range(30))
     measure = family_a_session_measure(first_30)
-    calibration = calibrate_family_a(program, _a_history_measures(), 2023)
+    calibration = calibrate_family_a(program, _a_history_measures(symbol=symbol), 2023)
     return calibration, measure, confirmation
 
 
@@ -231,7 +253,6 @@ def _b_reachable_session(program):
         final_reclaim_index
         - parameters.reclaim_confirmation_bars
         - parameters.breakout_confirmation_bars
-        + 1
     )
     breakout_level = Decimal("100") * (
         Decimal(1) + parameters.breakout_buffer_bps / Decimal(10000)
@@ -277,7 +298,65 @@ def _b_reachable_session(program):
             low=previous_high + Decimal("0.01"),
         )
         previous_high = bars[index].high
-    return bars
+    return bars[: final_reclaim_index + 1]
+
+
+def _b_case(program_key: ProgramKey = ProgramKey.B5_01):
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is program_key)
+    bars = _flat_aggregate_session(_NORMAL_DAY, program.resolution)
+    opening_count = program.parameters.opening_range_minutes // int(program.resolution)
+    level = max(bar.high for bar in bars[:opening_count]) * (
+        Decimal(1) + program.parameters.breakout_buffer_bps / Decimal(10000)
+    )
+    return program, bars, level
+
+
+def _set_b_case_bar(
+    bars: list[AggregateBar],
+    program: Arch151Program,
+    index: int,
+    *,
+    close: Decimal,
+    low: Decimal,
+) -> None:
+    bars[index] = _bar_at(
+        _NORMAL_DAY,
+        program.resolution,
+        index,
+        close,
+        low=low,
+    )
+
+
+def _set_b_valid_setup(
+    bars: list[AggregateBar],
+    program: Arch151Program,
+    level: Decimal,
+    breakout_index: int,
+    retest_index: int,
+    reclaim_index: int,
+) -> None:
+    _set_b_case_bar(
+        bars,
+        program,
+        breakout_index,
+        close=level + Decimal("0.10"),
+        low=level + Decimal("0.03"),
+    )
+    _set_b_case_bar(
+        bars,
+        program,
+        retest_index,
+        close=level + Decimal("0.02"),
+        low=level,
+    )
+    _set_b_case_bar(
+        bars,
+        program,
+        reclaim_index,
+        close=level + Decimal("0.12"),
+        low=level + Decimal("0.04"),
+    )
 
 
 def _c_reachable_inputs(program):
@@ -331,12 +410,17 @@ def _c_reachable_inputs(program):
     return history, signal, bars
 
 
-def _d_reachable_inputs(program):
+def _d_reachable_inputs(
+    program,
+    *,
+    gap_symbol: str | None = None,
+    gap_index: int | None = None,
+):
     parameters = program.parameters
     resolution = program.resolution
     target = _flat_aggregate_session(_NORMAL_DAY, resolution)
     confirming = _flat_aggregate_session(_NORMAL_DAY, resolution, Decimal("100"))
-    minimum_setup_index = max(
+    minimum_setup_index = (gap_index + 1 if gap_index is not None else 0) + max(
         parameters.ema_slow + 2,
         parameters.atr_lookback + 1,
         parameters.swing_peak_window_bars,
@@ -408,8 +492,18 @@ def _d_reachable_inputs(program):
             low=previous_high + Decimal("0.001"),
         )
         previous_high = target[index].high
-    confirming_vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in confirming)
-    return target, confirming, confirming_vwaps
+    confirming_vwaps = [VwapObservation(bar, Decimal("90")) for bar in confirming]
+    if gap_index is not None:
+        if gap_symbol == "SPY":
+            del target[gap_index]
+        elif gap_symbol == "QQQ":
+            del confirming[gap_index]
+            del confirming_vwaps[gap_index]
+        else:
+            raise ValueError("gap_symbol must name the target or confirming ETF")
+    elif gap_symbol is not None:
+        raise ValueError("gap_index is required when a symbol gap is requested")
+    return target, confirming, tuple(confirming_vwaps)
 
 
 def _fold_metrics_for_year(year, profile=None):
@@ -774,22 +868,128 @@ def test_family_a_rejects_off_grid_and_mismatched_session_observations() -> None
         family_a_entry_signal(program, calibration, measure, other_session)
 
 
+def test_family_a_calibrations_are_independent_and_bound_to_symbol() -> None:
+    program = CANONICAL_PROGRAMS[0]
+    spy = calibrate_family_a(program, _a_history_measures(symbol="SPY"), 2023)
+    qqq = calibrate_family_a(program, _a_history_measures(symbol="QQQ"), 2023)
+
+    assert spy.symbol == "SPY"
+    assert qqq.symbol == "QQQ"
+    assert spy.noise_return == qqq.noise_return
+    assert spy.regime_median_return == qqq.regime_median_return
+    assert spy.calibration_id != qqq.calibration_id
+    assert spy.calibration_fingerprint != qqq.calibration_fingerprint
+
+
+def test_family_a_calibration_rejects_mixed_symbol_history() -> None:
+    program = CANONICAL_PROGRAMS[0]
+    spy_history = _a_history_measures(symbol="SPY")
+    qqq_same_date = family_a_historical_session_measure(
+        _full_session_minutes(spy_history[0].session_date, "QQQ")
+    )
+
+    with pytest.raises(Arch151Error, match="mixes instruments"):
+        calibrate_family_a(program, (qqq_same_date, *spy_history[1:]), 2023)
+
+
+@pytest.mark.parametrize(
+    ("calibration_symbol", "current_symbol"),
+    [("SPY", "QQQ"), ("QQQ", "SPY")],
+)
+def test_family_a_rejects_both_calibration_to_current_symbol_mismatches(
+    calibration_symbol: str,
+    current_symbol: str,
+) -> None:
+    program = CANONICAL_PROGRAMS[0]
+    calibration = calibrate_family_a(
+        program, _a_history_measures(symbol=calibration_symbol), 2023
+    )
+    _, current, confirmation = _a_reachable_inputs(program, current_symbol)
+
+    with pytest.raises(Arch151Error, match="source-bound"):
+        family_a_entry_signal(program, calibration, current, confirmation)
+    with pytest.raises(Arch151Error, match="binding"):
+        arch151.family_a_regime_passes(program, calibration, current)
+    with pytest.raises(Arch151Error, match="breakout inputs"):
+        family_a_breakout_level(program, calibration, current)
+    with pytest.raises(Arch151Error, match="risk inputs"):
+        family_a_initial_risk(program, calibration, current, Decimal("100"))
+
+
+def test_family_a_rejects_confirmation_symbol_mismatch() -> None:
+    program = CANONICAL_PROGRAMS[0]
+    calibration, current, _ = _a_reachable_inputs(program, "SPY")
+    _, _, qqq_confirmation = _a_reachable_inputs(program, "QQQ")
+
+    with pytest.raises(Arch151Error, match="confirmation instrument"):
+        family_a_entry_signal(program, calibration, current, qqq_confirmation)
+
+
+def test_family_a_historical_measure_requires_every_scheduled_session_minute() -> None:
+    regular_session = _full_session_minutes(_NORMAL_DAY)
+    assert len(regular_session) == 390
+    measured = family_a_historical_session_measure(regular_session)
+    assert measured.measure_scope is FamilyAMeasureScope.COMPLETE_HISTORICAL_SESSION
+    assert measured.symbol == "SPY"
+
+    with pytest.raises(UnavailableIndicatorError, match="complete published session"):
+        family_a_historical_session_measure(regular_session[:-1])
+
+
+def test_family_a_historical_measure_uses_published_early_close_length() -> None:
+    early_close = date(2023, 11, 24)
+    schedule = _AUTHORITY.schedule_for(early_close)
+    assert schedule is not None
+    assert schedule.closes_at.astimezone(_NY).time() == time(13, 0)
+    bars = _full_session_minutes(early_close, "QQQ")
+    assert len(bars) == 210
+
+    measured = family_a_historical_session_measure(bars)
+    assert measured.symbol == "QQQ"
+    assert measured.measure_scope is FamilyAMeasureScope.COMPLETE_HISTORICAL_SESSION
+
+
+def test_family_a_current_opening_measure_is_causal_without_future_bars() -> None:
+    first_30 = _full_session_minutes(_NORMAL_DAY, "QQQ")[:30]
+    current = family_a_session_measure(first_30)
+
+    assert current.symbol == "QQQ"
+    assert current.measure_scope is FamilyAMeasureScope.CURRENT_OPENING_WINDOW
+    with pytest.raises(UnavailableIndicatorError, match="exactly 30"):
+        family_a_session_measure((*first_30, _minute("QQQ", _NORMAL_DAY, 30)))
+    with pytest.raises(UnavailableIndicatorError, match="complete published session"):
+        family_a_historical_session_measure(first_30)
+    with pytest.raises(Arch151Error, match="complete published historical"):
+        calibrate_family_a(
+            CANONICAL_PROGRAMS[0], (*_a_history_measures(), current), 2023
+        )
+
+
 def test_family_a_calibration_is_prior_only_dimensionless_and_frozen() -> None:
     program = CANONICAL_PROGRAMS[0]
     calibration = calibrate_family_a(program, _a_history_measures(), 2023)
+    assert calibration.symbol == "SPY"
     assert calibration.noise_return == Decimal("0.001")
     assert calibration.regime_median_return == Decimal("0.001")
     current = family_a_session_measure(
         tuple(_minute("SPY", _NORMAL_DAY, i) for i in range(30))
     )
+    assert current.measure_scope is FamilyAMeasureScope.CURRENT_OPENING_WINDOW
     _, measure, confirmation = _a_reachable_inputs(program)
     assert current.absolute_return == 0
     assert measure == current
     assert (
         family_a_entry_signal(program, calibration, measure, confirmation) is not None
     )
+    current_year_complete = family_a_historical_session_measure(
+        _full_session_minutes(_NORMAL_DAY)
+    )
     with pytest.raises(Arch151Error, match="before scored year"):
-        calibrate_family_a(program, (*_a_history_measures(), measure), 2023)
+        calibrate_family_a(
+            program, (*_a_history_measures(), current_year_complete), 2023
+        )
+    with pytest.raises(FrozenInstanceError):
+        calibration.noise_return = Decimal("99")
     altered_bar = replace(
         confirmation[1].bar,
         timestamp=confirmation[1].bar.timestamp + timedelta(minutes=5),
@@ -801,12 +1001,16 @@ def test_family_a_calibration_is_prior_only_dimensionless_and_frozen() -> None:
 
 def test_family_a_uses_price_times_dimensionless_noise_for_stop_risk() -> None:
     program = CANONICAL_PROGRAMS[0]
-    calibration = calibrate_family_a(program, _a_history_measures(), 2023)
-    level = family_a_breakout_level(program, calibration, Decimal("100"))
-    assert level == Decimal("100.07500")
-    stop, risk = family_a_initial_risk(program, calibration, Decimal("100"))
-    assert stop == Decimal("99.875000")
-    assert risk == Decimal("0.125000")
+    calibration, current_session, _ = _a_reachable_inputs(program)
+    level = family_a_breakout_level(program, calibration, current_session)
+    assert level.symbol == "SPY"
+    assert level.calibration_id == calibration.calibration_id
+    assert level.level == Decimal("100.07500")
+    risk = family_a_initial_risk(program, calibration, current_session, Decimal("100"))
+    assert risk.symbol == "SPY"
+    assert risk.calibration_id == calibration.calibration_id
+    assert risk.stop_reference_price == Decimal("99.875000")
+    assert risk.risk_distance == Decimal("0.125000")
 
 
 def test_family_c_deviation_is_normalized_and_stop_converts_to_price_distance() -> None:
@@ -835,6 +1039,7 @@ def test_all_sixteen_programs_have_behaviorally_reachable_entry_predicates(
             calibration, measure, confirmation = _a_reachable_inputs(program)
             signal = family_a_entry_signal(program, calibration, measure, confirmation)
             assert signal is not None, program.key
+            assert signal.symbol == calibration.symbol == measure.symbol
             assert (
                 len(signal.confirmation_timestamps)
                 == program.parameters.confirmation_bars
@@ -886,6 +1091,149 @@ def test_all_sixteen_programs_have_behaviorally_reachable_entry_predicates(
             assert signal is not None, program.key
             assert signal.confirming_symbol == "QQQ"
             assert signal.stop_reference_price < signal.pullback_low < signal.swing_peak
+
+
+@pytest.mark.parametrize("failure_stage", ["retest", "reclaim"])
+def test_family_b_recovers_with_a_fresh_setup_after_failure(failure_stage: str) -> None:
+    program, bars, level = _b_case()
+    if failure_stage == "retest":
+        _set_b_case_bar(
+            bars,
+            program,
+            6,
+            close=level + Decimal("0.10"),
+            low=level + Decimal("0.03"),
+        )
+        _set_b_case_bar(
+            bars,
+            program,
+            7,
+            close=level + Decimal("0.02"),
+            low=level * Decimal("0.997"),
+        )
+        valid_breakout, retest, reclaim = 8, 9, 10
+    else:
+        _set_b_valid_setup(bars, program, level, 6, 7, 8)
+        _set_b_case_bar(bars, program, 8, close=level, low=level - Decimal("0.01"))
+        valid_breakout, retest, reclaim = 9, 10, 11
+
+    _set_b_valid_setup(bars, program, level, valid_breakout, retest, reclaim)
+    signal = family_b_entry_signal(program, bars[: reclaim + 1])
+
+    assert signal is not None
+    assert signal.breakout_confirmation_timestamps == (bars[valid_breakout].timestamp,)
+    assert signal.retest_timestamp == bars[retest].timestamp
+    assert signal.reclaim_timestamps == (bars[reclaim].timestamp,)
+
+
+def test_family_b_recovers_after_a_missing_post_opening_bucket() -> None:
+    program, bars, level = _b_case()
+    _set_b_case_bar(
+        bars,
+        program,
+        6,
+        close=level + Decimal("0.10"),
+        low=level + Decimal("0.03"),
+    )
+    _set_b_valid_setup(bars, program, level, 8, 9, 10)
+    sparse = (*bars[:7], *bars[8:11])
+
+    signal = family_b_entry_signal(program, sparse)
+
+    assert signal is not None
+    assert signal.breakout_confirmation_timestamps == (bars[8].timestamp,)
+    assert signal.retest_timestamp == bars[9].timestamp
+    assert signal.reclaim_timestamps == (bars[10].timestamp,)
+
+
+def test_family_b_missing_or_incomplete_opening_range_fails_closed() -> None:
+    program, bars, _ = _b_case()
+    missing_opening_bar = (*bars[:2], *bars[3:12])
+
+    with pytest.raises(
+        UnavailableIndicatorError,
+        match="opening range must be complete and session aligned",
+    ):
+        family_b_entry_signal(program, missing_opening_bar)
+
+
+def test_family_b_retest_deadline_includes_exact_final_subsequent_bar() -> None:
+    program, bars, level = _b_case()
+    final_breakout = 6
+    deadline_retest = final_breakout + program.parameters.retest_deadline_bars
+    upper = level * (
+        Decimal(1) + program.parameters.retest_tolerance_bps / Decimal(10000)
+    )
+    _set_b_case_bar(
+        bars,
+        program,
+        final_breakout,
+        close=level + Decimal("0.10"),
+        low=level + Decimal("0.03"),
+    )
+    for index in range(final_breakout + 1, deadline_retest):
+        _set_b_case_bar(
+            bars,
+            program,
+            index,
+            close=upper + Decimal("0.10"),
+            low=upper + Decimal("0.05"),
+        )
+    _set_b_case_bar(
+        bars,
+        program,
+        deadline_retest,
+        close=level + Decimal("0.02"),
+        low=level,
+    )
+    _set_b_case_bar(
+        bars,
+        program,
+        deadline_retest + 1,
+        close=level + Decimal("0.12"),
+        low=level + Decimal("0.04"),
+    )
+
+    signal = family_b_entry_signal(program, bars[: deadline_retest + 2])
+
+    assert signal is not None
+    assert signal.retest_timestamp == bars[deadline_retest].timestamp
+
+    late_bars = list(bars)
+    _set_b_case_bar(
+        late_bars,
+        program,
+        deadline_retest,
+        close=upper + Decimal("0.10"),
+        low=upper + Decimal("0.05"),
+    )
+    _set_b_case_bar(
+        late_bars,
+        program,
+        deadline_retest + 1,
+        close=level,
+        low=level,
+    )
+    _set_b_case_bar(
+        late_bars,
+        program,
+        deadline_retest + 2,
+        close=level + Decimal("0.12"),
+        low=level + Decimal("0.04"),
+    )
+    assert family_b_entry_signal(program, late_bars[: deadline_retest + 3]) is None
+
+
+def test_family_b_signal_is_bound_to_current_reclaim_completion() -> None:
+    program, bars, level = _b_case()
+    _set_b_valid_setup(bars, program, level, 6, 7, 8)
+
+    signal = family_b_entry_signal(program, bars[:9])
+
+    assert signal is not None
+    assert signal.signal_timestamp == bars[8].completed_at
+    assert signal.reclaim_timestamps == (bars[8].timestamp,)
+    assert family_b_entry_signal(program, bars[:10]) is None
 
 
 def test_family_c_rejects_insufficient_warmup_and_zero_er_denominator() -> None:
@@ -973,8 +1321,23 @@ def test_family_d_ema_atr_and_cross_confirmation_reset_at_gaps() -> None:
     ema = ema_series(up, 8)
     assert ema[:7] == (None,) * 7
     assert ema[7] == sum((bar.close for bar in up[:8]), Decimal(0)) / Decimal(8)
+    assert ema_series(up[:7], 8) == (None,) * 7
+
+    sparse_local = (*up[:5], *up[6:])
+    local_ema = ema_series(sparse_local, 3)
+    assert local_ema[5:7] == (None, None)
+    assert local_ema[7] == sum((bar.close for bar in up[6:9]), Decimal(0)) / Decimal(3)
+    sparse_confirming = tuple(replace(bar, symbol="QQQ") for bar in sparse_local)
+    confirming_ema = ema_series(sparse_confirming, 3)
+    assert confirming_ema[5:7] == (None, None)
+    assert confirming_ema[7] == local_ema[7]
+
     atr = average_true_range(up[5:20], 14)
     assert atr > 0
+    with pytest.raises(UnavailableIndicatorError, match="exactly 15"):
+        average_true_range(up[5:19], 14)
+    with pytest.raises(UnavailableIndicatorError, match="gap"):
+        average_true_range((up[0], up[1], up[3]), 2)
     target = up[-2:]
     other = tuple(replace(bar, symbol="QQQ") for bar in target)
     assert len(exact_cross_etf_confirmation(target, other, 2)) == 2
@@ -1011,6 +1374,66 @@ def test_family_d_vwap_observations_bind_exact_confirming_bars() -> None:
     for invalid in (reordered, wrong_symbol, stale):
         with pytest.raises(UnavailableIndicatorError, match="not exactly bar aligned"):
             family_d_entry_signal(program, target, confirming, invalid)
+
+
+@pytest.mark.parametrize("gap_symbol", ["SPY", "QQQ"])
+def test_family_d_reseeds_and_finds_fresh_signal_after_either_symbol_gap(
+    gap_symbol: str,
+) -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    target, confirming, vwaps = _d_reachable_inputs(
+        program, gap_symbol=gap_symbol, gap_index=1
+    )
+
+    signal = family_d_entry_signal(program, target, confirming, vwaps)
+
+    assert signal is not None
+    assert signal.setup_timestamp > target[0].timestamp
+    assert signal.signal_timestamp >= signal.setup_timestamp
+    assert signal.confirming_symbol == "QQQ"
+
+
+def test_family_d_does_not_bridge_cross_confirmation_across_a_gap() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    target, confirming, vwaps = _d_reachable_inputs(program)
+    original = family_d_entry_signal(program, target, confirming, vwaps)
+    assert original is not None
+    signal_index = next(
+        index
+        for index, bar in enumerate(target)
+        if bar.timestamp == original.signal_timestamp
+    )
+    missing_confirmation_index = signal_index - 1
+    gapped_confirming = tuple(
+        bar
+        for index, bar in enumerate(confirming)
+        if index != missing_confirmation_index
+    )
+    gapped_vwaps = tuple(
+        observation
+        for index, observation in enumerate(vwaps)
+        if index != missing_confirmation_index
+    )
+
+    assert (
+        family_d_entry_signal(program, target, gapped_confirming, gapped_vwaps) is None
+    )
+
+
+def test_family_d_gap_near_close_without_fresh_warmup_has_no_signal() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    target = _flat_aggregate_session(_NORMAL_DAY, program.resolution)
+    confirming = [
+        replace(bar, symbol="QQQ")
+        for bar in _flat_aggregate_session(
+            _NORMAL_DAY, program.resolution, Decimal("100")
+        )
+    ]
+    gap_index = len(target) - 3
+    del target[gap_index]
+    vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in confirming)
+
+    assert family_d_entry_signal(program, target, confirming, vwaps) is None
 
 
 def test_causal_execution_policy_and_cost_cases_are_closed_contracts() -> None:
@@ -1074,11 +1497,16 @@ def test_causal_execution_policy_and_cost_cases_are_closed_contracts() -> None:
 
 def test_signal_predicates_and_result_types_are_public_api() -> None:
     public_names = (
+        "FamilyABreakoutLevel",
+        "FamilyAInitialRisk",
+        "FamilyAMeasureScope",
+        "FamilyASessionMeasure",
         "NoiseBreakoutSignal",
         "OpeningRangeRetestSignal",
         "VwapMeanReversionSignal",
         "TrendPullbackSignal",
         "family_a_entry_signal",
+        "family_a_historical_session_measure",
         "family_b_entry_signal",
         "family_c_entry_signal",
         "family_c_reversion_exit",

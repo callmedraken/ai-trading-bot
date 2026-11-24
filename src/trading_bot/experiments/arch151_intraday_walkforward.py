@@ -27,7 +27,7 @@ SLOT_SCHEMA = "arch151-intraday-walkforward-trial-slot/v1"
 MANIFEST_SCHEMA = "arch151-intraday-walkforward-population/v1"
 BAR_SCHEMA = "arch151-intraday-walkforward-bar/v1"
 AGGREGATION_SCHEMA = "arch151-sparse-aggregate/v1"
-CALIBRATION_SCHEMA = "arch151-family-a-calibration/v1"
+CALIBRATION_SCHEMA = "arch151-family-a-calibration/v2"
 EXECUTION_POLICY_SCHEMA = "arch151-causal-execution-policy/v1"
 SEMANTIC_CONTRACT_VERSION = "arch151-frozen-design-2026-11-23/v1"
 IDENTITY_NAMESPACE_SEED = (
@@ -47,7 +47,7 @@ _PROGRAM_NAMESPACE = uuid5(_ROOT_NAMESPACE, "program-identity/v1")
 _SLOT_NAMESPACE = uuid5(_ROOT_NAMESPACE, "trial-slot-identity/v1")
 _MANIFEST_NAMESPACE = uuid5(_ROOT_NAMESPACE, "population-identity/v1")
 _AGGREGATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "sparse-aggregation/v1")
-_CALIBRATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "family-a-calibration/v1")
+_CALIBRATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "family-a-calibration/v2")
 _FOLD_NAMESPACE = uuid5(_ROOT_NAMESPACE, "walk-forward-fold/v1")
 _EVALUATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "fold-evaluation/v1")
 _LEDGER_NAMESPACE = uuid5(_ROOT_NAMESPACE, "prior-trial-ledger/v1")
@@ -1265,10 +1265,17 @@ def contiguous_aggregate_bars(
     return materialized
 
 
+class FamilyAMeasureScope(StrEnum):
+    CURRENT_OPENING_WINDOW = "CURRENT_OPENING_WINDOW"
+    COMPLETE_HISTORICAL_SESSION = "COMPLETE_HISTORICAL_SESSION"
+
+
 @dataclass(frozen=True, slots=True, init=False)
 class FamilyASessionMeasure:
-    """Dimensionless absolute first-30-minute return from a complete session."""
+    """Dimensionless first-30-minute return with symbol and completeness proof."""
 
+    symbol: str
+    measure_scope: FamilyAMeasureScope
     session_date: date
     session_open: Decimal
     first_30m_close: Decimal
@@ -1277,6 +1284,8 @@ class FamilyASessionMeasure:
 
     def __init__(
         self,
+        symbol: str,
+        measure_scope: FamilyAMeasureScope,
         session_date: date,
         session_open: Decimal,
         first_30m_close: Decimal,
@@ -1286,7 +1295,11 @@ class FamilyASessionMeasure:
         _seal: object = None,
     ) -> None:
         if _seal is not _FAMILY_A_MEASURE_SEAL:
-            raise Arch151Error("Family A measures require 30 exact session minutes")
+            raise Arch151Error("Family A measures must come from validated bars")
+        if symbol not in INITIAL_UNIVERSE:
+            raise Arch151Error("Family A measure symbol is outside frozen SPY/QQQ")
+        if type(measure_scope) is not FamilyAMeasureScope:
+            raise TypeError("Family A measure scope must be a closed enum")
         opening = _decimal(session_open, "session_open")
         closing = _decimal(first_30m_close, "first_30m_close")
         measured = _decimal(absolute_return, "absolute_return")
@@ -1303,6 +1316,8 @@ class FamilyASessionMeasure:
         if measured != expected:
             raise Arch151Error("Family A measure return does not match its prices")
         for name, value in (
+            ("symbol", symbol),
+            ("measure_scope", measure_scope),
             ("session_date", session_date),
             ("session_open", opening),
             ("first_30m_close", closing),
@@ -1312,13 +1327,36 @@ class FamilyASessionMeasure:
             object.__setattr__(self, name, value)
 
 
+def _family_a_measure_from_exact_session(
+    materialized: tuple[OneMinuteBar, ...],
+    scope: FamilyAMeasureScope,
+) -> FamilyASessionMeasure:
+    first = materialized[0]
+    first_30m = materialized[:30]
+    with localcontext(_DECIMAL_CONTEXT):
+        value = abs(first_30m[-1].close / first.open - Decimal(1))
+    digest = sha256(
+        _canonical_json([_bar_material(bar) for bar in materialized])
+    ).hexdigest()
+    return FamilyASessionMeasure(
+        first.symbol,
+        scope,
+        first.session_date,
+        first.open,
+        first_30m[-1].close,
+        value,
+        digest,
+        _seal=_FAMILY_A_MEASURE_SEAL,
+    )
+
+
 def family_a_session_measure(bars: Iterable[OneMinuteBar]) -> FamilyASessionMeasure:
-    """Derive a complete first-30-minute absolute return from 30 exact minutes."""
+    """Measure only the exact opening 30 minutes available at decision time."""
 
     materialized = _validated_minutes(bars)
     if len(materialized) != 30:
         raise UnavailableIndicatorError(
-            "Family A requires all 30 first-session minutes"
+            "current Family A measure requires exactly 30 opening minutes"
         )
     first = materialized[0]
     schedule = _SESSION_AUTHORITY.schedule_for(first.session_date)
@@ -1329,18 +1367,35 @@ def family_a_session_measure(bars: Iterable[OneMinuteBar]) -> FamilyASessionMeas
     )
     if tuple(bar.timestamp for bar in materialized) != expected:
         raise UnavailableIndicatorError("Family A first-30-minute window is incomplete")
-    with localcontext(_DECIMAL_CONTEXT):
-        value = abs(materialized[-1].close / first.open - Decimal(1))
-    digest = sha256(
-        _canonical_json([_bar_material(bar) for bar in materialized])
-    ).hexdigest()
-    return FamilyASessionMeasure(
-        first.session_date,
-        first.open,
-        materialized[-1].close,
-        value,
-        digest,
-        _seal=_FAMILY_A_MEASURE_SEAL,
+    return _family_a_measure_from_exact_session(
+        materialized, FamilyAMeasureScope.CURRENT_OPENING_WINDOW
+    )
+
+
+def family_a_historical_session_measure(
+    bars: Iterable[OneMinuteBar],
+) -> FamilyASessionMeasure:
+    """Measure first-30 return only after an exact full XNYS session is observed."""
+
+    materialized = _validated_minutes(bars)
+    first = materialized[0]
+    schedule = _SESSION_AUTHORITY.schedule_for(first.session_date)
+    assert schedule is not None
+    open_utc = schedule.opens_at.astimezone(UTC)
+    close_utc = schedule.closes_at.astimezone(UTC)
+    session_minutes = int((close_utc - open_utc).total_seconds() // 60)
+    expected = tuple(
+        open_utc + timedelta(minutes=offset) for offset in range(session_minutes)
+    )
+    if (
+        len(materialized) != session_minutes
+        or tuple(bar.timestamp for bar in materialized) != expected
+    ):
+        raise UnavailableIndicatorError(
+            "historical Family A measure requires the complete published session"
+        )
+    return _family_a_measure_from_exact_session(
+        materialized, FamilyAMeasureScope.COMPLETE_HISTORICAL_SESSION
     )
 
 
@@ -1349,6 +1404,7 @@ class FamilyACalibration:
     """Frozen pre-score-year noise and regime statistics for one A program."""
 
     program_key: ProgramKey
+    symbol: str
     scored_year: int
     noise_return: Decimal
     regime_median_return: Decimal
@@ -1359,6 +1415,7 @@ class FamilyACalibration:
     def __init__(
         self,
         program_key: ProgramKey,
+        symbol: str,
         scored_year: int,
         noise_return: Decimal,
         regime_median_return: Decimal,
@@ -1370,6 +1427,8 @@ class FamilyACalibration:
     ) -> None:
         if _seal is not _FAMILY_A_CALIBRATION_SEAL:
             raise Arch151Error("Family A calibration must come from source calibration")
+        if symbol not in INITIAL_UNIVERSE:
+            raise Arch151Error("Family A calibration symbol is outside frozen SPY/QQQ")
         noise = _decimal(noise_return, "noise_return")
         regime = _decimal(regime_median_return, "regime_median_return")
         if noise < 0 or regime < 0:
@@ -1380,6 +1439,7 @@ class FamilyACalibration:
             raise TypeError("calibration identity is invalid")
         for name, value in (
             ("program_key", program_key),
+            ("symbol", symbol),
             ("scored_year", scored_year),
             ("noise_return", noise),
             ("regime_median_return", regime),
@@ -1409,6 +1469,19 @@ def calibrate_family_a(
     materialized = tuple(observations)
     if any(type(item) is not FamilyASessionMeasure for item in materialized):
         raise TypeError("calibration inputs must be complete Family A session measures")
+    if not materialized:
+        raise UnavailableIndicatorError("Family A calibration history is empty")
+    if any(
+        item.measure_scope is not FamilyAMeasureScope.COMPLETE_HISTORICAL_SESSION
+        for item in materialized
+    ):
+        raise Arch151Error(
+            "calibration accepts only complete published historical sessions"
+        )
+    symbols = {item.symbol for item in materialized}
+    if len(symbols) != 1:
+        raise Arch151Error("Family A calibration history mixes instruments")
+    symbol = next(iter(symbols))
     dates = tuple(item.session_date for item in materialized)
     if dates != tuple(sorted(set(dates))):
         raise Arch151Error("calibration sessions must be unique and chronological")
@@ -1436,12 +1509,15 @@ def calibrate_family_a(
         "schema": CALIBRATION_SCHEMA,
         "semantic_contract_version": SEMANTIC_CONTRACT_VERSION,
         "program_id": str(program_id(program)),
+        "symbol": symbol,
         "scored_year": scored_year,
         "cutoff": cutoff.isoformat(),
         "noise_return": _decimal_text(noise),
         "regime_median_return": _decimal_text(regime),
         "observations": [
             {
+                "symbol": item.symbol,
+                "measure_scope": item.measure_scope.value,
                 "session_date": item.session_date.isoformat(),
                 "source_digest": item.source_digest,
             }
@@ -1451,6 +1527,7 @@ def calibrate_family_a(
     canonical = _canonical_json(material)
     return FamilyACalibration(
         program.key,
+        symbol,
         scored_year,
         noise,
         regime,
@@ -1483,7 +1560,11 @@ def family_a_regime_passes(
         not _is_canonical_program(program)
         or type(program.parameters) is not NoiseBreakoutParameters
         or type(calibration) is not FamilyACalibration
+        or type(current_session) is not FamilyASessionMeasure
         or calibration.program_key is not program.key
+        or calibration.symbol != current_session.symbol
+        or current_session.measure_scope
+        is not FamilyAMeasureScope.CURRENT_OPENING_WINDOW
         or current_session.session_date.year != calibration.scored_year
     ):
         raise Arch151Error("Family A calibration/current session binding is invalid")
@@ -1491,38 +1572,107 @@ def family_a_regime_passes(
     return current_session.absolute_return <= limit
 
 
+@dataclass(frozen=True, slots=True)
+class FamilyABreakoutLevel:
+    program_key: ProgramKey
+    symbol: str
+    session_date: date
+    calibration_id: UUID
+    level: Decimal
+
+    def __post_init__(self) -> None:
+        if type(self.program_key) is not ProgramKey:
+            raise TypeError("Family A breakout program key is invalid")
+        if self.symbol not in INITIAL_UNIVERSE:
+            raise Arch151Error("Family A breakout symbol is outside frozen SPY/QQQ")
+        if type(self.session_date) is not date or type(self.calibration_id) is not UUID:
+            raise TypeError("Family A breakout identity is invalid")
+        level = _decimal(self.level, "breakout level")
+        if level <= 0:
+            raise ValueError("Family A breakout level must be positive")
+        object.__setattr__(self, "level", level)
+
+
 def family_a_breakout_level(
-    program: Arch151Program, calibration: FamilyACalibration, session_open: Decimal
-) -> Decimal:
-    """Compute the frozen dimensionless noise threshold in price units."""
+    program: Arch151Program,
+    calibration: FamilyACalibration,
+    current_session: FamilyASessionMeasure,
+) -> FamilyABreakoutLevel:
+    """Return a symbol-bound frozen noise threshold for the current session."""
 
     if (
         not _is_canonical_program(program)
         or type(program.parameters) is not NoiseBreakoutParameters
+        or type(calibration) is not FamilyACalibration
+        or type(current_session) is not FamilyASessionMeasure
         or calibration.program_key is not program.key
+        or calibration.symbol != current_session.symbol
+        or current_session.measure_scope
+        is not FamilyAMeasureScope.CURRENT_OPENING_WINDOW
+        or current_session.session_date.year != calibration.scored_year
     ):
         raise Arch151Error(
             "Family A breakout inputs are not bound to a canonical program"
         )
-    open_price = _decimal(session_open, "session_open")
     with localcontext(_DECIMAL_CONTEXT):
-        return open_price * (
+        level = current_session.session_open * (
             Decimal(1)
             + program.parameters.breakout_multiplier * calibration.noise_return
         )
+    return FamilyABreakoutLevel(
+        program.key,
+        current_session.symbol,
+        current_session.session_date,
+        calibration.calibration_id,
+        level,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyAInitialRisk:
+    program_key: ProgramKey
+    symbol: str
+    session_date: date
+    calibration_id: UUID
+    entry_reference_price: Decimal
+    stop_reference_price: Decimal
+    risk_distance: Decimal
+
+    def __post_init__(self) -> None:
+        if type(self.program_key) is not ProgramKey:
+            raise TypeError("Family A risk program key is invalid")
+        if self.symbol not in INITIAL_UNIVERSE:
+            raise Arch151Error("Family A risk symbol is outside frozen SPY/QQQ")
+        if type(self.session_date) is not date or type(self.calibration_id) is not UUID:
+            raise TypeError("Family A risk identity is invalid")
+        entry = _decimal(self.entry_reference_price, "entry_reference_price")
+        stop = _decimal(self.stop_reference_price, "stop_reference_price")
+        distance = _decimal(self.risk_distance, "risk_distance")
+        if entry <= 0 or stop <= 0 or distance <= 0 or entry - stop != distance:
+            raise ValueError("Family A initial risk prices are inconsistent")
+        object.__setattr__(self, "entry_reference_price", entry)
+        object.__setattr__(self, "stop_reference_price", stop)
+        object.__setattr__(self, "risk_distance", distance)
 
 
 def family_a_initial_risk(
     program: Arch151Program,
     calibration: FamilyACalibration,
+    current_session: FamilyASessionMeasure,
     entry_reference_price: Decimal,
-) -> tuple[Decimal, Decimal]:
-    """Return stop and positive R using entry-price times dimensionless N."""
+) -> FamilyAInitialRisk:
+    """Return symbol-bound positive R using entry-price times dimensionless N."""
 
     if (
         not _is_canonical_program(program)
         or type(program.parameters) is not NoiseBreakoutParameters
+        or type(calibration) is not FamilyACalibration
+        or type(current_session) is not FamilyASessionMeasure
         or calibration.program_key is not program.key
+        or calibration.symbol != current_session.symbol
+        or current_session.measure_scope
+        is not FamilyAMeasureScope.CURRENT_OPENING_WINDOW
+        or current_session.session_date.year != calibration.scored_year
     ):
         raise Arch151Error("Family A risk inputs are not bound to a canonical program")
     entry = _decimal(entry_reference_price, "entry_reference_price")
@@ -1533,12 +1683,21 @@ def family_a_initial_risk(
         stop = entry - distance
     if distance <= 0 or stop <= 0 or not stop.is_finite():
         raise UnavailableIndicatorError("Family A initial risk distance is invalid")
-    return stop, distance
+    return FamilyAInitialRisk(
+        program.key,
+        current_session.symbol,
+        current_session.session_date,
+        calibration.calibration_id,
+        entry,
+        stop,
+        distance,
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class NoiseBreakoutSignal:
     program_key: ProgramKey
+    symbol: str
     session_date: date
     confirmation_timestamps: tuple[datetime, ...]
     breakout_level: Decimal
@@ -1560,6 +1719,9 @@ def family_a_entry_signal(
         or type(calibration) is not FamilyACalibration
         or type(current_session) is not FamilyASessionMeasure
         or calibration.program_key is not program.key
+        or calibration.symbol != current_session.symbol
+        or current_session.measure_scope
+        is not FamilyAMeasureScope.CURRENT_OPENING_WINDOW
         or current_session.session_date.year != calibration.scored_year
     ):
         raise Arch151Error("Family A signal inputs are not source-bound")
@@ -1576,18 +1738,20 @@ def family_a_entry_signal(
         item.bar.session_date != current_session.session_date for item in observations
     ):
         raise Arch151Error("Family A confirmation crossed the current session")
+    if any(item.bar.symbol != calibration.symbol for item in observations):
+        raise Arch151Error(
+            "Family A confirmation instrument does not match calibration"
+        )
     if current_session.session_open != _decimal(
         current_session.session_open, "session_open"
     ):
         raise Arch151Error("Family A session open is invalid")
     if not family_a_regime_passes(program, calibration, current_session):
         return None
-    threshold = family_a_breakout_level(
-        program, calibration, current_session.session_open
-    )
+    threshold = family_a_breakout_level(program, calibration, current_session)
     for observation in observations:
         if (
-            observation.bar.close <= threshold
+            observation.bar.close <= threshold.level
             or observation.bar.close <= observation.vwap
         ):
             return None
@@ -1600,9 +1764,10 @@ def family_a_entry_signal(
         return None
     return NoiseBreakoutSignal(
         program.key,
+        current_session.symbol,
         current_session.session_date,
         tuple(bar.timestamp for bar in bars),
-        threshold,
+        threshold.level,
         bars[-1].close,
         calibration.calibration_id,
     )
@@ -1612,12 +1777,87 @@ def family_a_entry_signal(
 class OpeningRangeRetestSignal:
     program_key: ProgramKey
     session_date: date
+    signal_timestamp: datetime
     breakout_level: Decimal
     breakout_confirmation_timestamps: tuple[datetime, ...]
     retest_timestamp: datetime
     reclaim_timestamps: tuple[datetime, ...]
     stop_reference_price: Decimal
     target_r: Decimal
+
+
+def _validated_sparse_session_aggregate_bars(
+    session_bars: Sequence[AggregateBar],
+    resolution: BarResolution | None = None,
+    *,
+    require_open: bool = False,
+) -> tuple[AggregateBar, ...]:
+    materialized = tuple(session_bars)
+    if not materialized:
+        raise UnavailableIndicatorError("sparse session aggregate input is empty")
+    if any(type(bar) is not AggregateBar for bar in materialized):
+        raise TypeError("sparse session input must contain AggregateBar values")
+    first = materialized[0]
+    expected_resolution = resolution or first.resolution
+    if type(expected_resolution) is not BarResolution:
+        raise TypeError("sparse session resolution must be a BarResolution")
+    schedule = _SESSION_AUTHORITY.schedule_for(first.session_date)
+    if schedule is None:
+        raise Arch151Error("aggregate date is not a published XNYS session")
+    open_utc = schedule.opens_at.astimezone(UTC)
+    close_utc = schedule.closes_at.astimezone(UTC)
+    if require_open and first.timestamp != open_utc:
+        raise UnavailableIndicatorError(
+            "sparse session input must begin at the published open"
+        )
+    previous_timestamp: datetime | None = None
+    for bar in materialized:
+        if (
+            bar.symbol != first.symbol
+            or bar.session_date != first.session_date
+            or bar.resolution is not expected_resolution
+        ):
+            raise Arch151Error(
+                "aggregate stream crosses symbol, resolution, or session"
+            )
+        if (
+            bar.timestamp < open_utc
+            or bar.completed_at > close_utc
+            or (bar.timestamp - open_utc).total_seconds()
+            % (int(expected_resolution) * 60)
+            != 0
+        ):
+            raise Arch151Error("aggregate bar is incomplete or off the published grid")
+        if previous_timestamp is not None and bar.timestamp <= previous_timestamp:
+            raise Arch151Error("sparse session bars must be strictly chronological")
+        previous_timestamp = bar.timestamp
+    return materialized
+
+
+def _validated_family_b_session_bars(
+    program: Arch151Program,
+    session_bars: Sequence[AggregateBar],
+    opening_count: int,
+) -> tuple[AggregateBar, ...]:
+    materialized = _validated_sparse_session_aggregate_bars(
+        session_bars, program.resolution, require_open=True
+    )
+    first = materialized[0]
+    schedule = _SESSION_AUTHORITY.schedule_for(first.session_date)
+    assert schedule is not None
+    open_utc = schedule.opens_at.astimezone(UTC)
+
+    if len(materialized) < opening_count:
+        raise UnavailableIndicatorError("Family B opening range is incomplete")
+    expected_opening = tuple(
+        open_utc + timedelta(minutes=index * int(program.resolution))
+        for index in range(opening_count)
+    )
+    if tuple(bar.timestamp for bar in materialized[:opening_count]) != expected_opening:
+        raise UnavailableIndicatorError(
+            "Family B opening range must be complete and session aligned"
+        )
+    return materialized
 
 
 def _validated_session_aggregate_bars(
@@ -1650,80 +1890,99 @@ def _validated_session_aggregate_bars(
 def family_b_entry_signal(
     program: Arch151Program, session_bars: Sequence[AggregateBar]
 ) -> OpeningRangeRetestSignal | None:
-    """Evaluate one chronological breakout, later retest, later reclaim setup."""
+    """Evaluate a causal retest predicate at the final supplied completed bar."""
 
     if (
         not _is_canonical_program(program)
         or type(program.parameters) is not OpeningRangeRetestParameters
     ):
         raise UnsupportedProgramError("Family B requires a canonical retest program")
-    bars = _validated_session_aggregate_bars(program, session_bars, from_open=True)
     parameters = program.parameters
     resolution = int(program.resolution)
     if parameters.opening_range_minutes % resolution:
         raise Arch151Error("opening range is not aligned to program resolution")
     opening_count = parameters.opening_range_minutes // resolution
-    if len(bars) <= opening_count:
-        return None
+    bars = _validated_family_b_session_bars(program, session_bars, opening_count)
     opening_range = bars[:opening_count]
     level = max(bar.high for bar in opening_range) * (
         Decimal(1) + parameters.breakout_buffer_bps / Decimal(10000)
     )
 
-    confirmation_count = 0
-    breakout_indexes: list[int] = []
-    final_breakout_index: int | None = None
-    for index in range(opening_count, len(bars)):
-        if bars[index].close > level:
-            confirmation_count += 1
-            breakout_indexes.append(index)
-            if confirmation_count == parameters.breakout_confirmation_bars:
-                final_breakout_index = index
-                break
-        else:
-            confirmation_count = 0
-            breakout_indexes.clear()
-    if final_breakout_index is None:
-        return None
-
     lower = level * (Decimal(1) - parameters.retest_tolerance_bps / Decimal(10000))
     upper = level * (Decimal(1) + parameters.retest_tolerance_bps / Decimal(10000))
+    resolution_delta = timedelta(minutes=resolution)
+    breakout_indexes: list[int] = []
+    final_breakout_index: int | None = None
     retest_index: int | None = None
-    deadline_end = min(
-        len(bars) - 1, final_breakout_index + parameters.retest_deadline_bars
-    )
-    for index in range(final_breakout_index + 1, deadline_end + 1):
-        if bars[index].low < lower:
-            return None
-        if lower <= bars[index].low <= upper:
-            retest_index = index
-            break
-    if retest_index is None:
-        return None
-
     reclaim_indexes: list[int] = []
-    for index in range(retest_index + 1, len(bars)):
-        if bars[index].close <= level:
-            return None
+    for index in range(opening_count, len(bars)):
+        current = bars[index]
+        if current.timestamp != bars[index - 1].timestamp + resolution_delta:
+            breakout_indexes.clear()
+            final_breakout_index = None
+            retest_index = None
+            reclaim_indexes.clear()
+
+        if (
+            final_breakout_index is not None
+            and retest_index is None
+            and index > final_breakout_index + parameters.retest_deadline_bars
+        ):
+            breakout_indexes.clear()
+            final_breakout_index = None
+            reclaim_indexes.clear()
+
+        if final_breakout_index is None:
+            if current.close > level:
+                breakout_indexes.append(index)
+                if len(breakout_indexes) == parameters.breakout_confirmation_bars:
+                    final_breakout_index = index
+            else:
+                breakout_indexes.clear()
+            continue
+
+        if retest_index is None:
+            if current.low < lower:
+                breakout_indexes.clear()
+                final_breakout_index = None
+                reclaim_indexes.clear()
+                continue
+            if lower <= current.low <= upper:
+                retest_index = index
+            continue
+
+        if current.close <= level:
+            breakout_indexes.clear()
+            final_breakout_index = None
+            retest_index = None
+            reclaim_indexes.clear()
+            continue
         reclaim_indexes.append(index)
-        if len(reclaim_indexes) == parameters.reclaim_confirmation_bars:
-            final_bar = bars[index]
-            if not program.entry_window.contains(final_bar.completed_at):
-                return None
-            swing_low = min(bar.low for bar in bars[retest_index : index + 1])
-            stop = swing_low * (
-                Decimal(1) - parameters.stop_buffer_bps / Decimal(10000)
-            )
-            return OpeningRangeRetestSignal(
-                program.key,
-                final_bar.session_date,
-                level,
-                tuple(bars[item].timestamp for item in breakout_indexes),
-                bars[retest_index].timestamp,
-                tuple(bars[item].timestamp for item in reclaim_indexes),
-                stop,
-                parameters.target_r,
-            )
+        if len(reclaim_indexes) != parameters.reclaim_confirmation_bars:
+            continue
+        final_bar = bars[index]
+        if index != len(bars) - 1 or not program.entry_window.contains(
+            final_bar.completed_at
+        ):
+            breakout_indexes.clear()
+            final_breakout_index = None
+            retest_index = None
+            reclaim_indexes.clear()
+            continue
+        assert retest_index is not None
+        swing_low = min(bar.low for bar in bars[retest_index : index + 1])
+        stop = swing_low * (Decimal(1) - parameters.stop_buffer_bps / Decimal(10000))
+        return OpeningRangeRetestSignal(
+            program.key,
+            final_bar.session_date,
+            final_bar.completed_at,
+            level,
+            tuple(bars[item].timestamp for item in breakout_indexes),
+            bars[retest_index].timestamp,
+            tuple(bars[item].timestamp for item in reclaim_indexes),
+            stop,
+            parameters.target_r,
+        )
     return None
 
 
@@ -1936,31 +2195,34 @@ def efficiency_ratio(closes: Sequence[Decimal], periods: int) -> Decimal:
 
 
 def ema_series(bars: Sequence[AggregateBar], period: int) -> tuple[Decimal | None, ...]:
-    """Compute session-local EMA with deterministic SMA seed and gap rejection."""
+    """Compute session-local EMA, reseeding after each sparse gap."""
 
     if type(period) is not int or period < 1:
         raise ValueError("EMA period must be positive")
-    materialized = contiguous_aggregate_bars(bars)
-    schedule = _SESSION_AUTHORITY.schedule_for(materialized[0].session_date)
-    if schedule is None or materialized[0].timestamp != schedule.opens_at.astimezone(
-        UTC
-    ):
-        raise UnavailableIndicatorError(
-            "session-local EMA must start at the published open"
-        )
-    if len(materialized) < period:
-        raise UnavailableIndicatorError("EMA lacks its contiguous SMA seed")
-    values: list[Decimal | None] = [None] * (period - 1)
+    materialized = _validated_sparse_session_aggregate_bars(bars, require_open=True)
+    values: list[Decimal | None] = [None] * len(materialized)
+    segment_start = 0
+    current: Decimal | None = None
     with localcontext(_DECIMAL_CONTEXT):
-        seed = sum(
-            (item.close for item in materialized[:period]), Decimal(0)
-        ) / Decimal(period)
-        values.append(seed)
         alpha = Decimal(2) / Decimal(period + 1)
-        current = seed
-        for item in materialized[period:]:
-            current = alpha * item.close + (Decimal(1) - alpha) * current
-            values.append(current)
+        for index, item in enumerate(materialized):
+            if index > 0 and item.timestamp != materialized[
+                index - 1
+            ].timestamp + timedelta(minutes=int(item.resolution)):
+                segment_start = index
+                current = None
+            contiguous_count = index - segment_start + 1
+            if contiguous_count < period:
+                continue
+            if contiguous_count == period:
+                current = sum(
+                    (bar.close for bar in materialized[segment_start : index + 1]),
+                    Decimal(0),
+                ) / Decimal(period)
+            else:
+                assert current is not None
+                current = alpha * item.close + (Decimal(1) - alpha) * current
+            values[index] = current
     return tuple(values)
 
 
@@ -2047,44 +2309,29 @@ class TrendPullbackSignal:
     confirming_symbol: str
 
 
-def family_d_entry_signal(
+def _family_d_contiguous_segment_signal(
     program: Arch151Program,
-    target_bars: Sequence[AggregateBar],
-    confirming_bars: Sequence[AggregateBar],
-    confirming_vwaps: Sequence[VwapObservation],
+    local: tuple[AggregateBar, ...],
+    other: tuple[AggregateBar, ...],
+    other_vwaps: tuple[Decimal, ...],
+    local_fast: tuple[Decimal | None, ...],
+    local_slow: tuple[Decimal | None, ...],
+    other_fast: tuple[Decimal | None, ...],
+    other_slow: tuple[Decimal | None, ...],
 ) -> TrendPullbackSignal | None:
-    """Evaluate a pure local-trend/cross-ETF pullback-reclaim entry predicate.
+    """Evaluate one gap-free, exactly aligned local/cross-ETF segment."""
 
-    This scans a bounded in-memory sequence for a completed-bar setup. It does
-    not model positions, fills, exits, costs, or replay a strategy.
-    """
-
-    if (
-        not _is_canonical_program(program)
-        or type(program.parameters) is not CrossEtfPullbackParameters
-    ):
-        raise UnsupportedProgramError("Family D requires a canonical pullback program")
-    local = _validated_session_aggregate_bars(program, target_bars, from_open=True)
-    other = _validated_session_aggregate_bars(program, confirming_bars, from_open=True)
     parameters = program.parameters
+    assert type(parameters) is CrossEtfPullbackParameters
     aligned = exact_cross_etf_confirmation(local, other, len(local))
-    vwap_observations = tuple(confirming_vwaps)
-    if len(vwap_observations) != len(aligned) or any(
-        type(observation) is not VwapObservation for observation in vwap_observations
+    if not (
+        len(local_fast)
+        == len(local_slow)
+        == len(other_fast)
+        == len(other_slow)
+        == len(local)
     ):
-        raise UnavailableIndicatorError("cross-ETF VWAP observations are incomplete")
-    if any(
-        observation.bar != pair.confirming_bar
-        for observation, pair in zip(vwap_observations, aligned, strict=True)
-    ):
-        raise UnavailableIndicatorError(
-            "cross-ETF VWAP observations are not exactly bar aligned"
-        )
-    vwaps = tuple(observation.vwap for observation in vwap_observations)
-    local_fast = ema_series(local, parameters.ema_fast)
-    local_slow = ema_series(local, parameters.ema_slow)
-    other_fast = ema_series(other, parameters.ema_fast)
-    other_slow = ema_series(other, parameters.ema_slow)
+        raise UnavailableIndicatorError("cross-ETF EMA values are incomplete")
 
     minimum_index = max(
         parameters.ema_slow + 2,
@@ -2123,13 +2370,11 @@ def family_d_entry_signal(
         )
         reclaim_count = 0
         reclaim_indexes: list[int] = []
-        invalid_setup = False
         for index in range(setup_index + 1, deadline_end + 1):
             pullback_low = min(pullback_low, local[index].low)
             with localcontext(_DECIMAL_CONTEXT):
                 depth_atr = (swing_peak - pullback_low) / frozen_atr
             if depth_atr > parameters.pullback_max_atr:
-                invalid_setup = True
                 break
             if (
                 local_fast[index] is not None
@@ -2164,7 +2409,8 @@ def family_d_entry_signal(
             cross_trend = len(confirmation) == cross_count and all(
                 other_fast[cross_start + offset] is not None
                 and other_slow[cross_start + offset] is not None
-                and other[cross_start + offset].close > vwaps[cross_start + offset]
+                and other[cross_start + offset].close
+                > other_vwaps[cross_start + offset]
                 and other_fast[cross_start + offset] > other_slow[cross_start + offset]
                 for offset in range(cross_count)
             )
@@ -2189,8 +2435,107 @@ def family_d_entry_signal(
                 local_slow[index],
                 other[0].symbol,
             )
-        if invalid_setup:
-            continue
+    return None
+
+
+def family_d_entry_signal(
+    program: Arch151Program,
+    target_bars: Sequence[AggregateBar],
+    confirming_bars: Sequence[AggregateBar],
+    confirming_vwaps: Sequence[VwapObservation],
+) -> TrendPullbackSignal | None:
+    """Evaluate pullback predicates independently inside exact aligned segments.
+
+    A missing bucket resets both the local setup state and the cross-ETF
+    confirmation segment. EMA and ATR warmup must be re-established within a
+    fresh contiguous segment; no stale cross-symbol value is substituted.
+    """
+
+    if (
+        not _is_canonical_program(program)
+        or type(program.parameters) is not CrossEtfPullbackParameters
+    ):
+        raise UnsupportedProgramError("Family D requires a canonical pullback program")
+    local = _validated_sparse_session_aggregate_bars(
+        target_bars, program.resolution, require_open=True
+    )
+    other = _validated_sparse_session_aggregate_bars(
+        confirming_bars, program.resolution, require_open=True
+    )
+    if local[0].symbol == other[0].symbol:
+        raise Arch151Error("cross-ETF confirmation requires distinct symbols")
+    vwap_observations = tuple(confirming_vwaps)
+    if len(vwap_observations) != len(other) or any(
+        type(observation) is not VwapObservation for observation in vwap_observations
+    ):
+        raise UnavailableIndicatorError("cross-ETF VWAP observations are incomplete")
+    if any(
+        observation.bar != bar
+        for observation, bar in zip(vwap_observations, other, strict=True)
+    ):
+        raise UnavailableIndicatorError(
+            "cross-ETF VWAP observations are not exactly bar aligned"
+        )
+
+    local_fast_all = ema_series(local, program.parameters.ema_fast)
+    local_slow_all = ema_series(local, program.parameters.ema_slow)
+    other_fast_all = ema_series(other, program.parameters.ema_fast)
+    other_slow_all = ema_series(other, program.parameters.ema_slow)
+
+    other_indexes = {bar.timestamp: index for index, bar in enumerate(other)}
+    vwap_by_timestamp = {
+        observation.bar.timestamp: observation.vwap for observation in vwap_observations
+    }
+    pairs = tuple(
+        (local_index, other_indexes[bar.timestamp])
+        for local_index, bar in enumerate(local)
+        if bar.timestamp in other_indexes
+    )
+    if not pairs:
+        raise UnavailableIndicatorError("cross-ETF streams have no exact overlap")
+
+    segments: list[list[tuple[int, int]]] = []
+    current_segment: list[tuple[int, int]] = []
+    resolution_delta = timedelta(minutes=int(program.resolution))
+    for pair in pairs:
+        local_index, other_index = pair
+        if current_segment:
+            previous_local, previous_other = current_segment[-1]
+            contiguous = (
+                local_index == previous_local + 1
+                and other_index == previous_other + 1
+                and local[local_index].timestamp
+                == local[previous_local].timestamp + resolution_delta
+                and other[other_index].timestamp
+                == other[previous_other].timestamp + resolution_delta
+            )
+            if not contiguous:
+                segments.append(current_segment)
+                current_segment = []
+        current_segment.append(pair)
+    if current_segment:
+        segments.append(current_segment)
+
+    for segment in segments:
+        local_segment = tuple(local[left] for left, _ in segment)
+        other_segment = tuple(other[right] for _, right in segment)
+        segment_vwaps = tuple(vwap_by_timestamp[bar.timestamp] for bar in other_segment)
+        segment_local_fast = tuple(local_fast_all[left] for left, _ in segment)
+        segment_local_slow = tuple(local_slow_all[left] for left, _ in segment)
+        segment_other_fast = tuple(other_fast_all[right] for _, right in segment)
+        segment_other_slow = tuple(other_slow_all[right] for _, right in segment)
+        signal = _family_d_contiguous_segment_signal(
+            program,
+            local_segment,
+            other_segment,
+            segment_vwaps,
+            segment_local_fast,
+            segment_local_slow,
+            segment_other_fast,
+            segment_other_slow,
+        )
+        if signal is not None:
+            return signal
     return None
 
 
@@ -3679,6 +4024,9 @@ __all__ = (
     "EntryWindow",
     "ExtensionAuthorization",
     "FILL_COST_POLICIES",
+    "FamilyABreakoutLevel",
+    "FamilyAInitialRisk",
+    "FamilyAMeasureScope",
     "FamilyACalibration",
     "FamilyASessionMeasure",
     "FinalObservedBarRule",
@@ -3739,6 +4087,7 @@ __all__ = (
     "exact_cross_etf_confirmation",
     "family_a_breakout_level",
     "family_a_entry_signal",
+    "family_a_historical_session_measure",
     "family_a_initial_risk",
     "family_a_regime_passes",
     "family_a_session_measure",

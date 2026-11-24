@@ -1,27 +1,62 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 design frozen; source foundation next
+## Current milestone - Architecture 151 foundation integrated; offline evaluator next
 
-Architecture 150 is terminal. Its accepted validation evaluated 24 frozen slots,
-qualified 0 and returned `NO_HOLDOUT_CANDIDATES`; 2024+ remained sealed.
-Terminal coordination closeout is integrated at
-`5a51378a868402e2880da714a8cf4848cb5160c7` / tree
-`f51c641a86870fecbbcfd0f25fb4e76668e27183`; develop run `45307361953`
-is terminal SUCCESS in DOCS_ONLY mode.
+Architecture 151 foundation/C3 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
+INTEGRATED. Feature FULL run `45492979313` and develop run `45495638481`, both
+attempt 1, are terminal SUCCESS; develop reused exact feature certification
+with stable identity and no duplicate FULL. Exact identities and continuation
+boundaries are in [the handoff](AI_TRADING_BOT_HANDOFF.md).
 
-Architecture 151 now owns intraday research continuation. Its frozen design
-reuses 2016-2023 SPY/QQQ sparse custody as development-visible history, scores
-five expanding walk-forward years 2019-2023, and freezes a lower-churn
-5m/15m four-family population of 16 structural programs / 32 ordered slots.
+Architecture 150 is terminal: 24 evaluated, 0 qualified,
+`NO_HOLDOUT_CANDIDATES`; no rerun or mutation. Architecture 151 reuses its
+accepted 2016-2023 sparse SPY/QQQ custody without development reacquisition.
+The 16 frozen programs / 32 slots score five expanding years (2019-2023),
+with BASE 2 bps/fill, STRESS 5 bps/fill and ZERO diagnostic. The 29 prior
+trials plus 32 current slots yield effective trial count 64. DSR remains
+uncomputed; no real replay or qualifying candidate exists. 2024-2025 and
+Jan-Oct 2026 remain sealed under the frozen sequential gates.
 
-STRESS remains 5 bps/fill. Selection-bias correction uses at least 64 effective
-search trials. Exactly zero or one final candidate may be frozen. 2024-2025
-remains the untouched local historical holdout; Jan-Oct 2026 remains a later
-recent-regime extension.
+Immediate next milestone: one coordinated synthetic-only offline evaluator
+checkpoint, covering custody authentication, deterministic causal execution,
+complete fold accounting, DSR/reviewed-equivalent statistics, immutable report
+provenance, gross/net and failure attribution, benchmark diagnostics and
+synthetic end-to-end/performance verification. Freeze statistical and execution
+semantics before real data access. Sol High coordinates/reviews; Luna Extra
+High implements, runs focused checks, admits and publishes to mapped CI.
+No real custody read/replay, provider/credential access, broker/order effect,
+or 2024+ access is authorized by this closeout.
 
-Immediate next milestone: source-only Architecture 151 foundation and canonical
-manifest with synthetic tests. No real replay, provider/credential access,
-Robinhood/broker effect or 2024+ access is authorized.
+### Product direction and conditional roadmap
+
+The primary product remains an autonomous same-day AI day trader, seeking
+frequent opportunities but not forcing trades, ending each session flat.
+Finish Arch151 evaluation and conditional holdout/extension first. A full
+survivor permits only a separately authorized paper/shadow translation study.
+If Arch151 fails qualification or its subsequent validation, prioritize an
+operational AI Portfolio Manager before another intraday strategy campaign.
+
+The separate portfolio-manager product is a longer-horizon, continuously
+monitoring desktop application on its own brokerage account. It should adopt
+and reconcile an existing portfolio (holdings, quantities, cost basis, entry
+history, cash and orders), research holdings and new opportunities, and issue
+reasoned buy/sell/hold/rebalance decisions subject to deterministic risk,
+position sizing and execution constraints. Multi-day holdings are permitted;
+mandatory intraday liquidation is not part of its portfolio policy. Cost basis
+informs decisions but does not replace forward return/risk assessment. Share
+safe research, market data, authentication, reconciliation, audit and GUI
+infrastructure; isolate account authority, strategies, risk and state.
+
+Arch149 is the initial portfolio research candidate, not a proven strategy or
+an operational authorization. Preserve its exact frozen 2024-2026 confirmation
+contract: no partial-2026 peek or real confirmation until calendar 2026 is
+complete. Source-only portfolio framework and synthetic/read-only readiness
+work may precede that date under separate review. No live trading is granted.
+Both products aim to outperform a comparable S&P 500 total-return benchmark
+net of costs and with explicit risk reporting; neither is guaranteed to do so.
+After the portfolio manager priority (if triggered), resume reusable AI-assisted
+edge discovery, broader predictive features, ML and independent intraday
+strategy validation. Do not mutate the frozen Arch151 or Arch149 trials.
 
 ---
 
@@ -222,12 +257,11 @@ its now-visible P&L.
 The observation performed zero credential/network/provider/Robinhood/broker/
 order/production effects, zero baseline replay, and zero `FINAL_HOLDOUT`
 access. `FINAL_HOLDOUT` remains sealed. No earlier frozen unevaluated trading hypothesis remained after that closeout.
-Architecture 149 remains a valid preserved secondary benchmark, but it no
-longer blocks the primary bot roadmap. Its exploratory result and frozen
-2024-2026 confirmation contract remain immutable; confirmation may be resumed
-later as a low-turnover benchmark.
+At that historical closeout, Architecture 149 was retained as a secondary
+benchmark. Its exploratory result and frozen 2024-2026 confirmation contract
+remain immutable; the current conditional portfolio priority is stated above.
 
-The primary product roadmap is now
+The next historical intraday research campaign was
 [Architecture 150 intraday AI day-trading campaign](architecture/150-intraday-ai-day-trading-campaign.md).
 It targets frequent same-day opportunities on SPY/QQQ, mandatory end-of-session
 flatness, bounded AI-generated deterministic intraday programs, realistic
@@ -295,10 +329,11 @@ family, 12 SPY and 12 QQQ. Each slot binds program semantics, source symbol and
 resolution. A unique STRESS discovery trial with any trade advances to
 SHORTLISTED; discovery metrics and BASE/ZERO diagnostics do not choose winners.
 Real G1 discovery is consumed. The validation observer authenticates that
-report and takes its complete frozen candidate set. Real validation and all
-2024+ observations remain unopened.
+report and takes its complete frozen candidate set. The subsequent accepted
+validation is terminal as recorded in the current milestone above; 2024+
+remained unopened.
 
-Architecture 149 now owns the next independent strategy family:
+Architecture 149 defined the independent strategy family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It is a single low-turnover,
 monthly cross-asset relative-strength rule over the accepted eight-ETF A147
 universe, with a strict positive-momentum-to-ETF / nonpositive-to-CASH gate and
@@ -336,8 +371,8 @@ production/FINAL_HOLDOUT effects.
 
 The 2024-2026 confirmation contract is now frozen before any confirmation data
 is opened. Partial 2026 or year-to-date confirmation is forbidden. Source-only
-confirmation support is the next implementation milestone; real confirmation
-data acquisition/replay must wait until calendar 2026 is complete.
+confirmation support remains deferred until the portfolio roadmap calls for it;
+real confirmation data acquisition/replay must wait until calendar 2026 is complete.
 See
 [Architecture 149](architecture/149-monthly-cross-asset-defensive-rotation.md)
 and its

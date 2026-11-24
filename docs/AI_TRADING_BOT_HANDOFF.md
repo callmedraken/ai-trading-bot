@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 design frozen; source foundation next
+## Current milestone: Architecture 151 foundation integrated; offline evaluator next
 
 Architecture 150 is terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
@@ -9,27 +9,66 @@ report `22f752aa-5dc1-5e42-af29-1c7e2f921175`, SHA-256
 `d3b637f410b9e8bf05d352e50efea95721151543ec6308fc270c804b5aa372c7`,
 24 evaluated / 0 qualified / `NO_HOLDOUT_CANDIDATES`.
 
-Architecture 151 is the successor design. Development is limited to accepted
-2016-2023 SPY/QQQ sparse custody. Five scored years 2019-2023 use only earlier
-history for fold calibration. The canonical population is exactly 16 structural
-programs across four families, two 5m and two 15m per family, evaluated SPY then
-QQQ for 32 total slots.
+Arch151 foundation is independently SOURCE/CERTIFICATION ACCEPTED and
+FAST-FORWARD INTEGRATED at `39ce9cfe095acfef44e41ff4aa12ae371abd14ac` /
+`b8216809237ce2c0826644d9534f82fd77ac763c`, with preserved predecessor commits
+`b6b398014ade93b13a4abda90634247dca822ada`,
+`f442cf958dad07a740650a2d274894f0a0411633` and
+`0a5b978a2f2f2a493a85257fda048910eb7d229d`. C3 feature mapped FULL
+`45492979313`, attempt 1, is terminal SUCCESS with all seven lanes and
+source-static, active-tests and source-gates green. Develop `45495638481`,
+attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason
+`exact_feature_certification`, `IDENTITY_STABLE=True` and no duplicate FULL.
+The operator proved both local worktrees and live refs at the exact accepted
+source identity; preserved develop untracked files are permitted, but tracked
+and index drift is STOP. Integration evidence root:
+`F:\AI\temp\arch151-c3-integration-ac70162d6e8c4859a85e4474bf34ec8a`.
 
-Families: regime-filtered noise/VWAP breakout; opening-range breakout retest;
-VWAP-deviation mean reversion; cross-ETF confirmed trend pullback. All are
-long-or-flat, session-flat and unleveraged. STRESS remains 5 bps/fill and churn
-is capped at two round trips/session.
+C3 corrects Family D current-segment signal selection and rebuilds the sparse
+expired-entry regression; 82 focused tests passed as reported by the implementing
+owner. No real replay, accepted-custody access, provider/credential access,
+Robinhood/broker/order effect or 2024+ access occurred during foundation work.
 
-Selection-bias correction uses at least 64 effective trials and freezes exactly
-zero or one final candidate. 2024-2025 is sealed until that freeze exists;
-Jan-Oct 2026 is sealed until holdout PASS.
+Continuation checkout: `F:\AI\worktrees\ai-trading-bot-arch151-intraday-walkforward-current`,
+branch `feature/research-arch151-intraday-walkforward-current`; canonical develop
+checkout `F:\AI\ai-trading-bot`. Reprove live remote develop and active feature
+HEAD/tree and clean expected state before implementation; documentation-only
+successors must be separately accepted and synchronized.
 
-Exact continuation boundary: implement source-only Architecture 151 types,
-canonical manifest, deterministic 5m/15m aggregation, walk-forward chronology,
-qualification/selection-bias records and 2024+ firewall with synthetic tests
-only. No real replay or external effect is authorized.
+[Architecture 151](architecture/151-intraday-walk-forward-campaign.md) and its
+[validation plan](validation/arch151-intraday-walk-forward-campaign.md) own the
+frozen manifest `4fdce706-4322-59e1-95d1-590a39e67978` / SHA-256
+`8a5c89c55388e8ec5d0c6384a8f69ab99587a538bd0d868cb29a108717084083`.
+The prior ledger is `f7ce28f9-56b2-570b-8c83-62fbac38edbf` / SHA-256
+`20dd765979f389504ccdf187589268a0d9d10a5d6479f1111738fc441a5a4269`.
+29 prior trials, 32 fixed slots, effective count 64. Fold evaluation schema v2
+retains explicit PF states; DSR producer and authenticated candidate issuance
+remain unavailable. Accepted sparse development custody is the D1R output
+identified below; verify its dataset and custody fingerprints before a later
+separately authorized read. No reacquisition.
 
-Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
+Exact next boundary: a single coordinated source-only offline evaluator
+checkpoint using synthetic inputs. Sol High is planning/coordinator/reviewer
+only; Luna Extra High owns implementation, affected tests, prepublication
+admission, ordinary publication and terminal mapped FULL. Implement complete
+causal execution, verified sparse projections, complete fold accounting and
+failure evidence, frozen statistical calculation, source-owned qualification
+and candidate binding, reports and synthetic end-to-end/performance coverage.
+Retain ZERO/BASE/STRESS diagnostics and compare comparable benchmark returns
+without altering any threshold. Actual 2019-2023 replay requires subsequent
+exact-source/certification acceptance and explicit reviewed read-only authority.
+2024-2025 stays sealed until one authenticated qualifying candidate is frozen;
+Jan-Oct 2026 stays sealed until that candidate's authenticated holdout PASS.
+No source-only step authorizes real replay, provider calls or trading.
+
+Product priority is defined in [Project Status](PROJECT_STATUS.md): complete
+Arch151; if qualification or later validation fails, prioritize the separate
+Arch149-based AI Portfolio Manager before further intraday strategy discovery.
+Preserve the Arch149 frozen confirmation boundary, account isolation and all
+broker/live readiness gates. Portfolio framework preparation is not authority
+to open partial 2026 confirmation or trade.
+
+Current implemented intraday runtime authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
 
 V1 scope is fixed: intraday-only, long-only, at most one of TQQQ/SQQQ, QQQ as the primary direction reference, two completed-bar confirmation, no same-cycle inverse flip, and forced flat beginning five minutes before official regular-session close. The source-owned hard stop is 3.00% below the reconciled average entry fill and may never be widened. Live readiness requires proving exact full-position stop protection; a broker stop-market order is preferred and software independently treats threshold breach as mandatory EXIT.
 
@@ -228,9 +267,9 @@ Do not retry, retime, threshold, filter, or mutate this Architecture-148
 hypothesis from its visible result. The observation performed no provider/
 broker/production effect, baseline replay, or `FINAL_HOLDOUT` access.
 `FINAL_HOLDOUT` remains sealed. No earlier frozen unevaluated trading hypothesis remained after that closeout.
-Primary product direction is now Architecture 150 intraday day trading.
-Architecture 149 is preserved as a secondary benchmark/capital-parking research
-path and does not block intraday work.
+At that historical closeout, Architecture 150 became the primary intraday
+research campaign and Architecture 149 was preserved as a secondary benchmark.
+Current conditional portfolio-manager priority is recorded above and in Project Status.
 
 Architecture 150 freezes a same-day, session-flat SPY/QQQ research campaign with
 three typed families (noise-area/VWAP momentum, VWAP trend/reversal, and
@@ -331,10 +370,10 @@ valid unique STRESS discovery trial with any trade is shortlisted; discovery
 economic metrics and BASE/ZERO diagnostics do not decide advancement.
 
 All 24 real G1 discovery trials are consumed and all advanced under the
-frozen mechanical rule. The V1 validation observer is pending exact-source
-review. Validation and 2024+ remain unopened.
+frozen mechanical rule. Subsequent V1 validation was accepted and consumed with
+zero qualifiers as recorded above. 2024+ remained unopened.
 
-Architecture 149 now owns the next frozen independent research family:
+Architecture 149 defined the frozen independent research family:
 `MONTHLY_CROSS_ASSET_DEFENSIVE_ROTATION_V1`. It has exactly one candidate,
 uses the accepted SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC daily universe, ranks fixed
 21/252-session momentum only at month end, holds the top ETF only when its score
@@ -361,7 +400,8 @@ The separately frozen confirmation contract is
 It preserves the exact strategy, starts a fresh $100,000 confirmation portfolio,
 uses pre-2024 A147 history only as signal warmup, and evaluates exactly calendar
 2024-2026. No partial-2026 peek is allowed. Source-only confirmation support is
-next; real acquisition/replay waits for completed 2026 data.
+deferred to the portfolio roadmap; real acquisition/replay waits for completed
+2026 data.
 
 The prior single-candidate research design remains in
 [`arch148-intraday-momentum-research.md`](validation/arch148-intraday-momentum-research.md).

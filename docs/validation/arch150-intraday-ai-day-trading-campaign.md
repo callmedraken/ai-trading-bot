@@ -1,6 +1,6 @@
 # Validation — Architecture 150 intraday AI day-trading campaign
 
-Status: **FOUNDATION + D1 + D1R + D1R-C1 + D2 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; REAL G1 DISCOVERY ACCEPTED AND CONSUMED; VALIDATION SOURCE REVIEW PENDING**.
+Status: **FOUNDATION + D1 + D1R + D1R-C1 + D2 + V1/V1-C1 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; REAL G1 DISCOVERY AND VALIDATION CONSUMED; G1 TERMINAL WITH NO HOLDOUT CANDIDATES; 2024+ SEALED**.
 
 Normative design:
 
@@ -345,16 +345,41 @@ Qualification requires positive net return, profit factor above 1, and all
 published frequency gates under STRESS. The observer produces
 `NO_HOLDOUT_CANDIDATES` if none pass. Otherwise it freezes the qualifying
 slot identities before the separate selection-bias review. In both cases,
-holdout and extension remain sealed. No validation observation was performed
-during source publication. Following exact-source review and integration, the
-separately reviewed real validation invocation takes only a fresh output path:
+holdout and extension remain sealed.
 
-```powershell
-python -B -m trading_bot.experiments.arch150_g1_validation `
-  --output-directory F:\AI\temp\arch150-g1-validation-<fresh-UUID>
-```
+## Real G1 validation observation
 
-Do not retry an interrupted or blocked invocation automatically.
+The separately reviewed real 2021-2023 validation observation completed at the
+accepted/integrated V1-C1 source
+`4df84db43833edc0d1b644e2116acdfdccc5897b` / tree
+`965f1528fd0011a89696ce633600495f1e04f4d4`.
+
+Evidence:
+`F:\AI\temp\arch150-g1-validation-cb197d11-9779-46e1-8179-81bab0c8806a\validation.json`
+
+- report ID: `22f752aa-5dc1-5e42-af29-1c7e2f921175`;
+- SHA-256: `d3b637f410b9e8bf05d352e50efea95721151543ec6308fc270c804b5aa372c7`;
+- byte length: 86,066;
+- validation freeze: `5dd43922-0cb9-5f09-a1be-372b0d3dc4f6`;
+- evaluated slots: 24;
+- qualified slots: 0;
+- terminal disposition: `NO_HOLDOUT_CANDIDATES`;
+- `holdout_authorized=false`;
+- validation strategy replays: 24;
+- discovery strategy replays: 0;
+- 2024+ data access, provider requests, credential reads, Robinhood calls and
+  broker-order effects: 0.
+
+Every candidate had negative STRESS validation net return and profit factor
+below 1, so all fail the precommitted economic gates independent of any
+frequency result. No selection-bias promotion set exists and no holdout access
+is authorized.
+
+Architecture 150 is terminal under its frozen contract. G2 was limited to at
+most 12 structural recombinations of already frozen G1 survivors; validation
+produced zero survivors, so G2 has an empty authorized population. Do not rerun
+discovery or validation, mutate the failed population from visible P&L, open
+2024-2025, or run the 2026 extension.
 
 ## Initial implementation scope
 

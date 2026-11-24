@@ -1,21 +1,40 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 150 G1 validation observer source review
+## Current milestone: Architecture 150 G1 terminal closeout; Architecture 151 design next
 
-G1 population freeze/C1 is accepted and integrated at HEAD
-`b6b811bae33a8423e0f6ad588b0f124eb3630591` / tree
-`c16fb6d225fb9f1ab97c3bbaf8de3829760fde97`. Develop run `45135927287`, attempt
-1, is terminal SUCCESS with `source-static` and `source-gates` passing,
-`DEVELOP_CERTIFICATION_REUSE=True` / `exact_feature_certification`,
-`IDENTITY_STABLE=True`, and no duplicate canonical FULL.
+Architecture 150 V1/V1-C1 is accepted and integrated at
+`4df84db43833edc0d1b644e2116acdfdccc5897b` / tree
+`965f1528fd0011a89696ce633600495f1e04f4d4`. Develop run
+`45303255286`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse, stable identity and no duplicate FULL.
 
-The real G1 discovery report is accepted and immutable. The V1 source-only
-checkpoint adds the offline validation observer and uses synthetic tests.
-Review and integrate the exact source before the separately reviewed
-2021–2023 validation observation. Follow the output-path and stop rules in
-the [Architecture 150 validation record](validation/arch150-intraday-ai-day-trading-campaign.md).
-Do not rerun discovery. Validation replay remains zero and 2024+ stays sealed.
+Accepted Arch150 discovery evidence:
+`F:\AI\temp\arch150-g1-discovery-3dc75767-c48c-4a99-8624-c25ccd67cbe8\discovery.json`;
+report `ec23c374-e069-59e9-9167-14b2adf3fb16`; SHA-256
+`919a0086c5bc1ba0cf919e4eb9569ef61b3a69f66dd14979ea3bec4f6b7cc34c`;
+candidate freeze `84367c0f-74d4-5125-a2f3-71f5a9ad6014`. Discovery is consumed
+and must not be rerun.
 
+Accepted Arch150 validation evidence:
+`F:\AI\temp\arch150-g1-validation-cb197d11-9779-46e1-8179-81bab0c8806a\validation.json`;
+report `22f752aa-5dc1-5e42-af29-1c7e2f921175`; SHA-256
+`d3b637f410b9e8bf05d352e50efea95721151543ec6308fc270c804b5aa372c7`;
+86,066 bytes; validation freeze `5dd43922-0cb9-5f09-a1be-372b0d3dc4f6`.
+Exactly 24 frozen slots were evaluated and 0 qualified.
+`TERMINAL_DISPOSITION=NO_HOLDOUT_CANDIDATES`,
+`HOLDOUT_AUTHORIZED=False`, `2024_PLUS_DATA_ACCESSED=False`; provider,
+credential, Robinhood and broker-effect counters are zero.
+
+Arch150 is terminal. Its G2 contract allows only recombinations of frozen G1
+survivors, and there are none. Do not open 2024-2025, do not run the 2026
+extension, and do not tune/rerun Arch150 from visible discovery or validation
+P&L.
+
+Exact continuation boundary: begin Architecture 151 as a design-only successor
+campaign. Treat 2016-2023 as development-visible. Preserve 2024-2025 as untouched
+final holdout and do not access it until the complete Architecture 151 candidate
+grammar, search budget, walk-forward/development procedure, cost cases,
+selection-bias correction and promotion gates are source-frozen.
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
 
 V1 scope is fixed: intraday-only, long-only, at most one of TQQQ/SQQQ, QQQ as the primary direction reference, two completed-bar confirmation, no same-cycle inverse flip, and forced flat beginning five minutes before official regular-session close. The source-owned hard stop is 3.00% below the reconciled average entry fill and may never be widened. Live readiness requires proving exact full-position stop protection; a broker stop-market order is preferred and software independently treats threshold breach as mandatory EXIT.

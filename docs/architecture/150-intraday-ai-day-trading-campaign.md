@@ -1,6 +1,6 @@
 # Architecture 150 — Intraday AI day-trading research campaign
 
-Status: **DESIGN FROZEN; FOUNDATION + D1 + D1R + D1R-C1 + D2 SOURCE ACCEPTED/INTEGRATED; SPARSE 2016-2023 CUSTODY ACCEPTED; CANONICAL G1 POPULATION SOURCE-FROZEN; DISCOVERY OBSERVER IMPLEMENTED, SOURCE REVIEW PENDING; REAL STRATEGY P&L REMAINS CLOSED**.
+Status: **DESIGN FROZEN; FOUNDATION + D1 + D1R + D1R-C1 + D2 + V1/V1-C1 ACCEPTED/INTEGRATED; G1 DISCOVERY + VALIDATION CONSUMED; 0 VALIDATION SURVIVORS; NO HOLDOUT CANDIDATES; 2024+ REMAINS SEALED**.
 
 ## Product goal
 
@@ -143,9 +143,10 @@ Validation authorization is mechanically the complete SHORTLISTED set in
 manifest ordinal order; callers cannot omit or add candidates. If no trial is
 SHORTLISTED, candidate freezing fails with `NO_VALIDATION_CANDIDATES` and does
 not create validation authorization.
-This population freeze has not consumed a real trial. No real sparse custody
-files have been read for strategy use; the 2021-2023 validation partition and
-all 2024+ data remain unopened.
+The frozen G1 population has now been consumed through discovery and validation.
+All 24 slots advanced mechanically from 2016-2020 discovery, then all 24 failed
+the precommitted 2021-2023 validation economics. There are zero validation
+survivors. All 2024+ data remains unopened.
 
 The G1 population freeze/C1 correction is accepted and integrated at HEAD
 `b6b811bae33a8423e0f6ad588b0f124eb3630591` / tree
@@ -403,12 +404,22 @@ strategy after 2024, so Architecture 150 requires its own untouched historical
 holdout and recent-regime extension rather than trusting headline in-sample
 returns.
 
-## Immediate milestone
+## Terminal result and successor boundary
 
-After exact-source review and integration of V1, the next milestone is one
-separately reviewed offline 2021–2023 validation observation over the full
-accepted discovery candidate set. No validation result can directly authorize
-holdout; the complete-trial selection-bias review remains mandatory.
+The real 2021-2023 validation observation is terminal
+`NO_HOLDOUT_CANDIDATES`: 24 frozen slots evaluated, 0 qualified. No 2024-2025
+holdout or 2026 extension data was opened.
+
+Generation 2 is limited by this frozen architecture to structural
+recombinations of already frozen G1 survivors. Because there are zero G1
+validation survivors, Architecture 150 has no authorized G2 population and is
+terminal.
+
+A successor intraday campaign must use a new architecture. It may treat
+2016-2023 as development-visible historical evidence, but it must preserve
+2024-2025 as untouched final holdout until the successor grammar, search budget,
+walk-forward/development procedure, costs, selection-bias correction and
+promotion gates are frozen.
 
 Do not implement live execution.
 

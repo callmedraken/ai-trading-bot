@@ -2857,27 +2857,29 @@ def family_d_entry_signal(
     if current_segment:
         segments.append(current_segment)
 
-    for segment in segments:
-        local_segment = tuple(local[left] for left, _ in segment)
-        other_segment = tuple(other[right] for _, right in segment)
-        segment_vwaps = tuple(vwap_by_timestamp[bar.timestamp] for bar in other_segment)
-        segment_local_fast = tuple(local_fast_all[left] for left, _ in segment)
-        segment_local_slow = tuple(local_slow_all[left] for left, _ in segment)
-        segment_other_fast = tuple(other_fast_all[right] for _, right in segment)
-        segment_other_slow = tuple(other_slow_all[right] for _, right in segment)
-        signal = _family_d_contiguous_segment_signal(
-            program,
-            local_segment,
-            other_segment,
-            segment_vwaps,
-            segment_local_fast,
-            segment_local_slow,
-            segment_other_fast,
-            segment_other_slow,
-        )
-        if signal is not None:
-            return signal
-    return None
+    final_segment = segments[-1]
+    local_segment = tuple(local[left] for left, _ in final_segment)
+    other_segment = tuple(other[right] for _, right in final_segment)
+    segment_vwaps = tuple(vwap_by_timestamp[bar.timestamp] for bar in other_segment)
+    segment_local_fast = tuple(local_fast_all[left] for left, _ in final_segment)
+    segment_local_slow = tuple(local_slow_all[left] for left, _ in final_segment)
+    segment_other_fast = tuple(other_fast_all[right] for _, right in final_segment)
+    segment_other_slow = tuple(other_slow_all[right] for _, right in final_segment)
+    signal = _family_d_contiguous_segment_signal(
+        program,
+        local_segment,
+        other_segment,
+        segment_vwaps,
+        segment_local_fast,
+        segment_local_slow,
+        segment_other_fast,
+        segment_other_slow,
+    )
+    if signal is None or signal.signal_timestamp != local[-1].timestamp:
+        return None
+    if signal.signal_timestamp != other[-1].timestamp:
+        return None
+    return signal
 
 
 @dataclass(frozen=True, slots=True)

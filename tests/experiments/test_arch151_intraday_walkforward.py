@@ -568,12 +568,13 @@ def _d_two_setup_streams(program):
     first_target, first_other, _, _, _ = _d_reachable_inputs(program)
     first_final = len(first_target) - 1
     parameters = program.parameters
-    second_final = (
-        first_final
-        + parameters.reclaim_deadline_bars
-        + parameters.reclaim_confirmation_bars
-        + 3
+    fresh_segment_warmup = max(
+        parameters.ema_slow + 2,
+        parameters.atr_lookback + 1,
+        parameters.swing_peak_window_bars,
     )
+    second_setup = first_final + 2 + fresh_segment_warmup
+    second_final = second_setup + parameters.reclaim_confirmation_bars
     full_target = list(_flat_aggregate_session(_NORMAL_DAY, program.resolution))
     full_other = list(
         _flat_aggregate_session(_NORMAL_DAY, program.resolution, Decimal("100"))
@@ -626,7 +627,7 @@ def _d_two_setup_streams(program):
             low=other_previous.high + Decimal("0.001"),
             symbol="QQQ",
         )
-    second_setup = _install_d_setup(program, full_target, second_final)
+    assert _install_d_setup(program, full_target, second_final) == second_setup
     assert program.entry_window.contains(full_target[second_final].completed_at)
     confirming_vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in full_other)
     return (
@@ -1810,6 +1811,52 @@ def test_family_d_does_not_bridge_cross_confirmation_across_a_gap() -> None:
     )
 
 
+@pytest.mark.parametrize("gap_symbol", ["SPY", "QQQ"])
+def test_family_d_discards_pre_gap_signal_when_final_segment_has_no_setup(
+    gap_symbol: str,
+) -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    (
+        _target,
+        confirming_all,
+        _vwaps,
+        _target_session,
+        _confirming_session,
+        first_final,
+        second_setup,
+        _second_final,
+        full_target,
+    ) = _d_two_setup_streams(program)
+    full_confirming = tuple(confirming_all)
+    cutoff = second_setup
+    gap_index = first_final + 1
+    target = tuple(
+        bar
+        for index, bar in enumerate(full_target[:cutoff])
+        if gap_symbol != "SPY" or index != gap_index
+    )
+    confirming = tuple(
+        bar
+        for index, bar in enumerate(full_confirming[:cutoff])
+        if gap_symbol != "QQQ" or index != gap_index
+    )
+    vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in confirming)
+    target_session = _verified_test_session(target)
+    confirming_session = _verified_test_session(confirming)
+
+    result = family_d_entry_signal(
+        program,
+        target,
+        confirming,
+        vwaps,
+        target_session=target_session,
+        confirming_session=confirming_session,
+    )
+
+    assert target[-1].timestamp == confirming[-1].timestamp
+    assert result is None
+
+
 def test_family_d_gap_near_close_without_fresh_warmup_has_no_signal() -> None:
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
     target = _flat_aggregate_session(_NORMAL_DAY, program.resolution)
@@ -1924,6 +1971,50 @@ def test_family_d_later_independent_setup_signals_after_first_decision() -> None
     assert second_signal.setup_timestamp > first_prefix_signal.setup_timestamp
 
 
+@pytest.mark.parametrize("gap_symbol", ["SPY", "QQQ"])
+def test_family_d_later_independent_setup_signals_after_gap(gap_symbol: str) -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    (
+        target_all,
+        confirming_all,
+        _vwaps,
+        _target_session,
+        _confirming_session,
+        first_final,
+        second_setup,
+        second_final,
+        full_target,
+    ) = _d_two_setup_streams(program)
+    gap_index = first_final + 1
+    target = tuple(
+        bar
+        for index, bar in enumerate(target_all)
+        if gap_symbol != "SPY" or index != gap_index
+    )
+    confirming = tuple(
+        bar
+        for index, bar in enumerate(confirming_all)
+        if gap_symbol != "QQQ" or index != gap_index
+    )
+    vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in confirming)
+    target_session = _verified_test_session(target)
+    confirming_session = _verified_test_session(confirming)
+
+    signal = family_d_entry_signal(
+        program,
+        target,
+        confirming,
+        vwaps,
+        target_session=target_session,
+        confirming_session=confirming_session,
+    )
+
+    assert signal is not None
+    assert signal.setup_timestamp == full_target[second_setup].timestamp
+    assert signal.signal_timestamp == full_target[second_final].timestamp
+    assert signal.signal_timestamp == target[-1].timestamp == confirming[-1].timestamp
+
+
 def test_family_d_expired_first_entry_does_not_block_later_signal() -> None:
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
     (
@@ -1937,17 +2028,52 @@ def test_family_d_expired_first_entry_does_not_block_later_signal() -> None:
         second_final,
         full_target,
     ) = _d_two_setup_streams(program)
-    all_minutes = list(_minutes_for_aggregates(full_target, program.resolution))
+    target_minutes = list(
+        _minutes_for_aggregates(full_target[: second_final + 1], program.resolution)
+    )
+    confirming_minutes = list(_minutes_for_aggregates(confirming, program.resolution))
     first_signal_bar = full_target[first_final]
     second_signal_bar = full_target[second_final]
-    all_minutes = [
+    next_entry_minute = second_signal_bar.completed_at
+    schedule = _AUTHORITY.schedule_for(_NORMAL_DAY)
+    assert schedule is not None
+    next_entry_offset = int(
+        (next_entry_minute - schedule.opens_at).total_seconds() // 60
+    )
+    next_bucket = full_target[second_final + 1]
+    target_minutes.append(
+        _minute(
+            "SPY",
+            _NORMAL_DAY,
+            next_entry_offset,
+            open_price=str(next_bucket.open),
+            high=str(next_bucket.high),
+            low=str(next_bucket.low),
+            close=str(next_bucket.close),
+            volume=next_bucket.volume // int(program.resolution),
+        )
+    )
+    target_minutes = [
         minute
-        for minute in all_minutes
+        for minute in target_minutes
         if minute.timestamp != first_signal_bar.completed_at
     ]
-    minute_times = {minute.timestamp for minute in all_minutes}
+    minute_times = {minute.timestamp for minute in target_minutes}
     assert first_signal_bar.completed_at not in minute_times
-    assert second_signal_bar.completed_at in minute_times
+    assert next_entry_minute in minute_times
+
+    target = aggregate_sparse_bars(target_minutes, program.resolution).bars
+    confirming = aggregate_sparse_bars(confirming_minutes, program.resolution).bars
+    assert all(
+        bar.timestamp != full_target[first_final + 1].timestamp for bar in target
+    )
+    target_session = arch151._test_only_verified_sparse_session(
+        target, minute_bars=target_minutes
+    )
+    confirming_session = arch151._test_only_verified_sparse_session(
+        confirming, minute_bars=confirming_minutes
+    )
+    vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in confirming)
 
     later_signal = family_d_entry_signal(
         program,
@@ -1959,6 +2085,11 @@ def test_family_d_expired_first_entry_does_not_block_later_signal() -> None:
     )
     assert later_signal is not None
     assert later_signal.signal_timestamp == second_signal_bar.timestamp
+    assert (
+        later_signal.signal_timestamp
+        == target[-1].timestamp
+        == confirming[-1].timestamp
+    )
 
 
 def test_family_d_gap_recovery_requires_fresh_warmup_and_verified_projection() -> None:
@@ -2042,6 +2173,50 @@ def test_family_d_each_prefix_matches_its_current_decision_result() -> None:
         observed.append(result)
     assert observed[-1] is not None
     assert all(result is None for result in observed[:-1])
+
+
+def test_family_d_prefixes_remain_causal_across_a_cross_symbol_gap() -> None:
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01)
+    (
+        target_all,
+        confirming_all,
+        _vwaps,
+        _target_session,
+        _confirming_session,
+        first_final,
+        _second_setup,
+        _second_final,
+        _full_target,
+    ) = _d_two_setup_streams(program)
+    gap_index = first_final + 1
+    target = tuple(bar for index, bar in enumerate(target_all) if index != gap_index)
+    confirming = tuple(confirming_all)
+    target_session = _verified_test_session(target)
+    confirming_session = _verified_test_session(confirming)
+
+    for decision_timestamp in sorted(
+        {bar.timestamp for bar in target} | {bar.timestamp for bar in confirming}
+    ):
+        target_prefix = tuple(
+            bar for bar in target if bar.timestamp <= decision_timestamp
+        )
+        confirming_prefix = tuple(
+            bar for bar in confirming if bar.timestamp <= decision_timestamp
+        )
+        if not target_prefix or not confirming_prefix:
+            continue
+        vwaps = tuple(VwapObservation(bar, Decimal("90")) for bar in confirming_prefix)
+        signal = family_d_entry_signal(
+            program,
+            target_prefix,
+            confirming_prefix,
+            vwaps,
+            target_session=target_session,
+            confirming_session=confirming_session,
+        )
+        if signal is not None:
+            assert signal.signal_timestamp == target_prefix[-1].timestamp
+            assert signal.signal_timestamp == confirming_prefix[-1].timestamp
 
 
 def test_family_d_same_bar_signal_tie_break_is_stable() -> None:

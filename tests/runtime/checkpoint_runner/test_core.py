@@ -453,6 +453,13 @@ def test_arch151_evaluator_successor_is_source_only_and_diff_selected():
         "src/trading_bot/experiments/arch151_intraday_walkforward_evaluator.py"
         in spec.ruff_paths
     )
+    assert (
+        "src/trading_bot/experiments/arch151_intraday_walkforward_operator.py"
+        in spec.ruff_paths
+    )
+    assert (
+        "tests/experiments/test_arch151_intraday_walkforward_operator.py" in spec.tests
+    )
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert name not in runner.ACTIVE_CI_CHECKPOINTS
     assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) == 1

@@ -35,7 +35,8 @@ BAR_SCHEMA = "arch151-intraday-walkforward-bar/v1"
 AGGREGATION_SCHEMA = "arch151-sparse-aggregate/v1"
 CALIBRATION_SCHEMA = "arch151-family-a-calibration/v2"
 EXECUTION_POLICY_SCHEMA = "arch151-causal-execution-policy/v1"
-_FOLD_EVALUATION_SCHEMA = "arch151-fold-evaluation/v2"
+_FOLD_EVALUATION_SCHEMA = "arch151-fold-evaluation/v3"
+_QUALIFICATION_SCHEMA = "arch151-development-qualification/v3"
 SEMANTIC_CONTRACT_VERSION = "arch151-frozen-design-2026-11-23/v1"
 IDENTITY_NAMESPACE_SEED = (
     "urn:ai-trading-bot:arch151:intraday-walkforward-foundation:v1"
@@ -79,13 +80,26 @@ _CALIBRATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "family-a-calibration/v2")
 _D1R_HISTORY_NAMESPACE = uuid5(_ROOT_NAMESPACE, "arch150-d1r-source-history/v1")
 _FEATURE_CACHE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "session-feature-cache-key/v1")
 _FOLD_NAMESPACE = uuid5(_ROOT_NAMESPACE, "walk-forward-fold/v1")
-_EVALUATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "fold-evaluation/v2")
+_EVALUATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "fold-evaluation/v3")
 _LEDGER_NAMESPACE = uuid5(_ROOT_NAMESPACE, "prior-trial-ledger/v1")
 _SELECTION_INPUT_NAMESPACE = uuid5(_ROOT_NAMESPACE, "selection-bias-input/v2")
 _DSR_EVIDENCE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "verified-dsr-evidence/v1")
-_DSR_CALCULATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "dsr-population-calculation/v1")
-_QUALIFICATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "development-qualification/v2")
+_DSR_CALCULATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "dsr-population-calculation/v2")
+_QUALIFICATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "development-qualification/v3")
 _FINAL_FREEZE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "final-candidate-freeze/v2")
+_AUTHENTICATED_DEVELOPMENT_EVIDENCE_NAMESPACE = uuid5(
+    _ROOT_NAMESPACE, "authenticated-development-evidence/v1"
+)
+_LATER_PERIOD_QUALIFICATION_NAMESPACE = uuid5(
+    _ROOT_NAMESPACE, "later-period-qualification/v1"
+)
+_HOLDOUT_AUTHORIZATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "holdout-authorization/v1")
+_EXTENSION_AUTHORIZATION_NAMESPACE = uuid5(
+    _ROOT_NAMESPACE, "extension-authorization/v1"
+)
+_RESEARCH_SURVIVOR_NAMESPACE = uuid5(
+    _ROOT_NAMESPACE, "research-survivor-classification/v1"
+)
 _FAMILY_A_MEASURE_SEAL = object()
 _FAMILY_A_CALIBRATION_SEAL = object()
 _VERIFIED_SPARSE_SESSION_SEAL = object()
@@ -98,8 +112,11 @@ _FINAL_FREEZE_SEAL = object()
 _AUTHENTICATED_DEVELOPMENT_EVIDENCE_SEAL = object()
 _VERIFIED_SELECTION_BIAS_SEAL = object()
 _AUTHENTICATED_HOLDOUT_PASS_SEAL = object()
+_AUTHENTICATED_EXTENSION_PASS_SEAL = object()
 _HOLDOUT_AUTHORIZATION_SEAL = object()
 _EXTENSION_AUTHORIZATION_SEAL = object()
+_LATER_PERIOD_QUALIFICATION_SEAL = object()
+_RESEARCH_SURVIVOR_CLASSIFICATION_SEAL = object()
 
 
 class Arch151Error(ValueError):
@@ -2310,37 +2327,43 @@ def _source_calibration_provenance(history: object) -> str:
     return sha256(_canonical_json(material)).hexdigest()
 
 
-def calibrate_family_a_from_source_history(
+def _family_a_historical_measures_from_source_history(
     history: Arch150D1RSourceHistory | _SyntheticSourceHistory,
-    program: Arch151Program,
     symbol: str,
     scored_year: int,
-) -> FamilyACalibration:
-    """Calibrate A from complete source sessions strictly before scored year."""
-
+) -> tuple[FamilyASessionMeasure, ...]:
+    """Return the source-bound complete-session prefix for one symbol/year."""
     _source_history_digest(history)
     provenance_digest = _source_calibration_provenance(history)
     if symbol not in INITIAL_UNIVERSE:
         raise Arch151Error("Family A calibration symbol is outside frozen SPY/QQQ")
     if type(scored_year) is not int or scored_year not in SCORED_YEARS:
         raise ValueError("scored year is outside the five frozen Arch151 years")
-    if (
-        not _is_canonical_program(program)
-        or program.family is not StrategyFamily.NOISE_VWAP_BREAKOUT
-    ):
-        raise UnsupportedProgramError("Family A history needs a canonical A program")
-    measures: list[FamilyASessionMeasure] = []
-    for projection in history._session_projections:
-        if (
-            projection.symbol != symbol
-            or projection.session_date >= date(scored_year, 1, 1)
-            or not projection.aggregate_streams
-            or projection.aggregate_streams[0].resolution
-            is not BarResolution.FIVE_MINUTE
-        ):
-            continue
+    a_parameters = tuple(
+        program.parameters
+        for program in CANONICAL_PROGRAMS
+        if program.family is StrategyFamily.NOISE_VWAP_BREAKOUT
+        and type(program.parameters) is NoiseBreakoutParameters
+    )
+    required_sessions = max(
+        max(item.noise_lookback_sessions, item.regime_sessions) for item in a_parameters
+    )
+    prior_projections = sorted(
+        (
+            projection
+            for projection in history._session_projections
+            if projection.symbol == symbol
+            and projection.session_date < date(scored_year, 1, 1)
+            and projection.aggregate_streams
+            and projection.aggregate_streams[0].resolution is BarResolution.FIVE_MINUTE
+        ),
+        key=lambda item: item.session_date,
+        reverse=True,
+    )
+    reverse_measures: list[FamilyASessionMeasure] = []
+    for projection in prior_projections:
         try:
-            measures.append(
+            reverse_measures.append(
                 _bind_family_a_measure_to_source(
                     family_a_historical_session_measure(projection.minutes),
                     provenance_digest,
@@ -2350,7 +2373,29 @@ def calibrate_family_a_from_source_history(
             # Sparse historical sessions are omitted from the complete-session
             # calibration population, never repaired or treated as zero.
             continue
-    return calibrate_family_a(program, tuple(measures), scored_year)
+        if len(reverse_measures) == required_sessions:
+            break
+    return tuple(reversed(reverse_measures))
+
+
+def calibrate_family_a_from_source_history(
+    history: Arch150D1RSourceHistory | _SyntheticSourceHistory,
+    program: Arch151Program,
+    symbol: str,
+    scored_year: int,
+) -> FamilyACalibration:
+    """Calibrate A from complete source sessions strictly before scored year."""
+
+    if (
+        not _is_canonical_program(program)
+        or program.family is not StrategyFamily.NOISE_VWAP_BREAKOUT
+    ):
+        raise UnsupportedProgramError("Family A history needs a canonical A program")
+    return calibrate_family_a(
+        program,
+        _family_a_historical_measures_from_source_history(history, symbol, scored_year),
+        scored_year,
+    )
 
 
 def family_a_current_measure_from_source_history(
@@ -4069,15 +4114,15 @@ class ProfitFactor:
             )
 
     @classmethod
-    def from_gross_totals(
-        cls, gross_positive: Decimal, gross_negative: Decimal
+    def from_totals(
+        cls, positive_total: Decimal, negative_total: Decimal
     ) -> ProfitFactor:
-        if type(gross_positive) is not Decimal or type(gross_negative) is not Decimal:
-            raise TypeError("gross trade P&L totals must be Decimal values")
-        positive = _decimal(gross_positive, "gross positive trade P&L")
-        negative = _decimal(gross_negative, "gross negative trade P&L")
+        if type(positive_total) is not Decimal or type(negative_total) is not Decimal:
+            raise TypeError("trade P&L totals must be Decimal values")
+        positive = _decimal(positive_total, "positive trade P&L")
+        negative = _decimal(negative_total, "negative trade P&L")
         if positive < 0 or negative < 0:
-            raise Arch151Error("invalid gross P&L evidence cannot produce a PF metric")
+            raise Arch151Error("invalid trade P&L evidence cannot produce a PF metric")
         if positive == 0 and negative == 0:
             return cls(ProfitFactorState.UNDEFINED, None)
         if positive > 0 and negative == 0:
@@ -4139,6 +4184,8 @@ class FoldMetrics:
     round_trips_by_session: tuple[int, ...]
     gross_positive_trade_pnl: Decimal
     gross_negative_trade_pnl: Decimal
+    net_positive_trade_pnl: Decimal
+    net_negative_trade_pnl: Decimal
     annual_turnover: Decimal
 
     def __post_init__(self) -> None:
@@ -4165,6 +4212,8 @@ class FoldMetrics:
         if (
             type(self.gross_positive_trade_pnl) is not Decimal
             or type(self.gross_negative_trade_pnl) is not Decimal
+            or type(self.net_positive_trade_pnl) is not Decimal
+            or type(self.net_negative_trade_pnl) is not Decimal
             or type(self.annual_turnover) is not Decimal
         ):
             raise TypeError("fold P&L and turnover inputs must be Decimal values")
@@ -4174,25 +4223,32 @@ class FoldMetrics:
         gross_negative = _decimal(
             self.gross_negative_trade_pnl, "gross negative trade P&L"
         )
+        net_positive = _decimal(self.net_positive_trade_pnl, "net positive trade P&L")
+        net_negative = _decimal(self.net_negative_trade_pnl, "net negative trade P&L")
         annual_turnover = _decimal(self.annual_turnover, "annual turnover")
-        if gross_positive < 0 or gross_negative < 0:
-            raise Arch151Error("invalid gross trade P&L evidence")
+        if min(gross_positive, gross_negative, net_positive, net_negative) < 0:
+            raise Arch151Error("invalid gross or realized net trade P&L evidence")
         if annual_turnover < 0:
             raise ValueError("annual turnover cannot be negative")
         if not any(round_trips) and (
             gross_positive != 0
             or gross_negative != 0
+            or net_positive != 0
+            or net_negative != 0
             or any(normalized_returns)
             or annual_turnover != 0
         ):
             raise Arch151Error(
-                "zero-trade fold requires zero returns, gross economics, and turnover"
+                "zero-trade fold requires zero returns, gross/net economics, "
+                "and turnover"
             )
         object.__setattr__(self, "session_net_returns", normalized_returns)
         object.__setattr__(self, "session_dates", session_dates)
         object.__setattr__(self, "round_trips_by_session", round_trips)
         object.__setattr__(self, "gross_positive_trade_pnl", gross_positive)
         object.__setattr__(self, "gross_negative_trade_pnl", gross_negative)
+        object.__setattr__(self, "net_positive_trade_pnl", net_positive)
+        object.__setattr__(self, "net_negative_trade_pnl", net_negative)
         object.__setattr__(self, "annual_turnover", annual_turnover)
 
     @property
@@ -4205,7 +4261,13 @@ class FoldMetrics:
 
     @property
     def profit_factor(self) -> ProfitFactor:
-        return ProfitFactor.from_gross_totals(
+        return ProfitFactor.from_totals(
+            self.net_positive_trade_pnl, self.net_negative_trade_pnl
+        )
+
+    @property
+    def pre_cost_profit_factor(self) -> ProfitFactor:
+        return ProfitFactor.from_totals(
             self.gross_positive_trade_pnl, self.gross_negative_trade_pnl
         )
 
@@ -4239,7 +4301,10 @@ def _fold_metrics_material(metrics: FoldMetrics) -> dict[str, object]:
         "round_trips_by_session": list(metrics.round_trips_by_session),
         "gross_positive_trade_pnl": _decimal_text(metrics.gross_positive_trade_pnl),
         "gross_negative_trade_pnl": _decimal_text(metrics.gross_negative_trade_pnl),
+        "net_positive_trade_pnl": _decimal_text(metrics.net_positive_trade_pnl),
+        "net_negative_trade_pnl": _decimal_text(metrics.net_negative_trade_pnl),
         "profit_factor": metrics.profit_factor.canonical_material(),
+        "pre_cost_profit_factor": metrics.pre_cost_profit_factor.canonical_material(),
         "annual_turnover": _decimal_text(metrics.annual_turnover),
     }
 
@@ -4384,6 +4449,7 @@ class DevelopmentAggregate:
     economics_case: FillCostCase
     net_return: Decimal
     profit_factor: ProfitFactor | Decimal
+    pre_cost_profit_factor: ProfitFactor | Decimal
     positive_scored_years: int
     profitable_scored_years: int
     worst_scored_year_return: Decimal
@@ -4419,6 +4485,16 @@ class DevelopmentAggregate:
             )
         elif type(self.profit_factor) is not ProfitFactor:
             raise TypeError("development profit factor must have an explicit state")
+        if type(self.pre_cost_profit_factor) is Decimal:
+            object.__setattr__(
+                self,
+                "pre_cost_profit_factor",
+                ProfitFactor.finite(self.pre_cost_profit_factor),
+            )
+        elif type(self.pre_cost_profit_factor) is not ProfitFactor:
+            raise TypeError(
+                "development pre-cost profit factor must have an explicit state"
+            )
         if self.sharpe is not None:
             if type(self.sharpe) is not Decimal:
                 raise TypeError("development Sharpe must be a Decimal value")
@@ -4470,11 +4546,68 @@ class SelectionBiasStatus(StrEnum):
     STATISTICAL_EVIDENCE_UNAVAILABLE = "STATISTICAL_EVIDENCE_UNAVAILABLE"
 
 
+class DsrTrialStatus(StrEnum):
+    SHARPE_AVAILABLE = "SHARPE_AVAILABLE"
+    SHARPE_UNAVAILABLE = "SHARPE_UNAVAILABLE"
+
+
 class DsrUnavailableReason(StrEnum):
     UNDEFINED_TRIAL_SHARPE = "UNDEFINED_TRIAL_SHARPE"
     ZERO_TRIAL_SHARPE_VARIANCE = "ZERO_TRIAL_SHARPE_VARIANCE"
     INVALID_CANDIDATE_MOMENTS = "INVALID_CANDIDATE_MOMENTS"
     DEGENERATE_DSR_VARIANCE = "DEGENERATE_DSR_VARIANCE"
+
+
+@dataclass(frozen=True, slots=True)
+class DsrTrialDiagnostic:
+    """Candidate-level DSR input status retained for every canonical slot."""
+
+    candidate_slot_id: UUID
+    status: DsrTrialStatus
+    daily_sharpe: Decimal | None
+    unavailable_reason: DsrUnavailableReason | None
+
+    def __post_init__(self) -> None:
+        if type(self.candidate_slot_id) is not UUID:
+            raise TypeError("DSR diagnostic requires a canonical slot UUID")
+        if type(self.status) is not DsrTrialStatus:
+            raise TypeError("DSR trial status must be a closed enum")
+        if (
+            self.unavailable_reason is not None
+            and type(self.unavailable_reason) is not DsrUnavailableReason
+        ):
+            raise TypeError("DSR trial reason must be a closed enum")
+        if self.status is DsrTrialStatus.SHARPE_AVAILABLE:
+            if (
+                type(self.daily_sharpe) is not Decimal
+                or not self.daily_sharpe.is_finite()
+                or self.unavailable_reason
+                is DsrUnavailableReason.UNDEFINED_TRIAL_SHARPE
+            ):
+                raise Arch151Error(
+                    "available Sharpe diagnostic requires a finite value"
+                )
+        else:
+            if not isinstance(self.unavailable_reason, DsrUnavailableReason):
+                raise Arch151Error("unavailable DSR diagnostic requires a reason")
+            if self.daily_sharpe is not None:
+                raise Arch151Error("unavailable Sharpe diagnostic cannot carry a value")
+
+    def canonical_material(self) -> dict[str, str | None]:
+        return {
+            "candidate_slot_id": str(self.candidate_slot_id),
+            "status": self.status.value,
+            "daily_sharpe": (
+                _decimal_text(self.daily_sharpe)
+                if self.daily_sharpe is not None
+                else None
+            ),
+            "unavailable_reason": (
+                self.unavailable_reason.value
+                if self.unavailable_reason is not None
+                else None
+            ),
+        }
 
 
 def _qualification_rejections(
@@ -4568,13 +4701,22 @@ def aggregate_development_economics(
         for value in all_returns:
             net_return *= Decimal(1) + value
         net_return -= Decimal(1)
+        net_positive = sum(
+            (record.metrics.net_positive_trade_pnl for record in records), Decimal(0)
+        )
+        net_negative = sum(
+            (record.metrics.net_negative_trade_pnl for record in records), Decimal(0)
+        )
         gross_positive = sum(
             (record.metrics.gross_positive_trade_pnl for record in records), Decimal(0)
         )
         gross_negative = sum(
             (record.metrics.gross_negative_trade_pnl for record in records), Decimal(0)
         )
-        profit_factor = ProfitFactor.from_gross_totals(gross_positive, gross_negative)
+        profit_factor = ProfitFactor.from_totals(net_positive, net_negative)
+        pre_cost_profit_factor = ProfitFactor.from_totals(
+            gross_positive, gross_negative
+        )
         average_round_trips = Decimal(total_round_trips) / Decimal(len(SCORED_YEARS))
         active_fraction = Decimal(active_sessions) / Decimal(total_sessions)
         turnover = sum(
@@ -4605,6 +4747,7 @@ def aggregate_development_economics(
         economics_case,
         net_return,
         profit_factor,
+        pre_cost_profit_factor,
         sum(value > 0 for value in annual_returns),
         sum(value.exceeds_one for value in annual_profit_factors),
         min(annual_returns),
@@ -4654,7 +4797,7 @@ def qualify_development(
             QualificationRejection.SELECTION_BIAS_PROBABILITY_BELOW_THRESHOLD
         )
     material = {
-        "schema": "arch151-development-qualification/v2",
+        "schema": _QUALIFICATION_SCHEMA,
         "batch_digest": batch.batch_digest,
         "economics_case": FillCostCase.STRESS.value,
         "economic_rejections": [item.value for item in economic_rejections],
@@ -5181,12 +5324,15 @@ class VerifiedSelectionBiasEvidence:
 
 @dataclass(frozen=True, slots=True)
 class SelectionBiasCalculation:
-    """One complete 32-slot DSR calculation or a typed fail-closed result."""
+    """Complete DSR status, candidate diagnostics, and non-authorizing order."""
 
     status: SelectionBiasStatus
     population_digest: str
     effective_trial_count: int
     evidence: tuple[VerifiedSelectionBiasEvidence, ...]
+    trial_diagnostics: tuple[DsrTrialDiagnostic, ...]
+    affected_trial_slot_ids: tuple[UUID, ...]
+    descriptive_economic_order: tuple[UUID, ...]
     unavailable_reason: DsrUnavailableReason | None
     calculation_id: UUID
 
@@ -5205,6 +5351,32 @@ class SelectionBiasCalculation:
             raise TypeError("selection-bias calculation identity must be a UUID")
         if type(self.evidence) is not tuple:
             raise TypeError("selection-bias evidence must be an immutable tuple")
+        expected_slot_ids = tuple(item.slot_id for item in CANONICAL_SLOTS)
+        if (
+            type(self.trial_diagnostics) is not tuple
+            or len(self.trial_diagnostics) != len(expected_slot_ids)
+            or any(
+                type(item) is not DsrTrialDiagnostic for item in self.trial_diagnostics
+            )
+            or tuple(item.candidate_slot_id for item in self.trial_diagnostics)
+            != expected_slot_ids
+        ):
+            raise Arch151Error("DSR diagnostics must preserve all 32 canonical slots")
+        if type(self.affected_trial_slot_ids) is not tuple:
+            raise TypeError("affected DSR slot IDs must be an immutable tuple")
+        if type(self.descriptive_economic_order) is not tuple:
+            raise TypeError("descriptive economic order must be an immutable tuple")
+        unavailable_ids = tuple(
+            item.candidate_slot_id
+            for item in self.trial_diagnostics
+            if item.unavailable_reason is not None
+        )
+        if self.affected_trial_slot_ids != unavailable_ids:
+            raise Arch151Error("affected DSR slots must match candidate diagnostics")
+        if len(self.descriptive_economic_order) != len(expected_slot_ids) or set(
+            self.descriptive_economic_order
+        ) != set(expected_slot_ids):
+            raise Arch151Error("descriptive economic order must preserve all 32 slots")
         if self.status is SelectionBiasStatus.DSR_VERIFIED:
             if (
                 len(self.evidence) != len(CANONICAL_SLOTS)
@@ -5221,18 +5393,37 @@ class SelectionBiasCalculation:
                 or tuple(item.candidate_slot_id for item in self.evidence)
                 != tuple(item.slot_id for item in CANONICAL_SLOTS)
                 or self.unavailable_reason is not None
+                or self.affected_trial_slot_ids
+                or any(
+                    item.status is not DsrTrialStatus.SHARPE_AVAILABLE
+                    or item.unavailable_reason is not None
+                    for item in self.trial_diagnostics
+                )
             ):
                 raise Arch151Error(
                     "verified DSR requires the complete ordered population"
                 )
-        elif self.evidence or not isinstance(
-            self.unavailable_reason, DsrUnavailableReason
+        elif (
+            self.evidence
+            or not isinstance(self.unavailable_reason, DsrUnavailableReason)
+            or not self.affected_trial_slot_ids
+            or self.unavailable_reason
+            != next(
+                item.unavailable_reason
+                for item in self.trial_diagnostics
+                if item.unavailable_reason is not None
+            )
         ):
-            raise Arch151Error("unavailable DSR cannot contain partial evidence")
+            raise Arch151Error(
+                "unavailable DSR requires reasons and no partial evidence"
+            )
         if self.calculation_id != _selection_bias_calculation_id(
             self.status,
             self.population_digest,
             self.evidence,
+            self.trial_diagnostics,
+            self.affected_trial_slot_ids,
+            self.descriptive_economic_order,
             self.unavailable_reason,
         ):
             raise Arch151Error(
@@ -5244,22 +5435,31 @@ def _selection_bias_calculation_id(
     status: SelectionBiasStatus,
     population_digest: str,
     evidence: tuple[VerifiedSelectionBiasEvidence, ...],
+    trial_diagnostics: tuple[DsrTrialDiagnostic, ...],
+    affected_trial_slot_ids: tuple[UUID, ...],
+    descriptive_economic_order: tuple[UUID, ...],
     unavailable_reason: DsrUnavailableReason | None,
 ) -> UUID:
+    common_material = {
+        "schema": "arch151-dsr-population-calculation/v2",
+        "population_digest": population_digest,
+        "status": status.value,
+        "trial_diagnostics": [item.canonical_material() for item in trial_diagnostics],
+        "affected_trial_slot_ids": [str(item) for item in affected_trial_slot_ids],
+        "descriptive_economic_order": [
+            str(item) for item in descriptive_economic_order
+        ],
+    }
     if status is SelectionBiasStatus.DSR_VERIFIED:
         material = {
-            "schema": "arch151-dsr-population-calculation/v1",
-            "population_digest": population_digest,
-            "status": status.value,
+            **common_material,
             "evidence_ids": [str(item.evidence_id) for item in evidence],
         }
     else:
         if not isinstance(unavailable_reason, DsrUnavailableReason):
             raise Arch151Error("unavailable DSR calculation requires a reason")
         material = {
-            "schema": "arch151-dsr-population-calculation/v1",
-            "population_digest": population_digest,
-            "status": status.value,
+            **common_material,
             "reason": unavailable_reason.value,
         }
     canonical = _canonical_json(material)
@@ -5409,21 +5609,96 @@ def _selection_bias_population_digest(
     return sha256(_canonical_json(material)).hexdigest()
 
 
+def rank_descriptive_economic_population(
+    batches: Sequence[DevelopmentEvaluationBatch],
+) -> tuple[UUID, ...]:
+    """Order all canonical slots descriptively without DSR or freeze authority.
+
+    Undefined Sharpe values sort after finite Sharpe values at that tie-break;
+    they do not remove a slot from this complete descriptive order.
+    """
+
+    population = tuple(batches)
+    expected = tuple(item.slot_id for item in CANONICAL_SLOTS)
+    if (
+        len(population) != len(expected)
+        or any(type(item) is not DevelopmentEvaluationBatch for item in population)
+        or tuple(item.slot_id for item in population) != expected
+    ):
+        raise Arch151Error(
+            "descriptive economic order requires all 32 canonical slot batches"
+        )
+    ordered: list[tuple[tuple[Decimal | int, ...], UUID]] = []
+    for batch in population:
+        aggregate = aggregate_development_economics(batch, FillCostCase.STRESS)
+        if type(aggregate.profit_factor) is not ProfitFactor:
+            raise Arch151Error("descriptive order requires typed STRESS profit factor")
+        sharpe_unavailable = aggregate.sharpe is None
+        sharpe_key = (
+            Decimal(0) if sharpe_unavailable else -aggregate.sharpe  # type: ignore[operator]
+        )
+        key: tuple[Decimal | int, ...] = (
+            -aggregate.worst_scored_year_return,
+            *aggregate.profit_factor.ranking_key,
+            int(sharpe_unavailable),
+            sharpe_key,
+            aggregate.max_drawdown,
+            aggregate.turnover,
+            batch.slot_id.int,
+        )
+        ordered.append((key, batch.slot_id))
+    return tuple(slot_id for _key, slot_id in sorted(ordered))
+
+
 def _unavailable_selection_bias_calculation(
-    population_digest: str, reason: DsrUnavailableReason
+    population_digest: str,
+    reason: DsrUnavailableReason,
+    trial_diagnostics: tuple[DsrTrialDiagnostic, ...],
+    descriptive_economic_order: tuple[UUID, ...],
 ) -> SelectionBiasCalculation:
+    affected = tuple(
+        item.candidate_slot_id
+        for item in trial_diagnostics
+        if item.unavailable_reason is not None
+    )
+    status = SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
+    calculation_id = _selection_bias_calculation_id(
+        status,
+        population_digest,
+        (),
+        trial_diagnostics,
+        affected,
+        descriptive_economic_order,
+        reason,
+    )
     return SelectionBiasCalculation(
-        SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE,
+        status,
         population_digest,
         SELECTION_BIAS_INPUT.effective_trial_count,
         (),
+        trial_diagnostics,
+        affected,
+        descriptive_economic_order,
         reason,
-        _selection_bias_calculation_id(
-            SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE,
-            population_digest,
-            (),
+        calculation_id,
+    )
+
+
+def _mark_population_dsr_unavailable(
+    diagnostics: tuple[DsrTrialDiagnostic, ...], reason: DsrUnavailableReason
+) -> tuple[DsrTrialDiagnostic, ...]:
+    return tuple(
+        DsrTrialDiagnostic(
+            diagnostic.candidate_slot_id,
+            (
+                DsrTrialStatus.SHARPE_AVAILABLE
+                if diagnostic.daily_sharpe is not None
+                else DsrTrialStatus.SHARPE_UNAVAILABLE
+            ),
+            diagnostic.daily_sharpe,
             reason,
-        ),
+        )
+        for diagnostic in diagnostics
     )
 
 
@@ -5441,7 +5716,9 @@ def compute_selection_bias_evidence(
     if tuple(item.slot_id for item in population) != expected_slots:
         raise Arch151Error("DSR population must preserve canonical manifest order")
     population_digest = _selection_bias_population_digest(population)
-    trial_statistics: list[tuple[Decimal, Decimal, Decimal, Decimal]] = []
+    descriptive_order = rank_descriptive_economic_population(population)
+    trial_statistics: list[tuple[Decimal, Decimal, Decimal, Decimal] | None] = []
+    trial_diagnostics: list[DsrTrialDiagnostic] = []
     for batch in population:
         stress_records = tuple(
             record
@@ -5462,13 +5739,70 @@ def compute_selection_bias_evidence(
                 if isinstance(statistics, DsrUnavailableReason)
                 else DsrUnavailableReason.UNDEFINED_TRIAL_SHARPE
             )
-            return _unavailable_selection_bias_calculation(population_digest, reason)
+            trial_statistics.append(None)
+            trial_diagnostics.append(
+                DsrTrialDiagnostic(
+                    batch.slot_id,
+                    DsrTrialStatus.SHARPE_UNAVAILABLE,
+                    None,
+                    reason,
+                )
+            )
+            continue
+        if (
+            type(statistics) is not tuple
+            or len(statistics) != 4
+            or any(
+                type(value) is not Decimal or not value.is_finite()
+                for value in statistics
+            )
+            or statistics[3] <= 0
+        ):
+            trial_statistics.append(None)
+            trial_diagnostics.append(
+                DsrTrialDiagnostic(
+                    batch.slot_id,
+                    DsrTrialStatus.SHARPE_UNAVAILABLE,
+                    None,
+                    DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS,
+                )
+            )
+            continue
         trial_statistics.append(statistics)
-    sharpes = tuple(item[0] for item in trial_statistics)
-    sharpe_dispersion = _sample_standard_deviation_centered(sharpes)
-    if sharpe_dispersion == 0:
+        trial_diagnostics.append(
+            DsrTrialDiagnostic(
+                batch.slot_id,
+                DsrTrialStatus.SHARPE_AVAILABLE,
+                statistics[0],
+                None,
+            )
+        )
+    diagnostics = tuple(trial_diagnostics)
+    candidate_unavailable = tuple(
+        item for item in diagnostics if item.unavailable_reason is not None
+    )
+    if candidate_unavailable:
+        reason = candidate_unavailable[0].unavailable_reason
+        assert reason is not None
         return _unavailable_selection_bias_calculation(
-            population_digest, DsrUnavailableReason.ZERO_TRIAL_SHARPE_VARIANCE
+            population_digest, reason, diagnostics, descriptive_order
+        )
+
+    concrete_statistics = tuple(item for item in trial_statistics if item is not None)
+    sharpes = tuple(item[0] for item in concrete_statistics)
+    try:
+        sharpe_dispersion = _sample_standard_deviation_centered(sharpes)
+    except ArithmeticError:
+        reason = DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+        diagnostics = _mark_population_dsr_unavailable(diagnostics, reason)
+        return _unavailable_selection_bias_calculation(
+            population_digest, reason, diagnostics, descriptive_order
+        )
+    if sharpe_dispersion == 0:
+        reason = DsrUnavailableReason.ZERO_TRIAL_SHARPE_VARIANCE
+        diagnostics = _mark_population_dsr_unavailable(diagnostics, reason)
+        return _unavailable_selection_bias_calculation(
+            population_digest, reason, diagnostics, descriptive_order
         )
     try:
         with localcontext(_DECIMAL_CONTEXT):
@@ -5477,12 +5811,15 @@ def compute_selection_bias_evidence(
             )
             time_scale = Decimal(DSR_OBSERVATION_COUNT - 1).sqrt()
     except ArithmeticError:
+        reason = DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+        diagnostics = _mark_population_dsr_unavailable(diagnostics, reason)
         return _unavailable_selection_bias_calculation(
-            population_digest, DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+            population_digest, reason, diagnostics, descriptive_order
         )
     evidence_records: list[VerifiedSelectionBiasEvidence] = []
+    failures: dict[UUID, DsrUnavailableReason] = {}
     for batch, (sharpe, skew, kurtosis, _std) in zip(
-        population, trial_statistics, strict=True
+        population, concrete_statistics, strict=True
     ):
         with localcontext(_DECIMAL_CONTEXT):
             dsr_variance = (
@@ -5491,18 +5828,23 @@ def compute_selection_bias_evidence(
                 + ((kurtosis - Decimal(1)) / Decimal(4)) * sharpe**2
             )
         if not dsr_variance.is_finite() or dsr_variance <= 0:
-            return _unavailable_selection_bias_calculation(
-                population_digest, DsrUnavailableReason.DEGENERATE_DSR_VARIANCE
-            )
+            failures[batch.slot_id] = DsrUnavailableReason.DEGENERATE_DSR_VARIANCE
+            continue
         try:
             with localcontext(_DECIMAL_CONTEXT):
                 probability = _normal_cdf(
                     (sharpe - expected_maximum) * time_scale / dsr_variance.sqrt()
                 )
         except ArithmeticError:
-            return _unavailable_selection_bias_calculation(
-                population_digest, DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
-            )
+            failures[batch.slot_id] = DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+            continue
+        if (
+            type(probability) is not Decimal
+            or not probability.is_finite()
+            or not (Decimal(0) <= probability <= Decimal(1))
+        ):
+            failures[batch.slot_id] = DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+            continue
         evidence_records.append(
             VerifiedSelectionBiasEvidence(
                 _seal=_VERIFIED_SELECTION_BIAS_SEAL,
@@ -5516,19 +5858,43 @@ def compute_selection_bias_evidence(
                 probability=probability,
             )
         )
+    if failures:
+        diagnostics = tuple(
+            DsrTrialDiagnostic(
+                item.candidate_slot_id,
+                DsrTrialStatus.SHARPE_AVAILABLE
+                if item.candidate_slot_id in failures
+                else item.status,
+                item.daily_sharpe,
+                failures.get(item.candidate_slot_id, item.unavailable_reason),
+            )
+            for item in diagnostics
+        )
+        reason = next(iter(failures.values()))
+        return _unavailable_selection_bias_calculation(
+            population_digest, reason, diagnostics, descriptive_order
+        )
     evidence = tuple(evidence_records)
+    status = SelectionBiasStatus.DSR_VERIFIED
+    calculation_id = _selection_bias_calculation_id(
+        status,
+        population_digest,
+        evidence,
+        diagnostics,
+        (),
+        descriptive_order,
+        None,
+    )
     return SelectionBiasCalculation(
-        SelectionBiasStatus.DSR_VERIFIED,
+        status,
         population_digest,
         SELECTION_BIAS_INPUT.effective_trial_count,
         evidence,
+        diagnostics,
+        (),
+        descriptive_order,
         None,
-        _selection_bias_calculation_id(
-            SelectionBiasStatus.DSR_VERIFIED,
-            population_digest,
-            evidence,
-            None,
-        ),
+        calculation_id,
     )
 
 
@@ -5585,18 +5951,219 @@ def rank_verified_candidate_population(
 
 @dataclass(frozen=True, slots=True, init=False)
 class AuthenticatedDevelopmentEvidence:
-    """Authenticated evaluator output type; this source foundation cannot issue it."""
+    """Sealed binding of the complete accepted-source development result."""
 
     freeze_id: UUID
+    freeze_fingerprint: str
+    candidate_slot_id: UUID
     source_manifest_id: UUID
+    manifest_fingerprint: str
     batch_digests: tuple[str, ...]
+    year_batch_ids: tuple[UUID, ...]
+    run_id: UUID
+    report_id: UUID
+    report_sha256: str
+    record_count: int
+    source_kind: str
+    source_binding_id: UUID
+    source_digest: str
+    source_branch: str
+    source_origin: str
+    source_head: str
+    source_tree: str
+    invocation_id: UUID
+    source_revision_digest: str
+    selection_bias_calculation_id: UUID
+    selection_bias_population_digest: str
+    selection_bias_ledger_id: UUID
+    selection_bias_effective_trial_count: int
+    selection_bias_evidence_ids: tuple[UUID, ...]
+    selection_bias_evidence_digests: tuple[str, ...]
+    evidence_id: UUID
     evidence_digest: str
     _seal: object
 
-    def __init__(self, *_args: object, **_kwargs: object) -> None:
-        raise AuthorizationUnavailableError(
-            "authenticated development evidence is unavailable in this foundation"
+    def __init__(
+        self,
+        *,
+        _seal: object = None,
+        freeze_id: UUID,
+        freeze_fingerprint: str,
+        candidate_slot_id: UUID,
+        source_manifest_id: UUID,
+        manifest_fingerprint: str,
+        batch_digests: tuple[str, ...],
+        year_batch_ids: tuple[UUID, ...],
+        run_id: UUID,
+        report_id: UUID,
+        report_sha256: str,
+        record_count: int,
+        source_kind: str,
+        source_binding_id: UUID,
+        source_digest: str,
+        source_branch: str,
+        source_origin: str,
+        source_head: str,
+        source_tree: str,
+        invocation_id: UUID,
+        source_revision_digest: str,
+        selection_bias_calculation_id: UUID,
+        selection_bias_population_digest: str,
+        selection_bias_ledger_id: UUID,
+        selection_bias_effective_trial_count: int,
+        selection_bias_evidence_ids: tuple[UUID, ...],
+        selection_bias_evidence_digests: tuple[str, ...],
+    ) -> None:
+        if _seal is not _AUTHENTICATED_DEVELOPMENT_EVIDENCE_SEAL:
+            raise AuthorizationUnavailableError(
+                "authenticated development evidence requires the sealed "
+                "accepted-source evaluator"
+            )
+        if (
+            type(freeze_id) is not UUID
+            or type(candidate_slot_id) is not UUID
+            or candidate_slot_id not in {item.slot_id for item in CANONICAL_SLOTS}
+            or source_manifest_id != CANONICAL_MANIFEST.manifest_id
+            or manifest_fingerprint != CANONICAL_MANIFEST.fingerprint
+            or type(run_id) is not UUID
+            or type(report_id) is not UUID
+            or type(source_binding_id) is not UUID
+            or type(invocation_id) is not UUID
+            or type(selection_bias_calculation_id) is not UUID
+            or selection_bias_ledger_id != SELECTION_BIAS_INPUT.ledger_id
+            or selection_bias_effective_trial_count
+            != SELECTION_BIAS_INPUT.effective_trial_count
+            or type(record_count) is not int
+            or record_count != 480
+            or source_kind != "ARCH150_D1R_ACCEPTED"
+        ):
+            raise AuthorizationUnavailableError(
+                "development evidence does not bind one complete "
+                "accepted-source candidate"
+            )
+        for name, digest in (
+            ("freeze fingerprint", freeze_fingerprint),
+            ("report SHA-256", report_sha256),
+            ("source digest", source_digest),
+            ("source revision digest", source_revision_digest),
+            ("selection-bias population digest", selection_bias_population_digest),
+        ):
+            if not _is_sha256(digest):
+                raise ValueError(f"{name} must be lowercase SHA-256")
+        if (
+            type(batch_digests) is not tuple
+            or len(batch_digests) != len(CANONICAL_SLOTS)
+            or any(not _is_sha256(item) for item in batch_digests)
+            or type(year_batch_ids) is not tuple
+            or len(year_batch_ids) != len(SCORED_YEARS)
+            or any(type(item) is not UUID for item in year_batch_ids)
+            or len(set(year_batch_ids)) != len(year_batch_ids)
+        ):
+            raise AuthorizationUnavailableError(
+                "development evidence must bind the exact 32 slots and "
+                "five year batches"
+            )
+        if (
+            type(selection_bias_evidence_ids) is not tuple
+            or len(selection_bias_evidence_ids) != len(CANONICAL_SLOTS)
+            or any(type(item) is not UUID for item in selection_bias_evidence_ids)
+            or len(set(selection_bias_evidence_ids)) != len(selection_bias_evidence_ids)
+            or type(selection_bias_evidence_digests) is not tuple
+            or len(selection_bias_evidence_digests) != len(CANONICAL_SLOTS)
+            or any(not _is_sha256(item) for item in selection_bias_evidence_digests)
+        ):
+            raise AuthorizationUnavailableError(
+                "development evidence must bind all 32 verified DSR records"
+            )
+        if (
+            type(source_branch) is not str
+            or not source_branch
+            or type(source_origin) is not str
+            or not source_origin
+            or type(source_head) is not str
+            or len(source_head) not in (40, 64)
+            or any(char not in "0123456789abcdef" for char in source_head)
+            or type(source_tree) is not str
+            or len(source_tree) not in (40, 64)
+            or any(char not in "0123456789abcdef" for char in source_tree)
+        ):
+            raise ValueError("development source revision identity is invalid")
+        material = {
+            "schema": "arch151-authenticated-development-evidence/v1",
+            "freeze_id": str(freeze_id),
+            "freeze_fingerprint": freeze_fingerprint,
+            "candidate_slot_id": str(candidate_slot_id),
+            "source_manifest_id": str(source_manifest_id),
+            "manifest_fingerprint": manifest_fingerprint,
+            "batch_digests": list(batch_digests),
+            "year_batch_ids": [str(item) for item in year_batch_ids],
+            "run_id": str(run_id),
+            "report_id": str(report_id),
+            "report_sha256": report_sha256,
+            "record_count": record_count,
+            "source_kind": source_kind,
+            "source_binding_id": str(source_binding_id),
+            "source_digest": source_digest,
+            "source_branch": source_branch,
+            "source_origin": source_origin,
+            "source_head": source_head,
+            "source_tree": source_tree,
+            "invocation_id": str(invocation_id),
+            "source_revision_digest": source_revision_digest,
+            "selection_bias_calculation_id": str(selection_bias_calculation_id),
+            "selection_bias_population_digest": selection_bias_population_digest,
+            "selection_bias_ledger_id": str(selection_bias_ledger_id),
+            "selection_bias_effective_trial_count": (
+                selection_bias_effective_trial_count
+            ),
+            "selection_bias_evidence_ids": [
+                str(item) for item in selection_bias_evidence_ids
+            ],
+            "selection_bias_evidence_digests": list(selection_bias_evidence_digests),
+        }
+        canonical = _canonical_json(material)
+        values: tuple[tuple[str, object], ...] = (
+            ("freeze_id", freeze_id),
+            ("freeze_fingerprint", freeze_fingerprint),
+            ("candidate_slot_id", candidate_slot_id),
+            ("source_manifest_id", source_manifest_id),
+            ("manifest_fingerprint", manifest_fingerprint),
+            ("batch_digests", batch_digests),
+            ("year_batch_ids", year_batch_ids),
+            ("run_id", run_id),
+            ("report_id", report_id),
+            ("report_sha256", report_sha256),
+            ("record_count", record_count),
+            ("source_kind", source_kind),
+            ("source_binding_id", source_binding_id),
+            ("source_digest", source_digest),
+            ("source_branch", source_branch),
+            ("source_origin", source_origin),
+            ("source_head", source_head),
+            ("source_tree", source_tree),
+            ("invocation_id", invocation_id),
+            ("source_revision_digest", source_revision_digest),
+            ("selection_bias_calculation_id", selection_bias_calculation_id),
+            ("selection_bias_population_digest", selection_bias_population_digest),
+            ("selection_bias_ledger_id", selection_bias_ledger_id),
+            (
+                "selection_bias_effective_trial_count",
+                selection_bias_effective_trial_count,
+            ),
+            ("selection_bias_evidence_ids", selection_bias_evidence_ids),
+            ("selection_bias_evidence_digests", selection_bias_evidence_digests),
+            (
+                "evidence_id",
+                uuid5(
+                    _AUTHENTICATED_DEVELOPMENT_EVIDENCE_NAMESPACE,
+                    canonical.decode("utf-8"),
+                ),
+            ),
+            ("evidence_digest", sha256(canonical).hexdigest()),
+            ("_seal", _seal),
         )
+        for name, value in values:
+            object.__setattr__(self, name, value)
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -5604,8 +6171,11 @@ class AuthenticatedHoldoutPass:
     """Evaluator-owned holdout result type; no holdout reader is present here."""
 
     freeze_id: UUID
+    freeze_fingerprint: str
     candidate_slot_id: UUID
     conclusion: HoldoutConclusion
+    qualification_id: UUID
+    source_revision_digest: str
     evidence_digest: str
     _seal: object
 
@@ -5619,10 +6189,18 @@ class AuthenticatedHoldoutPass:
 class HoldoutAuthorization:
     """Sealed permission record bound to one exact source-owned freeze."""
 
+    authorization_id: UUID
     freeze_id: UUID
+    freeze_fingerprint: str
     candidate_slot_id: UUID
     development_evidence_digest: str
+    development_report_id: UUID
+    development_report_sha256: str
+    source_revision_digest: str
+    selection_bias_evidence_id: UUID
     selection_bias_evidence_digest: str
+    mutation_policy: MutationAfterHoldoutVisibilityPolicy
+    authorization_digest: str
     _seal: object
 
     def __init__(
@@ -5630,19 +6208,67 @@ class HoldoutAuthorization:
         *,
         _seal: object = None,
         freeze_id: UUID,
+        freeze_fingerprint: str,
         candidate_slot_id: UUID,
         development_evidence_digest: str,
+        development_report_id: UUID,
+        development_report_sha256: str,
+        source_revision_digest: str,
+        selection_bias_evidence_id: UUID,
         selection_bias_evidence_digest: str,
     ) -> None:
         if _seal is not _HOLDOUT_AUTHORIZATION_SEAL:
             raise AuthorizationUnavailableError(
                 "holdout authorization must come from the source gate"
             )
+        if (
+            type(freeze_id) is not UUID
+            or not _is_sha256(freeze_fingerprint)
+            or type(candidate_slot_id) is not UUID
+            or type(development_report_id) is not UUID
+            or type(selection_bias_evidence_id) is not UUID
+            or any(
+                not _is_sha256(item)
+                for item in (
+                    development_evidence_digest,
+                    development_report_sha256,
+                    source_revision_digest,
+                    selection_bias_evidence_digest,
+                )
+            )
+        ):
+            raise Arch151Error("holdout authorization binding is invalid")
+        mutation_policy = MutationAfterHoldoutVisibilityPolicy.PROHIBITED
+        material = {
+            "schema": "arch151-holdout-authorization/v1",
+            "freeze_id": str(freeze_id),
+            "freeze_fingerprint": freeze_fingerprint,
+            "candidate_slot_id": str(candidate_slot_id),
+            "development_evidence_digest": development_evidence_digest,
+            "development_report_id": str(development_report_id),
+            "development_report_sha256": development_report_sha256,
+            "source_revision_digest": source_revision_digest,
+            "selection_bias_evidence_id": str(selection_bias_evidence_id),
+            "selection_bias_evidence_digest": selection_bias_evidence_digest,
+            "mutation_policy": mutation_policy.value,
+        }
+        canonical = _canonical_json(material)
         for name, value in (
+            (
+                "authorization_id",
+                uuid5(_HOLDOUT_AUTHORIZATION_NAMESPACE, canonical.decode("utf-8")),
+            ),
             ("freeze_id", freeze_id),
+            ("freeze_fingerprint", freeze_fingerprint),
             ("candidate_slot_id", candidate_slot_id),
             ("development_evidence_digest", development_evidence_digest),
+            ("development_report_id", development_report_id),
+            ("development_report_sha256", development_report_sha256),
+            ("source_revision_digest", source_revision_digest),
+            ("selection_bias_evidence_id", selection_bias_evidence_id),
             ("selection_bias_evidence_digest", selection_bias_evidence_digest),
+            ("mutation_policy", mutation_policy),
+            ("authorization_digest", sha256(canonical).hexdigest()),
             ("_seal", _seal),
         ):
             object.__setattr__(self, name, value)
@@ -5652,9 +6278,14 @@ class HoldoutAuthorization:
 class ExtensionAuthorization:
     """Sealed extension permission bound to the same candidate and holdout PASS."""
 
+    authorization_id: UUID
     freeze_id: UUID
+    freeze_fingerprint: str
     candidate_slot_id: UUID
+    source_revision_digest: str
+    holdout_authorization_id: UUID
     holdout_pass_digest: str
+    authorization_digest: str
     _seal: object
 
     def __init__(
@@ -5662,17 +6293,146 @@ class ExtensionAuthorization:
         *,
         _seal: object = None,
         freeze_id: UUID,
+        freeze_fingerprint: str,
         candidate_slot_id: UUID,
+        source_revision_digest: str,
+        holdout_authorization_id: UUID,
         holdout_pass_digest: str,
     ) -> None:
         if _seal is not _EXTENSION_AUTHORIZATION_SEAL:
             raise AuthorizationUnavailableError(
                 "extension authorization must come from the source gate"
             )
+        if (
+            type(freeze_id) is not UUID
+            or not _is_sha256(freeze_fingerprint)
+            or type(candidate_slot_id) is not UUID
+            or type(holdout_authorization_id) is not UUID
+            or not _is_sha256(source_revision_digest)
+            or not _is_sha256(holdout_pass_digest)
+        ):
+            raise Arch151Error("extension authorization binding is invalid")
+        material = {
+            "schema": "arch151-extension-authorization/v1",
+            "freeze_id": str(freeze_id),
+            "freeze_fingerprint": freeze_fingerprint,
+            "candidate_slot_id": str(candidate_slot_id),
+            "source_revision_digest": source_revision_digest,
+            "holdout_authorization_id": str(holdout_authorization_id),
+            "holdout_pass_digest": holdout_pass_digest,
+        }
+        canonical = _canonical_json(material)
         for name, value in (
+            (
+                "authorization_id",
+                uuid5(_EXTENSION_AUTHORIZATION_NAMESPACE, canonical.decode("utf-8")),
+            ),
             ("freeze_id", freeze_id),
+            ("freeze_fingerprint", freeze_fingerprint),
             ("candidate_slot_id", candidate_slot_id),
+            ("source_revision_digest", source_revision_digest),
+            ("holdout_authorization_id", holdout_authorization_id),
             ("holdout_pass_digest", holdout_pass_digest),
+            ("authorization_digest", sha256(canonical).hexdigest()),
+            ("_seal", _seal),
+        ):
+            object.__setattr__(self, name, value)
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class AuthenticatedExtensionPass:
+    """Evaluator-owned extension PASS; no extension reader exists here."""
+
+    freeze_id: UUID
+    freeze_fingerprint: str
+    candidate_slot_id: UUID
+    extension_authorization_id: UUID
+    holdout_pass_digest: str
+    qualification_id: UUID
+    source_revision_digest: str
+    evidence_digest: str
+    _seal: object
+
+    def __init__(self, *_args: object, **_kwargs: object) -> None:
+        raise AuthorizationUnavailableError(
+            "authenticated extension PASS is unavailable without the "
+            "future extension evaluator"
+        )
+
+
+class ResearchSurvivorClass(StrEnum):
+    ARCH151_INTRADAY_RESEARCH_SURVIVOR = "ARCH151_INTRADAY_RESEARCH_SURVIVOR"
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class ResearchSurvivorClassification:
+    """Research classification only; it grants no runtime or order authority."""
+
+    classification: ResearchSurvivorClass
+    freeze_id: UUID
+    freeze_fingerprint: str
+    candidate_slot_id: UUID
+    source_revision_digest: str
+    holdout_pass_digest: str
+    extension_pass_digest: str
+    classification_id: UUID
+    _seal: object
+
+    def __init__(
+        self,
+        *,
+        _seal: object = None,
+        classification: ResearchSurvivorClass,
+        freeze_id: UUID,
+        freeze_fingerprint: str,
+        candidate_slot_id: UUID,
+        source_revision_digest: str,
+        holdout_pass_digest: str,
+        extension_pass_digest: str,
+        classification_id: UUID,
+    ) -> None:
+        if _seal is not _RESEARCH_SURVIVOR_CLASSIFICATION_SEAL:
+            raise AuthorizationUnavailableError(
+                "research survivor classification must follow "
+                "authenticated PASS evidence"
+            )
+        material = {
+            "schema": "arch151-research-survivor-classification/v1",
+            "classification": classification.value,
+            "freeze_id": str(freeze_id),
+            "freeze_fingerprint": freeze_fingerprint,
+            "candidate_slot_id": str(candidate_slot_id),
+            "source_revision_digest": source_revision_digest,
+            "holdout_pass_digest": holdout_pass_digest,
+            "extension_pass_digest": extension_pass_digest,
+            "runtime_authority": False,
+            "order_authority": False,
+        }
+        expected_id = uuid5(
+            _RESEARCH_SURVIVOR_NAMESPACE,
+            _canonical_json(material).decode("utf-8"),
+        )
+        if (
+            classification
+            is not ResearchSurvivorClass.ARCH151_INTRADAY_RESEARCH_SURVIVOR
+            or type(freeze_id) is not UUID
+            or not _is_sha256(freeze_fingerprint)
+            or type(candidate_slot_id) is not UUID
+            or not _is_sha256(source_revision_digest)
+            or not _is_sha256(holdout_pass_digest)
+            or not _is_sha256(extension_pass_digest)
+            or classification_id != expected_id
+        ):
+            raise Arch151Error("research survivor classification is not canonical")
+        for name, value in (
+            ("classification", classification),
+            ("freeze_id", freeze_id),
+            ("freeze_fingerprint", freeze_fingerprint),
+            ("candidate_slot_id", candidate_slot_id),
+            ("source_revision_digest", source_revision_digest),
+            ("holdout_pass_digest", holdout_pass_digest),
+            ("extension_pass_digest", extension_pass_digest),
+            ("classification_id", classification_id),
             ("_seal", _seal),
         ):
             object.__setattr__(self, name, value)
@@ -5877,6 +6637,641 @@ def freeze_final_candidate_set(
     )
 
 
+class LaterPeriodKind(StrEnum):
+    HOLDOUT_2024_2025 = "HOLDOUT_2024_2025"
+    EXTENSION_2026_JAN_OCT = "EXTENSION_2026_JAN_OCT"
+
+
+class LaterPeriodStatus(StrEnum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    INCOMPLETE = "INCOMPLETE"
+    INVALID = "INVALID"
+
+
+class LaterPeriodRejection(StrEnum):
+    SESSION_POPULATION_INCOMPLETE = "SESSION_POPULATION_INCOMPLETE"
+    CALENDAR_MONTH_POPULATION_INCOMPLETE = "CALENDAR_MONTH_POPULATION_INCOMPLETE"
+    SESSION_TRADE_RECONCILIATION_INVALID = "SESSION_TRADE_RECONCILIATION_INVALID"
+    HOLDOUT_NET_RETURN_NOT_POSITIVE = "HOLDOUT_NET_RETURN_NOT_POSITIVE"
+    HOLDOUT_YEAR_RETURN_NOT_POSITIVE = "HOLDOUT_YEAR_RETURN_NOT_POSITIVE"
+    HOLDOUT_PROFIT_FACTOR_NOT_ABOVE_1_10 = "HOLDOUT_PROFIT_FACTOR_NOT_ABOVE_1_10"
+    HOLDOUT_MAX_DRAWDOWN_ABOVE_15_PERCENT = "HOLDOUT_MAX_DRAWDOWN_ABOVE_15_PERCENT"
+    HOLDOUT_ACTIVE_SESSION_FRACTION_BELOW_30_PERCENT = (
+        "HOLDOUT_ACTIVE_SESSION_FRACTION_BELOW_30_PERCENT"
+    )
+    HOLDOUT_AVERAGE_ROUND_TRIPS_BELOW_80 = "HOLDOUT_AVERAGE_ROUND_TRIPS_BELOW_80"
+    HOLDOUT_POSITIVE_PNL_CONCENTRATION_ABOVE_40_PERCENT = (
+        "HOLDOUT_POSITIVE_PNL_CONCENTRATION_ABOVE_40_PERCENT"
+    )
+    HOLDOUT_POSITIVE_PNL_UNAVAILABLE = "HOLDOUT_POSITIVE_PNL_UNAVAILABLE"
+    EXTENSION_NET_RETURN_NOT_POSITIVE = "EXTENSION_NET_RETURN_NOT_POSITIVE"
+    EXTENSION_PROFIT_FACTOR_NOT_ABOVE_1_05 = "EXTENSION_PROFIT_FACTOR_NOT_ABOVE_1_05"
+    EXTENSION_MAX_DRAWDOWN_ABOVE_15_PERCENT = "EXTENSION_MAX_DRAWDOWN_ABOVE_15_PERCENT"
+    EXTENSION_POSITIVE_MONTHS_BELOW_6 = "EXTENSION_POSITIVE_MONTHS_BELOW_6"
+    EXTENSION_ACTIVE_SESSION_FRACTION_BELOW_30_PERCENT = (
+        "EXTENSION_ACTIVE_SESSION_FRACTION_BELOW_30_PERCENT"
+    )
+
+
+class MutationAfterHoldoutVisibilityPolicy(StrEnum):
+    PROHIBITED = "PROHIBITED"
+
+
+@dataclass(frozen=True, slots=True)
+class LaterPeriodSessionEvidence:
+    """Pure one-session STRESS summary; it carries no source/authentication seal."""
+
+    session_date: date
+    net_return: Decimal
+    net_trade_pnl: Decimal
+    completed_round_trips: int
+
+    def __post_init__(self) -> None:
+        if type(self.session_date) is not date:
+            raise TypeError("later-period session date must be date")
+        if (
+            type(self.net_return) is not Decimal
+            or type(self.net_trade_pnl) is not Decimal
+        ):
+            raise TypeError("later-period returns and P&L must be Decimal")
+        net_return = _decimal(self.net_return, "later-period net return")
+        net_trade_pnl = _decimal(self.net_trade_pnl, "later-period session net P&L")
+        if net_return <= Decimal(-1):
+            raise ValueError("later-period session return must exceed -100%")
+        if (
+            type(self.completed_round_trips) is not int
+            or not 0 <= self.completed_round_trips <= 2
+        ):
+            raise ValueError(
+                "later-period session must have zero through two round trips"
+            )
+        object.__setattr__(self, "net_return", net_return)
+        object.__setattr__(self, "net_trade_pnl", net_trade_pnl)
+
+
+@dataclass(frozen=True, slots=True)
+class LaterPeriodTradeEvidence:
+    """Pure completed-trade net P&L used to recompute STRESS profit factor."""
+
+    exit_session_date: date
+    net_pnl: Decimal
+
+    def __post_init__(self) -> None:
+        if type(self.exit_session_date) is not date:
+            raise TypeError("later-period trade exit date must be date")
+        if type(self.net_pnl) is not Decimal:
+            raise TypeError("later-period trade net P&L must be Decimal")
+        object.__setattr__(
+            self, "net_pnl", _decimal(self.net_pnl, "later-period trade net P&L")
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class LaterPeriodEvaluationEvidence:
+    """Non-authorizing synthetic/pure input to sealed-period threshold contracts."""
+
+    period: LaterPeriodKind
+    freeze_id: UUID
+    freeze_fingerprint: str
+    candidate_slot_id: UUID
+    economics_case: FillCostCase
+    sessions: tuple[LaterPeriodSessionEvidence, ...]
+    trades: tuple[LaterPeriodTradeEvidence, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.period) is not LaterPeriodKind:
+            raise TypeError("later-period kind is invalid")
+        if type(self.freeze_id) is not UUID or type(self.candidate_slot_id) is not UUID:
+            raise TypeError("later-period freeze and candidate identities must be UUID")
+        if not _is_sha256(self.freeze_fingerprint):
+            raise ValueError("later-period freeze fingerprint must be SHA-256")
+        if type(self.economics_case) is not FillCostCase:
+            raise TypeError("later-period economics case is invalid")
+        if type(self.sessions) is not tuple or any(
+            type(item) is not LaterPeriodSessionEvidence for item in self.sessions
+        ):
+            raise TypeError("later-period sessions must be immutable typed records")
+        if type(self.trades) is not tuple or any(
+            type(item) is not LaterPeriodTradeEvidence for item in self.trades
+        ):
+            raise TypeError("later-period trades must be immutable typed records")
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class LaterPeriodQualification:
+    """Pure threshold result; it is not an authenticated holdout or extension pass."""
+
+    period: LaterPeriodKind
+    status: LaterPeriodStatus
+    rejection_reasons: tuple[LaterPeriodRejection, ...]
+    freeze_id: UUID
+    freeze_fingerprint: str
+    candidate_slot_id: UUID
+    expected_session_count: int
+    observed_session_count: int
+    expected_month_count: int
+    observed_month_count: int
+    calendar_partition_net_returns: tuple[tuple[int, Decimal], ...]
+    aggregate_net_return: Decimal | None
+    profit_factor: ProfitFactor | None
+    max_drawdown: Decimal | None
+    active_session_fraction: Decimal | None
+    average_completed_round_trips_per_year: Decimal | None
+    positive_month_count: int | None
+    maximum_positive_month_pnl_share: Decimal | None
+    input_digest: str
+    qualification_id: UUID
+    _seal: object
+
+    def __init__(
+        self,
+        *,
+        _seal: object = None,
+        period: LaterPeriodKind,
+        status: LaterPeriodStatus,
+        rejection_reasons: tuple[LaterPeriodRejection, ...],
+        freeze_id: UUID,
+        freeze_fingerprint: str,
+        candidate_slot_id: UUID,
+        expected_session_count: int,
+        observed_session_count: int,
+        expected_month_count: int,
+        observed_month_count: int,
+        calendar_partition_net_returns: tuple[tuple[int, Decimal], ...],
+        aggregate_net_return: Decimal | None,
+        profit_factor: ProfitFactor | None,
+        max_drawdown: Decimal | None,
+        active_session_fraction: Decimal | None,
+        average_completed_round_trips_per_year: Decimal | None,
+        positive_month_count: int | None,
+        maximum_positive_month_pnl_share: Decimal | None,
+        input_digest: str,
+    ) -> None:
+        if _seal is not _LATER_PERIOD_QUALIFICATION_SEAL:
+            raise AuthorizationUnavailableError(
+                "later-period qualification must be computed by the "
+                "pure policy function"
+            )
+        material = {
+            "schema": "arch151-later-period-qualification/v1",
+            "period": period.value,
+            "status": status.value,
+            "rejection_reasons": [item.value for item in rejection_reasons],
+            "freeze_id": str(freeze_id),
+            "freeze_fingerprint": freeze_fingerprint,
+            "candidate_slot_id": str(candidate_slot_id),
+            "expected_session_count": expected_session_count,
+            "observed_session_count": observed_session_count,
+            "expected_month_count": expected_month_count,
+            "observed_month_count": observed_month_count,
+            "calendar_partition_net_returns": [
+                [year, _decimal_text(value)]
+                for year, value in calendar_partition_net_returns
+            ],
+            "aggregate_net_return": (
+                _decimal_text(aggregate_net_return)
+                if aggregate_net_return is not None
+                else None
+            ),
+            "profit_factor": (
+                profit_factor.canonical_material()
+                if profit_factor is not None
+                else None
+            ),
+            "max_drawdown": (
+                _decimal_text(max_drawdown) if max_drawdown is not None else None
+            ),
+            "active_session_fraction": (
+                _decimal_text(active_session_fraction)
+                if active_session_fraction is not None
+                else None
+            ),
+            "average_completed_round_trips_per_year": (
+                _decimal_text(average_completed_round_trips_per_year)
+                if average_completed_round_trips_per_year is not None
+                else None
+            ),
+            "positive_month_count": positive_month_count,
+            "maximum_positive_month_pnl_share": (
+                _decimal_text(maximum_positive_month_pnl_share)
+                if maximum_positive_month_pnl_share is not None
+                else None
+            ),
+            "input_digest": input_digest,
+        }
+        canonical = _canonical_json(material)
+        if (
+            type(period) is not LaterPeriodKind
+            or type(status) is not LaterPeriodStatus
+            or type(rejection_reasons) is not tuple
+            or any(type(item) is not LaterPeriodRejection for item in rejection_reasons)
+            or not _is_sha256(freeze_fingerprint)
+            or not _is_sha256(input_digest)
+            or (status is LaterPeriodStatus.PASS and rejection_reasons)
+            or (status is not LaterPeriodStatus.PASS and not rejection_reasons)
+        ):
+            raise Arch151Error(
+                "later-period qualification identity or status is invalid"
+            )
+        for name, value in (
+            ("period", period),
+            ("status", status),
+            ("rejection_reasons", rejection_reasons),
+            ("freeze_id", freeze_id),
+            ("freeze_fingerprint", freeze_fingerprint),
+            ("candidate_slot_id", candidate_slot_id),
+            ("expected_session_count", expected_session_count),
+            ("observed_session_count", observed_session_count),
+            ("expected_month_count", expected_month_count),
+            ("observed_month_count", observed_month_count),
+            ("calendar_partition_net_returns", calendar_partition_net_returns),
+            ("aggregate_net_return", aggregate_net_return),
+            ("profit_factor", profit_factor),
+            ("max_drawdown", max_drawdown),
+            ("active_session_fraction", active_session_fraction),
+            (
+                "average_completed_round_trips_per_year",
+                average_completed_round_trips_per_year,
+            ),
+            ("positive_month_count", positive_month_count),
+            ("maximum_positive_month_pnl_share", maximum_positive_month_pnl_share),
+            ("input_digest", input_digest),
+            (
+                "qualification_id",
+                uuid5(
+                    _LATER_PERIOD_QUALIFICATION_NAMESPACE,
+                    canonical.decode("utf-8"),
+                ),
+            ),
+            ("_seal", _seal),
+        ):
+            object.__setattr__(self, name, value)
+
+    @property
+    def passed(self) -> bool:
+        return self.status is LaterPeriodStatus.PASS
+
+
+def _later_period_bounds(period: LaterPeriodKind) -> tuple[date, date]:
+    if period is LaterPeriodKind.HOLDOUT_2024_2025:
+        return date(2024, 1, 1), date(2026, 1, 1)
+    if period is LaterPeriodKind.EXTENSION_2026_JAN_OCT:
+        return date(2026, 1, 1), date(2026, 11, 1)
+    raise TypeError("later-period kind is invalid")
+
+
+def _later_period_calendar(
+    period: LaterPeriodKind,
+) -> tuple[tuple[date, ...], tuple[tuple[int, int], ...]]:
+    start, end_exclusive = _later_period_bounds(period)
+    sessions: list[date] = []
+    day = start
+    while day < end_exclusive:
+        schedule = _SESSION_AUTHORITY.schedule_for(day)
+        if schedule is not None:
+            if schedule.session_date != day or schedule.closes_at <= schedule.opens_at:
+                raise AuthorizationUnavailableError(
+                    "published later-period session schedule is inconsistent"
+                )
+            sessions.append(day)
+        day += timedelta(days=1)
+    months: list[tuple[int, int]] = []
+    year, month = start.year, start.month
+    while date(year, month, 1) < end_exclusive:
+        months.append((year, month))
+        if month == 12:
+            year, month = year + 1, 1
+        else:
+            month += 1
+    if not sessions or len(months) != (
+        24 if period is LaterPeriodKind.HOLDOUT_2024_2025 else 10
+    ):
+        raise AuthorizationUnavailableError(
+            "published XNYS later-period calendar is incomplete"
+        )
+    return tuple(sessions), tuple(months)
+
+
+def _later_period_input_material(
+    evidence: LaterPeriodEvaluationEvidence,
+) -> dict[str, object]:
+    return {
+        "schema": "arch151-later-period-input/v1",
+        "period": evidence.period.value,
+        "freeze_id": str(evidence.freeze_id),
+        "freeze_fingerprint": evidence.freeze_fingerprint,
+        "candidate_slot_id": str(evidence.candidate_slot_id),
+        "economics_case": evidence.economics_case.value,
+        "sessions": [
+            {
+                "session_date": item.session_date.isoformat(),
+                "net_return": _decimal_text(item.net_return),
+                "net_trade_pnl": _decimal_text(item.net_trade_pnl),
+                "completed_round_trips": item.completed_round_trips,
+            }
+            for item in evidence.sessions
+        ],
+        "trades": [
+            {
+                "exit_session_date": item.exit_session_date.isoformat(),
+                "net_pnl": _decimal_text(item.net_pnl),
+            }
+            for item in evidence.trades
+        ],
+    }
+
+
+def _new_later_period_qualification(
+    *,
+    evidence: LaterPeriodEvaluationEvidence,
+    status: LaterPeriodStatus,
+    rejection_reasons: tuple[LaterPeriodRejection, ...],
+    expected_session_count: int,
+    expected_month_count: int,
+    calendar_partition_net_returns: tuple[tuple[int, Decimal], ...] = (),
+    aggregate_net_return: Decimal | None = None,
+    profit_factor: ProfitFactor | None = None,
+    max_drawdown: Decimal | None = None,
+    active_session_fraction: Decimal | None = None,
+    average_completed_round_trips_per_year: Decimal | None = None,
+    positive_month_count: int | None = None,
+    maximum_positive_month_pnl_share: Decimal | None = None,
+) -> LaterPeriodQualification:
+    return LaterPeriodQualification(
+        _seal=_LATER_PERIOD_QUALIFICATION_SEAL,
+        period=evidence.period,
+        status=status,
+        rejection_reasons=rejection_reasons,
+        freeze_id=evidence.freeze_id,
+        freeze_fingerprint=evidence.freeze_fingerprint,
+        candidate_slot_id=evidence.candidate_slot_id,
+        expected_session_count=expected_session_count,
+        observed_session_count=len(evidence.sessions),
+        expected_month_count=expected_month_count,
+        observed_month_count=len(
+            {
+                (item.session_date.year, item.session_date.month)
+                for item in evidence.sessions
+            }
+        ),
+        calendar_partition_net_returns=calendar_partition_net_returns,
+        aggregate_net_return=aggregate_net_return,
+        profit_factor=profit_factor,
+        max_drawdown=max_drawdown,
+        active_session_fraction=active_session_fraction,
+        average_completed_round_trips_per_year=average_completed_round_trips_per_year,
+        positive_month_count=positive_month_count,
+        maximum_positive_month_pnl_share=maximum_positive_month_pnl_share,
+        input_digest=sha256(
+            _canonical_json(_later_period_input_material(evidence))
+        ).hexdigest(),
+    )
+
+
+def _later_period_compound(returns: Sequence[Decimal]) -> Decimal:
+    with localcontext(_DECIMAL_CONTEXT):
+        equity = Decimal(1)
+        for item in returns:
+            equity *= Decimal(1) + item
+        return equity - Decimal(1)
+
+
+def _later_period_max_drawdown(returns: Sequence[Decimal]) -> Decimal:
+    with localcontext(_DECIMAL_CONTEXT):
+        equity = Decimal(1)
+        peak = Decimal(1)
+        worst = Decimal(0)
+        for item in returns:
+            equity *= Decimal(1) + item
+            if equity > peak:
+                peak = equity
+            drawdown = (peak - equity) / peak
+            if drawdown > worst:
+                worst = drawdown
+        return worst
+
+
+def _profit_factor_exceeds(profit_factor: ProfitFactor, threshold: Decimal) -> bool:
+    if profit_factor.state is ProfitFactorState.POSITIVE_INFINITY:
+        return True
+    return (
+        profit_factor.state is ProfitFactorState.FINITE
+        and profit_factor.finite_value is not None
+        and profit_factor.finite_value > threshold
+    )
+
+
+def qualify_later_period(
+    freeze: FinalCandidateFreeze,
+    evidence: LaterPeriodEvaluationEvidence,
+) -> LaterPeriodQualification:
+    """Apply frozen holdout or extension thresholds to pure STRESS summaries.
+
+    The returned PASS is diagnostic/qualifying data only. It is deliberately
+    not an authenticated holdout result and cannot authorize later-period data.
+    """
+
+    if (
+        type(freeze) is not FinalCandidateFreeze
+        or getattr(freeze, "_seal", None) is not _FINAL_FREEZE_SEAL
+        or freeze.status is not FinalFreezeStatus.ONE_CANDIDATE_FROZEN
+        or freeze.candidate_slot_id is None
+    ):
+        raise AuthorizationUnavailableError(
+            "later-period qualification requires the source-owned one-candidate freeze"
+        )
+    if type(evidence) is not LaterPeriodEvaluationEvidence:
+        raise TypeError("later-period qualification evidence is invalid")
+    if (
+        evidence.freeze_id != freeze.freeze_id
+        or evidence.freeze_fingerprint != freeze.fingerprint
+        or evidence.candidate_slot_id != freeze.candidate_slot_id
+    ):
+        raise AuthorizationUnavailableError(
+            "later-period evidence differs from the exact frozen candidate"
+        )
+    if evidence.economics_case is not FillCostCase.STRESS:
+        raise Arch151Error("later-period qualification requires STRESS economics")
+    expected_sessions, expected_months = _later_period_calendar(evidence.period)
+    actual_sessions = tuple(item.session_date for item in evidence.sessions)
+    actual_months = tuple(
+        sorted(
+            {
+                (item.session_date.year, item.session_date.month)
+                for item in evidence.sessions
+            }
+        )
+    )
+    incomplete_reasons: list[LaterPeriodRejection] = []
+    if actual_sessions != expected_sessions:
+        incomplete_reasons.append(LaterPeriodRejection.SESSION_POPULATION_INCOMPLETE)
+    if actual_months != expected_months:
+        incomplete_reasons.append(
+            LaterPeriodRejection.CALENDAR_MONTH_POPULATION_INCOMPLETE
+        )
+    if incomplete_reasons:
+        return _new_later_period_qualification(
+            evidence=evidence,
+            status=LaterPeriodStatus.INCOMPLETE,
+            rejection_reasons=tuple(incomplete_reasons),
+            expected_session_count=len(expected_sessions),
+            expected_month_count=len(expected_months),
+        )
+
+    slot = next(
+        item for item in CANONICAL_SLOTS if item.slot_id == freeze.candidate_slot_id
+    )
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is slot.program_key)
+    session_limit = 1 if program.family is StrategyFamily.OPENING_RANGE_RETEST else 2
+    if any(item.completed_round_trips > session_limit for item in evidence.sessions):
+        raise Arch151Error("later-period session exceeds the frozen entry limit")
+    if any(
+        left.exit_session_date > right.exit_session_date
+        for left, right in zip(evidence.trades, evidence.trades[1:], strict=False)
+    ):
+        raise Arch151Error("later-period trades are not chronologically ordered")
+    trades_by_date: dict[date, list[Decimal]] = defaultdict(list)
+    for trade in evidence.trades:
+        if trade.exit_session_date not in expected_sessions:
+            raise Arch151Error(
+                "later-period trade exit is outside the published calendar"
+            )
+        trades_by_date[trade.exit_session_date].append(trade.net_pnl)
+    for session in evidence.sessions:
+        values = trades_by_date.get(session.session_date, [])
+        with localcontext(_DECIMAL_CONTEXT):
+            session_pnl = sum(values, Decimal(0))
+        if (
+            len(values) != session.completed_round_trips
+            or session_pnl != session.net_trade_pnl
+        ):
+            return _new_later_period_qualification(
+                evidence=evidence,
+                status=LaterPeriodStatus.INVALID,
+                rejection_reasons=(
+                    LaterPeriodRejection.SESSION_TRADE_RECONCILIATION_INVALID,
+                ),
+                expected_session_count=len(expected_sessions),
+                expected_month_count=len(expected_months),
+            )
+
+    year_returns = tuple(
+        (
+            year,
+            _later_period_compound(
+                tuple(
+                    item.net_return
+                    for item in evidence.sessions
+                    if item.session_date.year == year
+                )
+            ),
+        )
+        for year in sorted({item.session_date.year for item in evidence.sessions})
+    )
+    aggregate_return = _later_period_compound(
+        tuple(item.net_return for item in evidence.sessions)
+    )
+    drawdown = _later_period_max_drawdown(
+        tuple(item.net_return for item in evidence.sessions)
+    )
+    with localcontext(_DECIMAL_CONTEXT):
+        positive_pnl = sum(
+            (max(item.net_pnl, Decimal(0)) for item in evidence.trades), Decimal(0)
+        )
+        negative_pnl = sum(
+            (max(-item.net_pnl, Decimal(0)) for item in evidence.trades), Decimal(0)
+        )
+    profit_factor = ProfitFactor.from_totals(positive_pnl, negative_pnl)
+    active_count = sum(item.completed_round_trips > 0 for item in evidence.sessions)
+    with localcontext(_DECIMAL_CONTEXT):
+        active_fraction = Decimal(active_count) / Decimal(len(expected_sessions))
+        average_round_trips_per_year = (
+            Decimal(sum(item.completed_round_trips for item in evidence.sessions))
+            / Decimal(2)
+            if evidence.period is LaterPeriodKind.HOLDOUT_2024_2025
+            else None
+        )
+    monthly_returns: dict[tuple[int, int], list[Decimal]] = {
+        month: [] for month in expected_months
+    }
+    monthly_pnl: dict[tuple[int, int], Decimal] = {
+        month: Decimal(0) for month in expected_months
+    }
+    for session in evidence.sessions:
+        month = (session.session_date.year, session.session_date.month)
+        monthly_returns[month].append(session.net_return)
+    with localcontext(_DECIMAL_CONTEXT):
+        for session in evidence.sessions:
+            month = (session.session_date.year, session.session_date.month)
+            monthly_pnl[month] += session.net_trade_pnl
+    monthly_return_values = {
+        month: _later_period_compound(values)
+        for month, values in monthly_returns.items()
+    }
+    positive_month_count = sum(value > 0 for value in monthly_return_values.values())
+    positive_month_pnl = {
+        month: value for month, value in monthly_pnl.items() if value > 0
+    }
+    with localcontext(_DECIMAL_CONTEXT):
+        total_positive_month_pnl = sum(positive_month_pnl.values(), Decimal(0))
+        maximum_month_share = (
+            max(positive_month_pnl.values()) / total_positive_month_pnl
+            if total_positive_month_pnl > 0
+            else None
+        )
+    reasons: list[LaterPeriodRejection] = []
+    if evidence.period is LaterPeriodKind.HOLDOUT_2024_2025:
+        if aggregate_return <= 0:
+            reasons.append(LaterPeriodRejection.HOLDOUT_NET_RETURN_NOT_POSITIVE)
+        if any(value <= 0 for _year, value in year_returns):
+            reasons.append(LaterPeriodRejection.HOLDOUT_YEAR_RETURN_NOT_POSITIVE)
+        if not _profit_factor_exceeds(profit_factor, Decimal("1.10")):
+            reasons.append(LaterPeriodRejection.HOLDOUT_PROFIT_FACTOR_NOT_ABOVE_1_10)
+        if drawdown > Decimal("0.15"):
+            reasons.append(LaterPeriodRejection.HOLDOUT_MAX_DRAWDOWN_ABOVE_15_PERCENT)
+        if active_fraction < Decimal("0.30"):
+            reasons.append(
+                LaterPeriodRejection.HOLDOUT_ACTIVE_SESSION_FRACTION_BELOW_30_PERCENT
+            )
+        if average_round_trips_per_year is None or average_round_trips_per_year < 80:
+            reasons.append(LaterPeriodRejection.HOLDOUT_AVERAGE_ROUND_TRIPS_BELOW_80)
+        if maximum_month_share is None:
+            reasons.append(LaterPeriodRejection.HOLDOUT_POSITIVE_PNL_UNAVAILABLE)
+        elif maximum_month_share > Decimal("0.40"):
+            reasons.append(
+                LaterPeriodRejection.HOLDOUT_POSITIVE_PNL_CONCENTRATION_ABOVE_40_PERCENT
+            )
+    else:
+        if aggregate_return <= 0:
+            reasons.append(LaterPeriodRejection.EXTENSION_NET_RETURN_NOT_POSITIVE)
+        if not _profit_factor_exceeds(profit_factor, Decimal("1.05")):
+            reasons.append(LaterPeriodRejection.EXTENSION_PROFIT_FACTOR_NOT_ABOVE_1_05)
+        if drawdown > Decimal("0.15"):
+            reasons.append(LaterPeriodRejection.EXTENSION_MAX_DRAWDOWN_ABOVE_15_PERCENT)
+        if positive_month_count < 6:
+            reasons.append(LaterPeriodRejection.EXTENSION_POSITIVE_MONTHS_BELOW_6)
+        if active_fraction < Decimal("0.30"):
+            reasons.append(
+                LaterPeriodRejection.EXTENSION_ACTIVE_SESSION_FRACTION_BELOW_30_PERCENT
+            )
+    return _new_later_period_qualification(
+        evidence=evidence,
+        status=LaterPeriodStatus.FAIL if reasons else LaterPeriodStatus.PASS,
+        rejection_reasons=tuple(reasons),
+        expected_session_count=len(expected_sessions),
+        expected_month_count=len(expected_months),
+        calendar_partition_net_returns=year_returns,
+        aggregate_net_return=aggregate_return,
+        profit_factor=profit_factor,
+        max_drawdown=drawdown,
+        active_session_fraction=active_fraction,
+        average_completed_round_trips_per_year=average_round_trips_per_year,
+        positive_month_count=positive_month_count,
+        maximum_positive_month_pnl_share=maximum_month_share,
+    )
+
+
 def authorize_holdout(
     freeze: FinalCandidateFreeze,
     development_evidence: AuthenticatedDevelopmentEvidence | None = None,
@@ -5906,12 +7301,29 @@ def authorize_holdout(
         )
     if (
         development_evidence.freeze_id != freeze.freeze_id
+        or development_evidence.freeze_fingerprint != freeze.fingerprint
         or development_evidence.source_manifest_id != freeze.source_manifest_id
         or development_evidence.batch_digests != freeze.batch_digests
+        or development_evidence.record_count != 480
+        or development_evidence.source_kind != "ARCH150_D1R_ACCEPTED"
+        or development_evidence.selection_bias_calculation_id
+        != freeze.selection_bias_calculation_id
+        or development_evidence.selection_bias_evidence_digests
+        != freeze.selection_bias_evidence_digests
+        or development_evidence.selection_bias_ledger_id
+        != SELECTION_BIAS_INPUT.ledger_id
+        or development_evidence.selection_bias_effective_trial_count
+        != SELECTION_BIAS_INPUT.effective_trial_count
         or selection_bias_evidence.candidate_slot_id != freeze.candidate_slot_id
+        or selection_bias_evidence.population_digest
+        != development_evidence.selection_bias_population_digest
         or selection_bias_evidence.ledger_id != SELECTION_BIAS_INPUT.ledger_id
         or selection_bias_evidence.effective_trial_count
         != SELECTION_BIAS_INPUT.effective_trial_count
+        or selection_bias_evidence.evidence_id
+        not in development_evidence.selection_bias_evidence_ids
+        or selection_bias_evidence.evidence_digest
+        not in development_evidence.selection_bias_evidence_digests
         or not _selection_bias_probability_meets_threshold(
             selection_bias_evidence.probability
         )
@@ -5919,11 +7331,32 @@ def authorize_holdout(
         raise AuthorizationUnavailableError(
             "holdout evidence does not authenticate the exact frozen candidate"
         )
+    candidate_index = next(
+        index
+        for index, slot in enumerate(CANONICAL_SLOTS)
+        if slot.slot_id == freeze.candidate_slot_id
+    )
+    if (
+        development_evidence.selection_bias_evidence_ids[candidate_index]
+        != selection_bias_evidence.evidence_id
+        or development_evidence.selection_bias_evidence_digests[candidate_index]
+        != selection_bias_evidence.evidence_digest
+        or selection_bias_evidence.development_batch_digest
+        != development_evidence.batch_digests[candidate_index]
+    ):
+        raise AuthorizationUnavailableError(
+            "holdout DSR evidence is not bound to the frozen candidate batch"
+        )
     return HoldoutAuthorization(
         _seal=_HOLDOUT_AUTHORIZATION_SEAL,
         freeze_id=freeze.freeze_id,
+        freeze_fingerprint=freeze.fingerprint,
         candidate_slot_id=freeze.candidate_slot_id,
         development_evidence_digest=development_evidence.evidence_digest,
+        development_report_id=development_evidence.report_id,
+        development_report_sha256=development_evidence.report_sha256,
+        source_revision_digest=development_evidence.source_revision_digest,
+        selection_bias_evidence_id=selection_bias_evidence.evidence_id,
         selection_bias_evidence_digest=selection_bias_evidence.evidence_digest,
     )
 
@@ -5952,9 +7385,14 @@ def authorize_extension(
         )
     if (
         holdout_authorization.freeze_id != freeze.freeze_id
+        or holdout_authorization.freeze_fingerprint != freeze.fingerprint
         or holdout_authorization.candidate_slot_id != freeze.candidate_slot_id
         or holdout_pass.freeze_id != freeze.freeze_id
+        or holdout_pass.freeze_fingerprint != freeze.fingerprint
         or holdout_pass.candidate_slot_id != freeze.candidate_slot_id
+        or holdout_pass.source_revision_digest
+        != holdout_authorization.source_revision_digest
+        or holdout_pass.conclusion is not HoldoutConclusion.PASS
     ):
         raise AuthorizationUnavailableError(
             "extension evidence is not bound to the exact frozen candidate"
@@ -5962,8 +7400,106 @@ def authorize_extension(
     return ExtensionAuthorization(
         _seal=_EXTENSION_AUTHORIZATION_SEAL,
         freeze_id=freeze.freeze_id,
+        freeze_fingerprint=freeze.fingerprint,
         candidate_slot_id=freeze.candidate_slot_id,
+        source_revision_digest=holdout_authorization.source_revision_digest,
+        holdout_authorization_id=holdout_authorization.authorization_id,
         holdout_pass_digest=holdout_pass.evidence_digest,
+    )
+
+
+def classify_research_survivor(
+    freeze: FinalCandidateFreeze,
+    holdout_authorization: HoldoutAuthorization,
+    holdout_pass: AuthenticatedHoldoutPass,
+    extension_authorization: ExtensionAuthorization,
+    extension_pass: AuthenticatedExtensionPass,
+) -> ResearchSurvivorClassification:
+    """Classify a full survivor after same-candidate holdout and extension PASS.
+
+    The result is a research label only. It grants no runtime, order, Robinhood,
+    or live authority.
+    """
+
+    if (
+        type(freeze) is not FinalCandidateFreeze
+        or getattr(freeze, "_seal", None) is not _FINAL_FREEZE_SEAL
+        or freeze.status is not FinalFreezeStatus.ONE_CANDIDATE_FROZEN
+        or freeze.candidate_slot_id is None
+        or type(holdout_authorization) is not HoldoutAuthorization
+        or getattr(holdout_authorization, "_seal", None)
+        is not _HOLDOUT_AUTHORIZATION_SEAL
+        or type(holdout_pass) is not AuthenticatedHoldoutPass
+        or getattr(holdout_pass, "_seal", None) is not _AUTHENTICATED_HOLDOUT_PASS_SEAL
+        or type(extension_authorization) is not ExtensionAuthorization
+        or getattr(extension_authorization, "_seal", None)
+        is not _EXTENSION_AUTHORIZATION_SEAL
+        or type(extension_pass) is not AuthenticatedExtensionPass
+        or getattr(extension_pass, "_seal", None)
+        is not _AUTHENTICATED_EXTENSION_PASS_SEAL
+    ):
+        raise AuthorizationUnavailableError(
+            "source-owned freeze and ordered authenticated "
+            "holdout/extension evidence are required"
+        )
+    same_candidate = (
+        holdout_authorization.freeze_id
+        == holdout_pass.freeze_id
+        == extension_authorization.freeze_id
+        == extension_pass.freeze_id
+        == freeze.freeze_id
+        and holdout_authorization.freeze_fingerprint
+        == holdout_pass.freeze_fingerprint
+        == extension_authorization.freeze_fingerprint
+        == extension_pass.freeze_fingerprint
+        == freeze.fingerprint
+        and holdout_authorization.candidate_slot_id
+        == holdout_pass.candidate_slot_id
+        == extension_authorization.candidate_slot_id
+        == extension_pass.candidate_slot_id
+        == freeze.candidate_slot_id
+        and holdout_authorization.source_revision_digest
+        == holdout_pass.source_revision_digest
+        == extension_authorization.source_revision_digest
+        == extension_pass.source_revision_digest
+        and extension_authorization.holdout_pass_digest == holdout_pass.evidence_digest
+        and extension_pass.extension_authorization_id
+        == extension_authorization.authorization_id
+        and extension_pass.holdout_pass_digest == holdout_pass.evidence_digest
+        and holdout_pass.conclusion is HoldoutConclusion.PASS
+    )
+    if not same_candidate:
+        raise AuthorizationUnavailableError(
+            "survivor evidence differs from the exact frozen candidate or "
+            "source revision"
+        )
+    material = {
+        "schema": "arch151-research-survivor-classification/v1",
+        "classification": (
+            ResearchSurvivorClass.ARCH151_INTRADAY_RESEARCH_SURVIVOR.value
+        ),
+        "freeze_id": str(freeze.freeze_id),
+        "freeze_fingerprint": freeze.fingerprint,
+        "candidate_slot_id": str(freeze.candidate_slot_id),
+        "source_revision_digest": holdout_authorization.source_revision_digest,
+        "holdout_pass_digest": holdout_pass.evidence_digest,
+        "extension_pass_digest": extension_pass.evidence_digest,
+        "runtime_authority": False,
+        "order_authority": False,
+    }
+    canonical = _canonical_json(material)
+    return ResearchSurvivorClassification(
+        _seal=_RESEARCH_SURVIVOR_CLASSIFICATION_SEAL,
+        classification=ResearchSurvivorClass.ARCH151_INTRADAY_RESEARCH_SURVIVOR,
+        freeze_id=freeze.freeze_id,
+        freeze_fingerprint=freeze.fingerprint,
+        candidate_slot_id=freeze.candidate_slot_id,
+        source_revision_digest=holdout_authorization.source_revision_digest,
+        holdout_pass_digest=holdout_pass.evidence_digest,
+        extension_pass_digest=extension_pass.evidence_digest,
+        classification_id=uuid5(
+            _RESEARCH_SURVIVOR_NAMESPACE, canonical.decode("utf-8")
+        ),
     )
 
 
@@ -6127,6 +7663,7 @@ __all__ = (
     "ARCH150_D1R_UNION_MISSING_COUNT",
     "AGGREGATION_SCHEMA",
     "AuthenticatedDevelopmentEvidence",
+    "AuthenticatedExtensionPass",
     "AuthenticatedHoldoutPass",
     "Arch150D1RSourceHistory",
     "Arch151Error",
@@ -6149,6 +7686,8 @@ __all__ = (
     "DevelopmentQualification",
     "DSR_OBSERVATION_COUNT",
     "DsrUnavailableReason",
+    "DsrTrialDiagnostic",
+    "DsrTrialStatus",
     "DEVELOPMENT_END",
     "DEVELOPMENT_START",
     "EVALUATION_ECONOMICS_ORDER",
@@ -6182,6 +7721,14 @@ __all__ = (
     "HoldoutConclusion",
     "IncompleteAggregationError",
     "MissingObservationRule",
+    "LaterPeriodEvaluationEvidence",
+    "LaterPeriodKind",
+    "LaterPeriodQualification",
+    "LaterPeriodRejection",
+    "LaterPeriodSessionEvidence",
+    "LaterPeriodStatus",
+    "LaterPeriodTradeEvidence",
+    "MutationAfterHoldoutVisibilityPolicy",
     "NoiseBreakoutParameters",
     "NoiseBreakoutSignal",
     "OneMinuteBar",
@@ -6194,6 +7741,8 @@ __all__ = (
     "PriorTrialLedgerEntry",
     "ProgramKey",
     "QualificationRejection",
+    "ResearchSurvivorClass",
+    "ResearchSurvivorClassification",
     "SCORED_YEARS",
     "SELECTION_BIAS_INPUT",
     "SelectionBiasCalculation",
@@ -6220,6 +7769,7 @@ __all__ = (
     "aggregate_development_economics",
     "authorize_extension",
     "authorize_holdout",
+    "classify_research_survivor",
     "average_true_range",
     "calibrate_family_a",
     "calibrate_family_a_from_source_history",
@@ -6247,10 +7797,12 @@ __all__ = (
     "program_from_bytes",
     "program_id",
     "program_to_bytes",
+    "qualify_later_period",
     "prepare_cross_etf_session_features",
     "prepare_session_features",
     "qualify_development",
     "rank_verified_candidate_population",
+    "rank_descriptive_economic_population",
     "rank_synthetic_candidate_population",
     "sample_standard_deviation",
     "structural_entry_opportunities",

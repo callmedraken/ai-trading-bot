@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import json
+import tracemalloc
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, localcontext
 from functools import cache
 from hashlib import sha256
+from time import perf_counter
 from types import MappingProxyType
-from uuid import UUID
+from uuid import UUID, uuid5
 
 import pytest
 
 from trading_bot.experiments import arch151_intraday_walkforward as arch151
 from trading_bot.experiments import arch151_intraday_walkforward_evaluator as evaluator
+from trading_bot.experiments import arch151_intraday_walkforward_operator as operator
 
 SESSION = date(2023, 1, 3)
 
@@ -62,6 +65,7 @@ def _b_history(
     exit_delay_minutes: int = 1,
     second_setup: bool = False,
     second_open_observed: bool = False,
+    entry_reference: Decimal = Decimal("100.2"),
 ):
     program = next(
         item
@@ -143,23 +147,27 @@ def _b_history(
     ]
     entry_time = bars[8].completed_at
     stop = level * (Decimal(1) - parameters.stop_buffer_bps / Decimal(10000))
-    risk = Decimal("100.2") - stop
-    target = Decimal("100.2") + parameters.target_r * risk
+    risk = entry_reference - stop
+    target = entry_reference + parameters.target_r * risk
     if entry_observed:
         entry_low = (
-            stop - Decimal("0.01") if ambiguous_entry_range else Decimal("100.19")
+            stop - Decimal("0.01")
+            if ambiguous_entry_range
+            else max(stop + Decimal("0.01"), entry_reference - Decimal("0.01"))
         )
         entry_high = (
-            target + Decimal("0.01") if ambiguous_entry_range else Decimal("100.3")
+            target + Decimal("0.01")
+            if ambiguous_entry_range
+            else min(target - Decimal("0.01"), entry_reference + Decimal("0.1"))
         )
         minutes.append(
             arch151.OneMinuteBar(
                 "SPY",
                 entry_time,
-                Decimal("100.2"),
+                entry_reference,
                 entry_high,
                 entry_low,
-                Decimal("100.25"),
+                min(entry_high, entry_reference + Decimal("0.05")),
                 100,
             )
         )
@@ -179,7 +187,7 @@ def _b_history(
                 )
             elif exit_mode == "ambiguous_touch":
                 exit_open, exit_high, exit_low = (
-                    Decimal("100.2"),
+                    entry_reference,
                     target + Decimal("0.1"),
                     stop - Decimal("0.1"),
                 )
@@ -201,10 +209,10 @@ def _b_history(
             arch151.OneMinuteBar(
                 "SPY",
                 entry_time + timedelta(minutes=1),
-                Decimal("100.2"),
-                Decimal("100.3"),
-                Decimal("100.1"),
-                Decimal("100.25"),
+                entry_reference,
+                entry_reference + Decimal("0.1"),
+                entry_reference - Decimal("0.1"),
+                entry_reference + Decimal("0.05"),
                 100,
             )
         )
@@ -240,6 +248,170 @@ def _b_history(
         stop,
         schedule.closes_at - timedelta(minutes=5),
     )
+
+
+def _synthetic_benchmark_history(
+    year: int = 2019, *, missing_start: bool = False, missing_end: bool = False
+):
+    sessions = arch151._published_sessions_for_year(year)
+    first_date, last_date = sessions[0], sessions[-1]
+    minutes: list[arch151.OneMinuteBar] = []
+    for session, role in ((first_date, "first"), (last_date, "last")):
+        schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
+        assert schedule is not None
+        scheduled_minutes = int(
+            (schedule.closes_at - schedule.opens_at).total_seconds() // 60
+        )
+        if role == "first":
+            offsets = range(15, 30) if missing_start else range(0, 15)
+        else:
+            offsets = (
+                range(scheduled_minutes - 30, scheduled_minutes - 15)
+                if missing_end
+                else range(scheduled_minutes - 15, scheduled_minutes)
+            )
+        for offset in offsets:
+            opening = Decimal("100")
+            closing = (
+                Decimal("110")
+                if role == "last" and offset == scheduled_minutes - 1
+                else opening
+            )
+            high = max(opening, closing) + Decimal("0.01")
+            low = min(opening, closing) - Decimal("0.01")
+            minutes.append(
+                arch151.OneMinuteBar(
+                    "SPY",
+                    schedule.opens_at + timedelta(minutes=offset),
+                    opening,
+                    high,
+                    low,
+                    closing,
+                    100,
+                )
+            )
+    return arch151._test_only_synthetic_source_history(minutes)
+
+
+def _synthetic_campaign_measures(
+    _history, symbol: str, scored_year: int
+) -> tuple[arch151.FamilyASessionMeasure, ...]:
+    """Create deterministic test-only prior measures for full composition."""
+
+    prior_dates = tuple(
+        session
+        for session in arch151._SESSION_AUTHORITY.published.sessions
+        if date(2016, 1, 1) <= session < date(scored_year, 1, 1)
+    )[-60:]
+    return tuple(
+        arch151.FamilyASessionMeasure(
+            symbol,
+            arch151.FamilyAMeasureScope.COMPLETE_HISTORICAL_SESSION,
+            session,
+            Decimal("100"),
+            Decimal("110"),
+            Decimal("0.1"),
+            sha256(
+                f"synthetic-prior:{symbol}:{session.isoformat()}".encode()
+            ).hexdigest(),
+            _seal=arch151._FAMILY_A_MEASURE_SEAL,
+        )
+        for session in prior_dates
+    )
+
+
+def _synthetic_five_year_campaign_history():
+    """Generate 20 full ETF sessions plus one non-idle B setup per year."""
+
+    minutes: list[arch151.OneMinuteBar] = []
+    session_count = 0
+    generated_bars = 0
+    for year in arch151.SCORED_YEARS:
+        sessions = arch151._published_sessions_for_year(year)
+        selected = tuple(
+            sessions[index * (len(sessions) - 1) // 3] for index in range(4)
+        )
+        signal_session = selected[1]
+        b_program, b_history, *_ = _b_history(session=signal_session)
+        assert b_program.key is arch151.ProgramKey.B5_01
+        b_projection = next(
+            item
+            for item in b_history._session_projections
+            if item.symbol == "SPY" and item.session_date == signal_session
+        )
+        b_minutes = {item.timestamp: item for item in b_projection.minutes}
+        for session in selected:
+            schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
+            assert schedule is not None
+            count = int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
+            for symbol in arch151.INITIAL_UNIVERSE:
+                for offset in range(count):
+                    timestamp = schedule.opens_at + timedelta(minutes=offset)
+                    supplied = (
+                        b_minutes.get(timestamp)
+                        if (symbol == "SPY" and session == signal_session)
+                        else None
+                    )
+                    if supplied is not None:
+                        minute = supplied
+                    else:
+                        close = (
+                            Decimal("101")
+                            if (
+                                year == arch151.SCORED_YEARS[-1]
+                                and session == sessions[-1]
+                                and offset == count - 1
+                                and symbol == "SPY"
+                            )
+                            else Decimal("100")
+                        )
+                        minute = arch151.OneMinuteBar(
+                            symbol,
+                            timestamp,
+                            Decimal("100"),
+                            max(Decimal("100"), close) + Decimal("0.01"),
+                            min(Decimal("100"), close) - Decimal("0.01"),
+                            close,
+                            100,
+                        )
+                    minutes.append(minute)
+                    generated_bars += 1
+            session_count += 1
+    assert session_count == 20
+    return arch151._test_only_synthetic_source_history(minutes), generated_bars
+
+
+def _synthetic_single_year_campaign_history():
+    """Generate one complete SPY/QQQ session containing a B5 trade setup."""
+
+    session = arch151._published_sessions_for_year(2023)[1]
+    program, b_history, *_ = _b_history(session=session)
+    assert program.key is arch151.ProgramKey.B5_01
+    projection = next(
+        item
+        for item in b_history._session_projections
+        if item.symbol == "SPY" and item.session_date == session
+    )
+    supplied_minutes = {item.timestamp: item for item in projection.minutes}
+    schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
+    assert schedule is not None
+    count = int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
+    minutes = tuple(
+        supplied_minutes.get(timestamp)
+        or arch151.OneMinuteBar(
+            symbol,
+            timestamp,
+            Decimal("100"),
+            Decimal("100.01"),
+            Decimal("99.99"),
+            Decimal("100"),
+            100,
+        )
+        for symbol in arch151.INITIAL_UNIVERSE
+        for offset in range(count)
+        for timestamp in (schedule.opens_at + timedelta(minutes=offset),)
+    )
+    return arch151._test_only_synthetic_source_history(minutes), len(minutes)
 
 
 def _slot_for(program: arch151.Arch151Program, symbol: str = "SPY"):
@@ -803,6 +975,9 @@ def test_b_simulator_fills_next_open_then_target_open_with_cost_reconciliation()
     assert trade.exit_reason is evaluator.ExitReason.TARGET_OPEN
     assert trade.exit.reference_price == target
     assert trade.exit.execution_price < target
+    assert trade.excursion_minute_count == 1
+    assert trade.mfe_return is not None and trade.mfe_return > 0
+    assert trade.mae_return is not None and trade.mae_return < 0
     assert trade.entry.cash_before == Decimal(1)
     assert trade.entry.cash_after >= 0
     assert record.closing_equity == trade.exit.cash_after
@@ -959,6 +1134,9 @@ def test_entry_minute_ambiguous_stop_and_target_resolves_to_stop() -> None:
     assert record.trades[0].entry.timestamp == entry_time
     assert record.trades[0].exit_reason is evaluator.ExitReason.STOP_TOUCH
     assert record.trades[0].exit.reference_price == stop
+    assert record.trades[0].mfe_return is None
+    assert record.trades[0].mae_return is None
+    assert record.trades[0].excursion_minute_count == 0
 
 
 @pytest.mark.parametrize("symbol", arch151.INITIAL_UNIVERSE)
@@ -1186,6 +1364,78 @@ def test_each_cost_case_applies_adverse_cost_once_per_actual_fill(
     assert record.trades[0].gross_exposure_fraction <= Decimal(1)
 
 
+def test_stress_pf_uses_net_winning_and_losing_trade_outcomes() -> None:
+    program, history, _entry_time, _target, _stop, _boundary = _b_history(
+        entry_reference=Decimal("100.04")
+    )
+    slot = _slot_for(program)
+    source_digest = evaluator._history_digest(history)
+
+    def make_complete_year(case: arch151.FillCostCase):
+        trade_session = evaluator._simulate_session(history, slot, SESSION, case)
+        assert len(trade_session.trades) == 1
+        trade = trade_session.trades[0]
+        assert trade.gross_pnl > 0
+        if case is arch151.FillCostCase.STRESS:
+            assert trade.net_pnl < 0
+        else:
+            assert trade.net_pnl > 0
+        equity = Decimal(1)
+        sessions = []
+        for session in arch151._published_sessions_for_year(2023):
+            if session == SESSION:
+                record = trade_session
+            else:
+                record = evaluator._idle_session(
+                    history_digest=source_digest,
+                    slot=slot,
+                    case=case,
+                    session=session,
+                    starting_equity=equity,
+                )
+            sessions.append(record)
+            assert record.closing_equity is not None
+            equity = record.closing_equity
+        replay = evaluator._finish_slot_year(
+            history_digest=source_digest,
+            slot=slot,
+            year=2023,
+            case=case,
+            sessions=tuple(sessions),
+        )
+        return trade, replay, evaluator._fold_metrics_from_slot_year(replay)
+
+    stress_trade, stress_replay, stress_metrics = make_complete_year(
+        arch151.FillCostCase.STRESS
+    )
+    base_trade, _base_replay, base_metrics = make_complete_year(
+        arch151.FillCostCase.BASE
+    )
+
+    assert stress_trade.gross_pnl > 0 > stress_trade.net_pnl
+    assert stress_metrics.pre_cost_profit_factor.state is (
+        arch151.ProfitFactorState.POSITIVE_INFINITY
+    )
+    assert stress_metrics.profit_factor.state is arch151.ProfitFactorState.FINITE
+    assert stress_metrics.profit_factor.finite_value == Decimal(0)
+    assert stress_metrics.net_positive_trade_pnl == 0
+    assert stress_metrics.net_negative_trade_pnl > 0
+    assert base_trade.net_pnl > 0
+    assert (
+        base_metrics.profit_factor.state is arch151.ProfitFactorState.POSITIVE_INFINITY
+    )
+    with pytest.raises(
+        evaluator.EvaluationIntegrityError,
+        match="realized P&L totals do not reconcile",
+    ):
+        evaluator._fold_metrics_from_slot_year(
+            replace(
+                stress_replay,
+                positive_net_pnl=stress_replay.positive_net_pnl + Decimal("0.01"),
+            )
+        )
+
+
 def test_canonical_year_batch_keeps_all_slots_costs_and_full_session_denominators() -> (
     None
 ):
@@ -1193,8 +1443,39 @@ def test_canonical_year_batch_keeps_all_slots_costs_and_full_session_denominator
     batch = evaluator.simulate_canonical_year(history, 2023)
 
     assert batch.batch_id == evaluator._canonical_year_batch_id(
-        batch.source_binding, batch.scored_year, batch.evaluations
+        batch.source_binding,
+        batch.scored_year,
+        batch.evaluations,
+        batch.passive_spy_benchmark,
     )
+    assert evaluator._BATCH_NAMESPACE == uuid5(
+        evaluator._NAMESPACE, "canonical-year-batch/v3"
+    )
+    assert batch.passive_spy_benchmark.scored_year == 2023
+    assert batch.passive_spy_benchmark.source_digest == batch.source_digest
+    assert (
+        batch.passive_spy_benchmark.price_basis
+        == "ALPACA_ALL_ADJUSTED_1MINUTE_PRICE_V1"
+    )
+    predecessor_batch_namespace = uuid5(evaluator._NAMESPACE, "canonical-year-batch/v2")
+    predecessor_batch_material = {
+        "schema": "arch151-canonical-year-batch/v2",
+        "source_binding_id": str(batch.source_binding.binding_id),
+        "source_digest": batch.source_digest,
+        "manifest_id": str(batch.manifest_id),
+        "manifest_fingerprint": batch.manifest_fingerprint,
+        "scored_year": batch.scored_year,
+        "replay_outputs": [
+            {"replay_id": str(item.replay_id), "replay_digest": item.replay_digest}
+            for item in batch.evaluations
+        ],
+    }
+    predecessor_batch_id = evaluator._canonical_id(
+        predecessor_batch_namespace,
+        "arch151-canonical-year-batch/v2",
+        predecessor_batch_material,
+    )
+    assert batch.batch_id != predecessor_batch_id
     assert len(batch.evaluations) == len(arch151.CANONICAL_SLOTS) * 3
     assert tuple(item.slot.slot_id for item in batch.evaluations) == tuple(
         slot.slot_id
@@ -1228,6 +1509,235 @@ def test_canonical_year_batch_keeps_all_slots_costs_and_full_session_denominator
     )
     assert not batch.complete
     assert len(batch.evaluations) == len(arch151.CANONICAL_SLOTS) * 3
+
+
+def test_family_d_program_pair_cache_matches_independent_reference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    program = next(
+        item
+        for item in arch151.CANONICAL_PROGRAMS
+        if item.key is arch151.ProgramKey.D5_01
+    )
+    history, _signal_time, _boundary = _d_history(program, "SPY")
+    slots = tuple(
+        slot for slot in arch151.CANONICAL_SLOTS if slot.program_key is program.key
+    )
+    assert tuple(slot.symbol for slot in slots) == arch151.INITIAL_UNIVERSE
+    original_prepare = arch151.prepare_session_features
+    prepared_program_symbols: list[str] = []
+
+    def counted_prepare(history, selected_program, symbol, session, cutoff):
+        if selected_program.key is program.key:
+            prepared_program_symbols.append(symbol)
+        return original_prepare(history, selected_program, symbol, session, cutoff)
+
+    monkeypatch.setattr(arch151, "prepare_session_features", counted_prepare)
+    optimized_batch = evaluator.simulate_canonical_year(history, 2023)
+    optimized_results = tuple(
+        tuple(
+            item
+            for item in optimized_batch.evaluations
+            if item.slot.slot_id == slot.slot_id
+        )
+        for slot in slots
+    )
+    optimized_preparations = tuple(prepared_program_symbols)
+
+    prepared_program_symbols.clear()
+    reference_results = tuple(
+        evaluator._simulate_slot_year_cases(history, slot, 2023) for slot in slots
+    )
+    reference_preparations = tuple(prepared_program_symbols)
+
+    assert optimized_results == reference_results
+    assert optimized_preparations == ("SPY", "QQQ")
+    assert reference_preparations == ("SPY", "QQQ", "QQQ", "SPY")
+
+
+def test_family_a_calibration_cache_matches_per_program_reference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    program = next(
+        item
+        for item in arch151.CANONICAL_PROGRAMS
+        if item.key is arch151.ProgramKey.A5_01
+    )
+    history, _session = _a_history(program, "SPY")
+    eligible_prior = tuple(
+        session
+        for session in arch151._SESSION_AUTHORITY.published.sessions
+        if date(2016, 1, 1) <= session < date(2019, 1, 1)
+    )
+    extra_session = eligible_prior[-61]
+    schedule = arch151._SESSION_AUTHORITY.schedule_for(extra_session)
+    assert schedule is not None
+    extra_minutes = tuple(
+        arch151.OneMinuteBar(
+            "SPY",
+            schedule.opens_at + timedelta(minutes=offset),
+            Decimal("100"),
+            Decimal("100.01"),
+            Decimal("99.99"),
+            Decimal("100"),
+            100,
+        )
+        for offset in range(
+            int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
+        )
+    )
+    all_minutes = tuple(
+        minute
+        for projection in history._session_projections
+        for minute in projection.minutes
+    )
+    history = arch151._test_only_synthetic_source_history(
+        (*extra_minutes, *all_minutes)
+    )
+    programs = _programs_for_family(arch151.StrategyFamily.NOISE_VWAP_BREAKOUT)
+    original_measure_source = arch151._family_a_historical_measures_from_source_history
+    measured_sources: list[tuple[str, int]] = []
+
+    def counted_measure_source(history, symbol, scored_year):
+        measured_sources.append((symbol, scored_year))
+        return original_measure_source(history, symbol, scored_year)
+
+    monkeypatch.setattr(
+        arch151,
+        "_family_a_historical_measures_from_source_history",
+        counted_measure_source,
+    )
+    cache = evaluator._FamilyACalibrationCache(history)
+    optimized = tuple(cache.calibration(item, "SPY", 2023) for item in programs)
+    assert measured_sources == [("SPY", 2023)]
+    assert len(cache._measures[(history.source_digest, "SPY", 2023)]) == 60
+    expected_calibration_dates = eligible_prior[-60:]
+    assert all(
+        item.calibration_session_dates == expected_calibration_dates
+        for item in optimized
+    )
+
+    reference = tuple(
+        arch151.calibrate_family_a_from_source_history(history, item, "SPY", 2023)
+        for item in programs
+    )
+    assert optimized == reference
+    assert measured_sources == [("SPY", 2023)] * 5
+
+
+def test_generated_five_year_simulation_composes_non_idle_480_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        arch151,
+        "_family_a_historical_measures_from_source_history",
+        _synthetic_campaign_measures,
+    )
+    history, source_minute_count = _synthetic_five_year_campaign_history()
+    traced = False
+    try:
+        tracemalloc.start()
+        traced = True
+        campaign_started = perf_counter()
+        year_batches = []
+        year_seconds = []
+        for year in arch151.SCORED_YEARS:
+            year_started = perf_counter()
+            year_batch = evaluator.simulate_canonical_year(history, year)
+            year_seconds.append(perf_counter() - year_started)
+            assert year_batch.complete
+            assert len(year_batch.evaluations) == 96
+            assert any(item.trades for item in year_batch.evaluations)
+            year_batches.append(year_batch)
+        run = evaluator.compose_development_evaluation(tuple(year_batches))
+        elapsed_seconds = perf_counter() - campaign_started
+        _current_bytes, peak_bytes = tracemalloc.get_traced_memory()
+    finally:
+        if traced:
+            tracemalloc.stop()
+
+    assert run.fold_evaluation_count == 480
+    assert tuple(item.scored_year for item in run.year_batches) == arch151.SCORED_YEARS
+    assert len(run.slot_batches) == 32
+    print(
+        "ARCH151_SYNTHETIC_PERF "
+        f"full_sessions=20 minute_bars={source_minute_count} "
+        f"per_year_seconds={tuple(round(item, 3) for item in year_seconds)} "
+        f"sim_and_compose_seconds={elapsed_seconds:.3f} "
+        f"peak_traced_mib={peak_bytes / (1024 * 1024):.2f}"
+    )
+
+
+def test_passive_spy_benchmark_binds_exact_adjusted_price_endpoints() -> None:
+    history = _synthetic_benchmark_history()
+    benchmark = evaluator._passive_benchmark_year(history, 2019)
+
+    first_session, last_session = (
+        arch151._published_sessions_for_year(2019)[0],
+        arch151._published_sessions_for_year(2019)[-1],
+    )
+    first_schedule = arch151._SESSION_AUTHORITY.schedule_for(first_session)
+    last_schedule = arch151._SESSION_AUTHORITY.schedule_for(last_session)
+    assert first_schedule is not None and last_schedule is not None
+    assert benchmark.status is evaluator.BenchmarkStatus.AVAILABLE
+    assert benchmark.start_timestamp == first_schedule.opens_at
+    assert benchmark.start_price == Decimal("100")
+    assert benchmark.end_timestamp == last_schedule.closes_at
+    assert benchmark.end_price == Decimal("110")
+    assert benchmark.adjusted_price_return == Decimal("0.1")
+    assert benchmark.adjustment == "all"
+    assert (
+        benchmark.adjustment_semantics
+        == "SPLIT_PRICE_VOLUME|CASH_DIVIDEND_PRICE|SPIN_OFF_PRICE"
+    )
+    assert benchmark.price_basis == "ALPACA_ALL_ADJUSTED_1MINUTE_PRICE_V1"
+    assert benchmark.benchmark_id == evaluator._passive_benchmark_year_id(benchmark)
+
+    annual = tuple(
+        evaluator._synthetic_passive_benchmark_for_test(
+            "a" * 64,
+            year,
+            start_price=Decimal(100 + index * 5),
+            end_price=Decimal(105 + index * 10),
+        )
+        for index, year in enumerate(arch151.SCORED_YEARS)
+    )
+    campaign = evaluator._passive_benchmark_campaign(annual)
+    assert campaign.status is evaluator.BenchmarkStatus.AVAILABLE
+    assert campaign.start_price == Decimal(100)
+    assert campaign.end_price == Decimal(145)
+    assert campaign.adjusted_price_return == Decimal("0.45")
+
+
+@pytest.mark.parametrize(
+    ("missing_start", "missing_end", "expected_reason"),
+    [
+        (
+            True,
+            False,
+            evaluator.BenchmarkUnavailableReason.FIRST_SESSION_OPEN_UNOBSERVED,
+        ),
+        (
+            False,
+            True,
+            evaluator.BenchmarkUnavailableReason.LAST_SESSION_CLOSE_UNOBSERVED,
+        ),
+    ],
+)
+def test_passive_spy_benchmark_missing_endpoints_are_unavailable_not_zero(
+    missing_start: bool,
+    missing_end: bool,
+    expected_reason: evaluator.BenchmarkUnavailableReason,
+) -> None:
+    history = _synthetic_benchmark_history(
+        missing_start=missing_start, missing_end=missing_end
+    )
+
+    benchmark = evaluator._passive_benchmark_year(history, 2019)
+
+    assert benchmark.status is evaluator.BenchmarkStatus.UNAVAILABLE
+    assert benchmark.unavailable_reason is expected_reason
+    assert benchmark.adjusted_price_return is None
 
 
 @pytest.mark.parametrize(
@@ -1332,8 +1842,9 @@ def _idle_session_records_for_year(
     )
 
 
-def _complete_idle_year_batch(year: int) -> evaluator.CanonicalYearBatch:
-    source_digest = "a" * 64
+def _complete_idle_year_batch(
+    year: int, source_digest: str = "a" * 64
+) -> evaluator.CanonicalYearBatch:
     cost_index = {
         case: index for index, case in enumerate(arch151.EVALUATION_ECONOMICS_ORDER)
     }
@@ -1363,16 +1874,265 @@ def _complete_idle_year_batch(year: int) -> evaluator.CanonicalYearBatch:
         for cost in arch151.EVALUATION_ECONOMICS_ORDER
     )
     source_binding = evaluator._synthetic_source_binding_for_test(source_digest)
+    benchmark = evaluator._synthetic_passive_benchmark_for_test(source_digest, year)
     return evaluator.CanonicalYearBatch(
-        evaluator._canonical_year_batch_id(source_binding, year, evaluations),
+        evaluator._canonical_year_batch_id(
+            source_binding, year, evaluations, benchmark
+        ),
         year,
         arch151.CANONICAL_MANIFEST.manifest_id,
         arch151.CANONICAL_MANIFEST.fingerprint,
         source_digest,
         evaluations,
+        benchmark,
         source_binding,
         evaluator._CANONICAL_YEAR_BATCH_SEAL,
     )
+
+
+def _one_trade_full_year_replay(
+    case: arch151.FillCostCase,
+) -> evaluator.SlotYearReplay:
+    program, history, *_ = _b_history()
+    slot = _slot_for(program)
+    first_session = evaluator._simulate_session(history, slot, SESSION, case)
+    assert first_session.closing_equity is not None
+    equity = first_session.closing_equity
+    sessions: list[evaluator.SessionReplayRecord] = []
+    for idle in _idle_session_records_for_year(2023):
+        if idle.session_date == SESSION:
+            sessions.append(first_session)
+        else:
+            sessions.append(
+                replace(
+                    idle,
+                    starting_equity=equity,
+                    closing_equity=equity,
+                    session_return=Decimal(0),
+                )
+            )
+    return evaluator._finish_slot_year(
+        history_digest=evaluator._history_digest(history),
+        slot=slot,
+        year=2023,
+        case=case,
+        sessions=tuple(sessions),
+    )
+
+
+def test_economic_diagnostics_reconcile_costs_months_time_and_excursions() -> None:
+    replays = {
+        case: _one_trade_full_year_replay(case)
+        for case in arch151.EVALUATION_ECONOMICS_ORDER
+    }
+    zero = replays[arch151.FillCostCase.ZERO]
+    base = replays[arch151.FillCostCase.BASE]
+    stress = replays[arch151.FillCostCase.STRESS]
+    zero_diag = evaluator._economic_diagnostic(
+        (zero,), evaluator.DiagnosticScope.SCORED_YEAR
+    )
+    base_diag = evaluator._economic_diagnostic(
+        (base,), evaluator.DiagnosticScope.SCORED_YEAR
+    )
+    stress_diag = evaluator._economic_diagnostic(
+        (stress,), evaluator.DiagnosticScope.SCORED_YEAR
+    )
+    base_drag = evaluator._cost_drag_diagnostic(
+        base,
+        zero,
+        evaluator.DiagnosticScope.SCORED_YEAR,
+        (base,),
+        (zero,),
+    )
+
+    trade = base.trades[0]
+    assert base_diag.complete
+    assert base_diag.trade_count == 1
+    assert base_diag.gross_trade_pnl == trade.gross_pnl
+    assert base_diag.net_trade_pnl == trade.net_pnl
+    assert base_diag.total_adverse_cost == trade.total_adverse_cost > 0
+    assert base_diag.gross_trade_expectancy == trade.gross_pnl
+    assert base_diag.net_trade_expectancy == trade.net_pnl
+    assert base_diag.net_win_rate == Decimal(1)
+    assert base_diag.average_net_win == trade.net_pnl
+    assert base_diag.average_net_loss is None
+    assert base_diag.net_payoff_ratio is None
+    assert base_diag.monthly_returns[0].month == 1
+    assert base_diag.monthly_returns[0].net_return == base.sessions[0].session_return
+    assert base_diag.positive_month_count == 1
+    assert base_diag.available_month_count == 12
+    assert base_diag.holding_minutes.mean == Decimal(1)
+    assert base_diag.time_in_market_minutes == Decimal(1)
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        expected_time_fraction = Decimal(1) / Decimal(
+            base_diag.published_session_minutes
+        )
+    assert base_diag.time_in_market_fraction == expected_time_fraction
+    target_open = next(
+        item
+        for item in base_diag.exits_by_reason
+        if item.reason is evaluator.ExitReason.TARGET_OPEN
+    )
+    assert target_open.trade_count == 1
+    assert target_open.net_pnl == trade.net_pnl
+    assert base_diag.generated_signals == 1
+    assert base_diag.executed_signals == 1
+    assert base_diag.expired_signals == base_diag.blocked_signals == 0
+    assert base_diag.mfe_returns.count == base_diag.mae_returns.count == 1
+    assert base_diag.trades[0].excursion_minute_count == 1
+    assert zero_diag.total_adverse_cost == 0
+    assert stress_diag.total_adverse_cost > base_diag.total_adverse_cost
+    assert (
+        base_drag.path_relationship
+        is evaluator.CostPathRelationship.IDENTICAL_ENTRY_EXIT_PATH
+    )
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        expected_return_delta = (
+            base_diag.compounded_net_return - zero_diag.compounded_net_return
+        )
+    assert base_drag.net_return_delta == expected_return_delta
+    assert base_drag.net_return_delta < 0
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        expected_cost_delta = base.total_adverse_cost - zero.total_adverse_cost
+    assert base_drag.adverse_cost_delta == expected_cost_delta
+
+
+def test_diagnostic_quartiles_use_nearest_rank_without_interpolation() -> None:
+    odd = evaluator._distribution_summary(
+        tuple(Decimal(item) for item in (1, 2, 3, 4, 5))
+    )
+    even = evaluator._distribution_summary(
+        tuple(Decimal(item) for item in (1, 2, 3, 4, 5, 6))
+    )
+
+    assert odd.first_quartile == Decimal(2)
+    assert odd.median == Decimal(3)
+    assert odd.third_quartile == Decimal(4)
+    assert even.first_quartile == Decimal(2)
+    assert even.median == Decimal("3.5")
+    assert even.third_quartile == Decimal(5)
+
+
+def test_economic_diagnostics_retain_expired_and_blocked_signal_counts() -> None:
+    program, expired_history, *_ = _b_history(entry_observed=False)
+    slot = _slot_for(program)
+    expired_session = evaluator._simulate_session(
+        expired_history, slot, SESSION, arch151.FillCostCase.ZERO
+    )
+    _program, blocked_history, *_ = _b_history(
+        exit_mode="target_open",
+        second_setup=True,
+        second_open_observed=True,
+    )
+    blocked_session = evaluator._simulate_session(
+        blocked_history, slot, SESSION, arch151.FillCostCase.ZERO
+    )
+
+    def partial_replay(
+        record: evaluator.SessionReplayRecord,
+        source_digest: str,
+        replay_id: int,
+    ) -> evaluator.SlotYearReplay:
+        return evaluator.SlotYearReplay(
+            replay_id=UUID(int=replay_id),
+            slot=slot,
+            scored_year=2023,
+            cost_case=arch151.FillCostCase.ZERO,
+            source_digest=source_digest,
+            sessions=(record,),
+            trades=record.trades,
+            complete=False,
+            initial_equity=Decimal(1),
+            final_equity=None,
+            net_return=None,
+            positive_net_pnl=None,
+            negative_net_pnl=None,
+            gross_trade_pnl=None,
+            total_adverse_cost=None,
+            fill_notional=None,
+            turnover=None,
+            maximum_drawdown=None,
+            failure=record.failure,
+        )
+
+    expired = evaluator._economic_diagnostic(
+        (
+            partial_replay(
+                expired_session,
+                evaluator._history_digest(expired_history),
+                9001,
+            ),
+        ),
+        evaluator.DiagnosticScope.SCORED_YEAR,
+    )
+    blocked = evaluator._economic_diagnostic(
+        (
+            partial_replay(
+                blocked_session,
+                evaluator._history_digest(blocked_history),
+                9002,
+            ),
+        ),
+        evaluator.DiagnosticScope.SCORED_YEAR,
+    )
+
+    assert not expired.complete and expired.generated_signals == 1
+    assert expired.expired_signals == 1
+    assert expired.executed_signals == expired.blocked_signals == 0
+    assert not blocked.complete and blocked.generated_signals == 2
+    assert blocked.executed_signals == 1
+    assert blocked.expired_signals == 0
+    assert blocked.blocked_signals == 1
+    assert (
+        next(
+            item
+            for item in blocked.rejections_by_reason
+            if item.reason is evaluator.RejectionReason.SESSION_ENTRY_LIMIT
+        ).count
+        == 1
+    )
+
+
+def test_unavailable_annual_benchmark_is_retained_without_zero_fill_or_dropout() -> (
+    None
+):
+    year_batches = tuple(
+        _complete_idle_year_batch(year) for year in arch151.SCORED_YEARS
+    )
+    original = year_batches[1]
+    unavailable = evaluator._synthetic_passive_benchmark_for_test(
+        original.source_digest,
+        original.scored_year,
+        start_price=None,
+        end_price=Decimal("110"),
+        unavailable_reason=(
+            evaluator.BenchmarkUnavailableReason.FIRST_SESSION_OPEN_UNOBSERVED
+        ),
+    )
+    changed = replace(
+        original,
+        batch_id=evaluator._canonical_year_batch_id(
+            original.source_binding,
+            original.scored_year,
+            original.evaluations,
+            unavailable,
+        ),
+        passive_spy_benchmark=unavailable,
+    )
+    run = evaluator.compose_development_evaluation(
+        (year_batches[0], changed, *year_batches[2:])
+    )
+
+    report = evaluator.serialize_development_evaluation(run)
+    payload = json.loads(report.canonical_json_bytes)
+    benchmark = payload["research_diagnostics"]["passive_spy_benchmark"]
+
+    assert len(benchmark["annual"]) == len(arch151.SCORED_YEARS) == 5
+    assert benchmark["annual"][1]["status"] == evaluator.BenchmarkStatus.UNAVAILABLE
+    assert benchmark["annual"][1]["adjusted_price_return"] is None
+    assert benchmark["five_year"]["status"] == evaluator.BenchmarkStatus.AVAILABLE
+    assert run.fold_evaluation_count == 480
+    assert len(run.qualifications) == len(arch151.CANONICAL_SLOTS) == 32
 
 
 def test_development_composition_preserves_all_480_fold_slot_cost_records() -> None:
@@ -1403,12 +2163,19 @@ def test_development_composition_preserves_all_480_fold_slot_cost_records() -> N
     assert len(run.qualifications) == 32
 
     changed_binding = evaluator._synthetic_source_binding_for_test("b" * 64)
+    changed_benchmark = evaluator._synthetic_passive_benchmark_for_test(
+        "b" * 64, year_batches[-1].scored_year
+    )
     changed_last = replace(
         year_batches[-1],
         batch_id=evaluator._canonical_year_batch_id(
-            changed_binding, year_batches[-1].scored_year, year_batches[-1].evaluations
+            changed_binding,
+            year_batches[-1].scored_year,
+            year_batches[-1].evaluations,
+            changed_benchmark,
         ),
         source_digest="b" * 64,
+        passive_spy_benchmark=changed_benchmark,
         source_binding=changed_binding,
     )
     with pytest.raises(evaluator.EvaluationIntegrityError, match="share exact source"):
@@ -1431,7 +2198,91 @@ def test_source_owned_report_binds_all_records_provenance_dsr_and_freeze() -> No
     assert report.manifest_fingerprint == arch151.CANONICAL_MANIFEST.fingerprint
     assert report.record_count == 480
     assert report.sha256 == sha256(report.canonical_json_bytes).hexdigest()
-    assert payload["schema"] == "arch151-development-evaluation-report/v1"
+    assert payload["schema"] == "arch151-development-evaluation-report/v3"
+    run_material = {
+        "schema": evaluator._DEVELOPMENT_RUN_SCHEMA,
+        "source_binding_id": str(run.source_binding.binding_id),
+        "source_digest": run.source_digest,
+        "manifest_id": str(arch151.CANONICAL_MANIFEST.manifest_id),
+        "manifest_fingerprint": arch151.CANONICAL_MANIFEST.fingerprint,
+        "year_batch_ids": [str(item.batch_id) for item in run.year_batches],
+        "slot_batch_digests": [item.batch_digest for item in run.slot_batches],
+        "selection_bias_calculation_id": str(run.selection_bias.calculation_id),
+        "qualification_ids": [
+            str(item.qualification_id) for item in run.qualifications
+        ],
+        "passive_spy_benchmark_id": str(run.passive_spy_benchmark.benchmark_id),
+        "ranking_order": [str(item) for item in run.ranking_order],
+        "freeze_id": str(run.final_freeze.freeze_id),
+    }
+    expected_run_namespace = uuid5(
+        evaluator._NAMESPACE, "development-evaluation-run/v4"
+    )
+    expected_run_id = evaluator._canonical_id(
+        expected_run_namespace,
+        "arch151-development-evaluation-run/v4",
+        run_material,
+    )
+    predecessor_run_v3_namespace = uuid5(
+        evaluator._NAMESPACE, "development-evaluation-run/v3"
+    )
+    predecessor_v3_material = {
+        key: value
+        for key, value in run_material.items()
+        if key != "passive_spy_benchmark_id"
+    }
+    predecessor_v3_material["schema"] = "arch151-development-evaluation-run/v3"
+    predecessor_run_v3_id = evaluator._canonical_id(
+        predecessor_run_v3_namespace,
+        "arch151-development-evaluation-run/v3",
+        predecessor_v3_material,
+    )
+    predecessor_run_v2_namespace = uuid5(
+        evaluator._NAMESPACE, "development-evaluation-run/v2"
+    )
+    predecessor_v2_material = dict(predecessor_v3_material)
+    predecessor_v2_material["schema"] = "arch151-development-evaluation-run/v2"
+    predecessor_run_v2_id = evaluator._canonical_id(
+        predecessor_run_v2_namespace,
+        "arch151-development-evaluation-run/v2",
+        predecessor_v2_material,
+    )
+    expected_report_id = evaluator._canonical_id(
+        evaluator._DEVELOPMENT_REPORT_NAMESPACE,
+        "arch151-development-evaluation-report/v3",
+        {"run_id": str(run.run_id), "sha256": report.sha256},
+    )
+    predecessor_report_v2_namespace = uuid5(
+        predecessor_run_v3_namespace, "canonical-report/v2"
+    )
+    predecessor_report_v2_id = evaluator._canonical_id(
+        predecessor_report_v2_namespace,
+        "arch151-development-evaluation-report/v2",
+        {"run_id": str(run.run_id), "sha256": report.sha256},
+    )
+    predecessor_report_v1_namespace = uuid5(
+        predecessor_run_v2_namespace, "canonical-report/v1"
+    )
+    predecessor_report_v1_id = evaluator._canonical_id(
+        predecessor_report_v1_namespace,
+        "arch151-development-evaluation-report/v1",
+        {"run_id": str(run.run_id), "sha256": report.sha256},
+    )
+    assert evaluator._DEVELOPMENT_RUN_SCHEMA == "arch151-development-evaluation-run/v4"
+    assert evaluator._DEVELOPMENT_RUN_NAMESPACE == expected_run_namespace
+    assert run.run_id == expected_run_id
+    assert run.run_id != predecessor_run_v3_id
+    assert run.run_id != predecessor_run_v2_id
+    assert (
+        evaluator._DEVELOPMENT_REPORT_SCHEMA
+        == "arch151-development-evaluation-report/v3"
+    )
+    assert evaluator._DEVELOPMENT_REPORT_NAMESPACE == uuid5(
+        expected_run_namespace, "canonical-report/v3"
+    )
+    assert report.report_id == expected_report_id
+    assert report.report_id != predecessor_report_v2_id
+    assert report.report_id != predecessor_report_v1_id
     assert payload["run"]["run_id"] == str(run.run_id)
     assert payload["run"]["source_digest"] == run.source_digest
     assert (
@@ -1442,14 +2293,79 @@ def test_source_owned_report_binds_all_records_provenance_dsr_and_freeze() -> No
     assert payload["record_count"] == len(payload["fold_records"]) == 480
     assert len(payload["year_batches"]) == 5
     assert len(payload["slot_year_replays"]) == 480
+    diagnostics = payload["research_diagnostics"]
+    assert diagnostics["qualification_or_ranking_input"] is False
+    assert len(diagnostics["annual_slot_economics"]) == 480
+    assert len(diagnostics["five_year_slot_economics"]) == 96
+    assert len(diagnostics["cost_drag_vs_zero"]) == 384
+    assert {
+        (item["slot_id"], item["scored_year"], item["cost_case"])
+        for item in diagnostics["annual_slot_economics"]
+    } == {
+        (str(slot.slot_id), year, case.value)
+        for slot in arch151.CANONICAL_SLOTS
+        for year in arch151.SCORED_YEARS
+        for case in arch151.EVALUATION_ECONOMICS_ORDER
+    }
+    assert {
+        (item["slot_id"], item["cost_case"])
+        for item in diagnostics["five_year_slot_economics"]
+    } == {
+        (str(slot.slot_id), case.value)
+        for slot in arch151.CANONICAL_SLOTS
+        for case in arch151.EVALUATION_ECONOMICS_ORDER
+    }
+    assert all(
+        item["trade_count"] == 0 for item in diagnostics["annual_slot_economics"]
+    )
+    assert all(
+        item["net_trade_expectancy"] is None
+        and item["net_win_rate"] is None
+        and item["net_payoff_ratio"] is None
+        for item in diagnostics["annual_slot_economics"]
+    )
+    assert all(
+        item["path_relationship"]
+        == evaluator.CostPathRelationship.IDENTICAL_ENTRY_EXIT_PATH
+        and item["net_return_delta"] == "0"
+        and item["adverse_cost_delta"] == "0"
+        for item in diagnostics["cost_drag_vs_zero"]
+    )
+    assert len(diagnostics["passive_spy_benchmark"]["annual"]) == 5
+    assert diagnostics["passive_spy_benchmark"]["metric"] == "ADJUSTED_PRICE_RETURN"
+    assert (
+        diagnostics["passive_spy_benchmark"]["price_basis"]
+        == "ALPACA_ALL_ADJUSTED_1MINUTE_PRICE_V1"
+    )
+    assert (
+        diagnostics["passive_spy_benchmark"][
+            "dividend_cashflow_total_return_reconstructed"
+        ]
+        is False
+    )
+    assert (
+        diagnostics["passive_spy_benchmark"]["five_year"]["adjusted_price_return"]
+        == "0.1"
+    )
     assert len(payload["slot_batches"]) == len(arch151.CANONICAL_SLOTS)
     assert len(payload["qualifications"]) == len(arch151.CANONICAL_SLOTS)
     assert payload["selection_bias"]["calculation_id"] == str(
         run.selection_bias.calculation_id
     )
     assert payload["selection_bias"]["evidence"] == []
+    assert len(payload["selection_bias"]["trial_diagnostics"]) == 32
+    assert payload["selection_bias"]["affected_trial_slot_ids"] == [
+        str(slot.slot_id) for slot in arch151.CANONICAL_SLOTS
+    ]
+    assert payload["selection_bias"]["descriptive_economic_order"] == [
+        str(item) for item in run.selection_bias.descriptive_economic_order
+    ]
+    assert len(payload["selection_bias"]["descriptive_economic_order"]) == 32
     assert payload["final_freeze"]["freeze_id"] == str(run.final_freeze.freeze_id)
     assert payload["final_freeze"]["candidate_slot_id"] is None
+    assert "pre_cost_profit_factor" in payload["fold_records"][0]["metrics"]
+    assert "net_positive_trade_pnl" in payload["fold_records"][0]["metrics"]
+    assert "pre_cost_profit_factor" in payload["qualifications"][0]["aggregate"]
     assert all(
         replay["signal_counts"]
         == {"generated": 0, "eligible": 0, "executed": 0, "expired": 0, "blocked": 0}
@@ -1473,6 +2389,7 @@ def test_unissued_development_batch_run_and_report_constructors_fail_closed() ->
             batch.manifest_fingerprint,
             batch.source_digest,
             batch.evaluations,
+            batch.passive_spy_benchmark,
             batch.source_binding,
             None,
         )
@@ -1494,6 +2411,141 @@ def test_unissued_development_batch_run_and_report_constructors_fail_closed() ->
             canonical_json_bytes=b"{}",
             sha256_digest=sha256(b"{}").hexdigest(),
         )
+
+
+def test_synthetic_development_report_cannot_issue_authenticated_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = evaluator.compose_development_evaluation(
+        tuple(_complete_idle_year_batch(year) for year in arch151.SCORED_YEARS)
+    )
+    report = evaluator.serialize_development_evaluation(run)
+    source_revision_calls = []
+
+    def reject_source_revision():
+        source_revision_calls.append(True)
+        raise AssertionError("synthetic authentication must not inspect Git source")
+
+    monkeypatch.setattr(operator, "_read_source_revision", reject_source_revision)
+    with pytest.raises(
+        arch151.AuthorizationUnavailableError,
+        match="synthetic development runs cannot issue",
+    ):
+        evaluator.authenticate_development_evidence(run, report, object())
+    assert source_revision_calls == []
+
+
+def test_operator_attestation_binds_exact_run_report_and_captured_revision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from trading_bot.experiments import (
+        arch151_intraday_walkforward_operator as operator,
+    )
+
+    run = evaluator.compose_development_evaluation(
+        tuple(_complete_idle_year_batch(year) for year in arch151.SCORED_YEARS)
+    )
+    report = evaluator.serialize_development_evaluation(run)
+    revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        "b" * 40,
+        "c" * 40,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    invocation_id = operator._invocation_id(revision)
+    context = operator._ActiveDevelopmentInvocation(
+        _seal=operator._ACTIVE_INVOCATION_SEAL,
+        attempt_id=UUID(int=9101),
+        invocation_id=invocation_id,
+        source_revision=revision,
+    )
+    context.bind_run(run)
+    context.bind_report(report)
+    attestation = operator._issue_development_source_attestation(
+        context,
+        run,
+        report,
+        _synthetic_test_only=True,
+    )
+
+    assert attestation.run_id == run.run_id
+    assert attestation.report_id == report.report_id
+    assert attestation.report_sha256 == report.sha256
+    assert attestation.record_count == 480
+    assert attestation.invocation_id == invocation_id
+    assert attestation.source_revision == revision
+    assert len(attestation.year_batch_ids) == 5
+    assert len(attestation.slot_batch_digests) == 32
+    assert (
+        operator._validate_development_source_attestation(
+            run, report, attestation, expected_revision=revision
+        )
+        == attestation
+    )
+
+    changed_revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        "d" * 40,
+        "e" * 40,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    with pytest.raises(operator.OperatorError):
+        operator._ActiveDevelopmentInvocation(
+            _seal=operator._ACTIVE_INVOCATION_SEAL,
+            attempt_id=UUID(int=9101),
+            invocation_id=operator._invocation_id(changed_revision),
+            source_revision=revision,
+        )
+    with pytest.raises(
+        arch151.AuthorizationUnavailableError, match="does not bind this run"
+    ):
+        operator._validate_development_source_attestation(
+            run, report, attestation, expected_revision=changed_revision
+        )
+
+    other_run = evaluator.compose_development_evaluation(
+        tuple(
+            _complete_idle_year_batch(year, "f" * 64) for year in arch151.SCORED_YEARS
+        )
+    )
+    forged_report = evaluator.serialize_development_evaluation(other_run)
+    with pytest.raises(
+        arch151.AuthorizationUnavailableError, match="does not bind this run"
+    ):
+        operator._validate_development_source_attestation(
+            run, forged_report, attestation
+        )
+
+    outcome = operator.OperatorOutcome(
+        operator.OperatorStatus.COMPLETED,
+        UUID(int=9102),
+        invocation_id,
+        None,
+        report.report_id,
+        report.sha256,
+        None,
+    )
+    for untrusted in (UUID(int=9103), outcome, revision):
+        with pytest.raises(arch151.AuthorizationUnavailableError):
+            operator._validate_development_source_attestation(run, report, untrusted)
+
+    source_revision_calls: list[None] = []
+
+    def reject_synthetic_authentication():
+        source_revision_calls.append(None)
+        pytest.fail("synthetic receipts must fail before current-source inspection")
+
+    monkeypatch.setattr(
+        operator, "_read_source_revision", reject_synthetic_authentication
+    )
+    with pytest.raises(
+        arch151.AuthorizationUnavailableError,
+        match="synthetic development runs cannot issue",
+    ):
+        evaluator.authenticate_development_evidence(run, report, attestation)
+    assert source_revision_calls == []
 
 
 def test_year_batch_identity_binds_complete_replay_outputs() -> None:

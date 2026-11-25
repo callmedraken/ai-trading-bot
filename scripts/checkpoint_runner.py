@@ -538,6 +538,8 @@ ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME: Final = (
 ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS: Final = (
     "src/trading_bot/experiments/arch151_intraday_walkforward_evaluator.py",
     "tests/experiments/test_arch151_intraday_walkforward_evaluator.py",
+    "src/trading_bot/experiments/arch151_intraday_walkforward_operator.py",
+    "tests/experiments/test_arch151_intraday_walkforward_operator.py",
     "docs/architecture/151-intraday-walk-forward-campaign.md",
     "docs/validation/arch151-intraday-walk-forward-campaign.md",
     "scripts/checkpoint_runner.py",
@@ -552,6 +554,7 @@ ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_TESTS: Final = (
     "tests/runtime/checkpoint_runner/test_source_authority.py",
     *ARCH151_INTRADAY_WALKFORWARD_PATHS[1:],
     "tests/experiments/test_arch151_intraday_walkforward_evaluator.py",
+    "tests/experiments/test_arch151_intraday_walkforward_operator.py",
 )
 ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_RUFF: Final = (
     *COMMON_RUFF_PATHS,
@@ -560,6 +563,8 @@ ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_RUFF: Final = (
     *ARCH151_INTRADAY_WALKFORWARD_PATHS,
     "src/trading_bot/experiments/arch151_intraday_walkforward_evaluator.py",
     "tests/experiments/test_arch151_intraday_walkforward_evaluator.py",
+    "src/trading_bot/experiments/arch151_intraday_walkforward_operator.py",
+    "tests/experiments/test_arch151_intraday_walkforward_operator.py",
 )
 AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: Final = "arch-ai-strategy-discovery-g1-engine"
 AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH: Final = (

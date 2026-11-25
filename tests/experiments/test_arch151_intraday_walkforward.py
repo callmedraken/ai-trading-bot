@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, date, datetime, time, timedelta
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from functools import cache
 from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo
@@ -692,12 +692,16 @@ def _fold_metrics_for_year(year, profile=None):
     double_sessions = profile.get("double_sessions", 0)
     for index in range(active_sessions):
         round_trips[index] = 2 if index < double_sessions else 1
+    gross_positive = profile.get("gross_positive", Decimal("2"))
+    gross_negative = profile.get("gross_negative", Decimal("1"))
     return arch151.FoldMetrics(
         session_dates,
         tuple(returns),
         tuple(round_trips),
-        profile.get("gross_positive", Decimal("2")),
-        profile.get("gross_negative", Decimal("1")),
+        gross_positive,
+        gross_negative,
+        profile.get("net_positive", gross_positive),
+        profile.get("net_negative", gross_negative),
         profile.get("annual_turnover", Decimal("0.25")),
     )
 
@@ -706,10 +710,19 @@ def _evaluation_batch_for_slot(slot, year_profiles=None):
     year_profiles = year_profiles or {}
     records = []
     for fold in arch151.WALK_FORWARD_FOLDS:
-        metrics = _fold_metrics_for_year(
-            fold.scored_year, year_profiles.get(fold.scored_year)
-        )
+        profile = year_profiles.get(fold.scored_year, {})
         for economics_case in arch151.EVALUATION_ECONOMICS_ORDER:
+            case_profiles = profile.get("economics_cases", {})
+            case_profile = case_profiles.get(economics_case, {})
+            metrics = _fold_metrics_for_year(
+                fold.scored_year,
+                {
+                    key: value
+                    for key, value in profile.items()
+                    if key != "economics_cases"
+                }
+                | case_profile,
+            )
             records.append(
                 arch151.FoldEvaluation(
                     slot.slot_id,
@@ -760,6 +773,8 @@ def _dsr_evaluation_population():
                 tuple(round_trips),
                 Decimal("0") if slot_index == 1 else Decimal("2"),
                 Decimal("1"),
+                Decimal("0") if slot_index == 1 else Decimal("2"),
+                Decimal("1"),
                 Decimal("0.25"),
             )
             for economics_case in arch151.EVALUATION_ECONOMICS_ORDER:
@@ -777,12 +792,70 @@ def _dsr_evaluation_population():
     return tuple(batches)
 
 
-def _synthetic_ranking_material(slot, probability=Decimal("0.95")):
+@cache
+def _one_candidate_final_freeze():
+    batches = _dsr_evaluation_population()
+    calculation = arch151.compute_selection_bias_evidence(batches)
+    freeze = arch151.freeze_final_candidate_set(
+        batches, _selection_bias_calculation=calculation
+    )
+    assert freeze.status is arch151.FinalFreezeStatus.ONE_CANDIDATE_FROZEN
+    assert freeze.candidate_slot_id == CANONICAL_SLOTS[0].slot_id
+    return freeze
+
+
+def _later_period_evidence(
+    period: arch151.LaterPeriodKind,
+    *,
+    freeze=None,
+    economics_case: arch151.FillCostCase = arch151.FillCostCase.STRESS,
+    returns_by_session: dict[date, Decimal] | None = None,
+    outcomes_by_session: dict[date, tuple[Decimal, ...]] | None = None,
+):
+    selected_freeze = freeze or _one_candidate_final_freeze()
+    expected_sessions, _expected_months = arch151._later_period_calendar(period)
+    return_values = returns_by_session or {}
+    outcomes = outcomes_by_session or {}
+    sessions = []
+    trades = []
+    for session in expected_sessions:
+        session_outcomes = outcomes.get(session, (Decimal("1"),))
+        session_pnl = sum(session_outcomes, Decimal(0))
+        sessions.append(
+            arch151.LaterPeriodSessionEvidence(
+                session,
+                return_values.get(session, Decimal("0.001")),
+                session_pnl,
+                len(session_outcomes),
+            )
+        )
+        trades.extend(
+            arch151.LaterPeriodTradeEvidence(session, value)
+            for value in session_outcomes
+        )
+    return arch151.LaterPeriodEvaluationEvidence(
+        period,
+        selected_freeze.freeze_id,
+        selected_freeze.fingerprint,
+        selected_freeze.candidate_slot_id,
+        economics_case,
+        tuple(sessions),
+        tuple(trades),
+    )
+
+
+def _synthetic_ranking_material(
+    slot,
+    probability=Decimal("0.95"),
+    net_profit_factor=Decimal("1.5"),
+    pre_cost_profit_factor=Decimal("1.5"),
+):
     aggregate = arch151.DevelopmentAggregate(
         slot.slot_id,
         arch151.FillCostCase.STRESS,
         Decimal("0.10"),
-        Decimal("1.5"),
+        net_profit_factor,
+        pre_cost_profit_factor,
         5,
         5,
         Decimal("-0.05"),
@@ -2579,13 +2652,13 @@ def test_fold_evaluation_batch_is_complete_ordered_and_source_bound() -> None:
         arch151.DevelopmentEvaluationBatch(slot.slot_id, mixed_case)
 
 
-def test_fold_evaluation_identity_uses_v2_schema_and_namespace() -> None:
+def test_fold_evaluation_identity_uses_v3_schema_and_namespace() -> None:
     slot = CANONICAL_SLOTS[0]
     batch = _evaluation_batch_for_slot(slot)
     repeated_batch = _evaluation_batch_for_slot(slot)
     record = batch.records[0]
     material = {
-        "schema": "arch151-fold-evaluation/v2",
+        "schema": "arch151-fold-evaluation/v3",
         "semantic_contract_version": arch151.SEMANTIC_CONTRACT_VERSION,
         "slot_id": str(record.slot_id),
         "program_id": str(record.program_id),
@@ -2594,29 +2667,51 @@ def test_fold_evaluation_identity_uses_v2_schema_and_namespace() -> None:
         "economics_case": record.economics_case.value,
         "metrics": arch151._fold_metrics_material(record.metrics),
     }
-    expected_namespace = uuid5(arch151._ROOT_NAMESPACE, "fold-evaluation/v2")
+    expected_namespace = uuid5(arch151._ROOT_NAMESPACE, "fold-evaluation/v3")
     expected_id = uuid5(
         expected_namespace,
         arch151._canonical_json(material).decode("utf-8"),
     )
-    legacy_metrics = dict(arch151._fold_metrics_material(record.metrics))
-    legacy_metrics.pop("profit_factor")
-    prior_schema_id = uuid5(
+    current_metrics = dict(arch151._fold_metrics_material(record.metrics))
+    v2_metrics = dict(current_metrics)
+    for key in (
+        "net_positive_trade_pnl",
+        "net_negative_trade_pnl",
+        "pre_cost_profit_factor",
+    ):
+        v2_metrics.pop(key)
+    v2_metrics["profit_factor"] = (
+        record.metrics.pre_cost_profit_factor.canonical_material()
+    )
+    prior_v2_id = uuid5(
+        uuid5(arch151._ROOT_NAMESPACE, "fold-evaluation/v2"),
+        arch151._canonical_json(
+            {
+                **material,
+                "schema": "arch151-fold-evaluation/v2",
+                "metrics": v2_metrics,
+            }
+        ).decode("utf-8"),
+    )
+    v1_metrics = dict(v2_metrics)
+    v1_metrics.pop("profit_factor")
+    prior_v1_id = uuid5(
         uuid5(arch151._ROOT_NAMESPACE, "fold-evaluation/v1"),
         arch151._canonical_json(
             {
                 **material,
                 "schema": "arch151-fold-evaluation/v1",
-                "metrics": legacy_metrics,
+                "metrics": v1_metrics,
             }
         ).decode("utf-8"),
     )
 
-    assert arch151._FOLD_EVALUATION_SCHEMA == "arch151-fold-evaluation/v2"
+    assert arch151._FOLD_EVALUATION_SCHEMA == "arch151-fold-evaluation/v3"
     assert arch151._EVALUATION_NAMESPACE == expected_namespace
     assert record.evaluation_id == expected_id
     assert record.evaluation_id == repeated_batch.records[0].evaluation_id
-    assert record.evaluation_id != prior_schema_id
+    assert record.evaluation_id != prior_v2_id
+    assert record.evaluation_id != prior_v1_id
     assert batch.batch_digest == repeated_batch.batch_digest
     qualification = arch151.qualify_development(batch)
     repeated_qualification = arch151.qualify_development(repeated_batch)
@@ -2649,6 +2744,43 @@ def test_fold_evaluation_identity_uses_v2_schema_and_namespace() -> None:
         replace(two_entry_record, metrics=over_cap_metrics)
 
 
+def test_qualification_identity_uses_v3_and_preserves_v2_predecessor_schema() -> None:
+    batch = _evaluation_batch_for_slot(CANONICAL_SLOTS[0])
+    qualification = arch151.qualify_development(batch)
+    material = {
+        "schema": "arch151-development-qualification/v3",
+        "batch_digest": batch.batch_digest,
+        "economics_case": arch151.FillCostCase.STRESS.value,
+        "economic_rejections": [
+            item.value for item in qualification.economic_rejection_reasons
+        ],
+        "selection_bias_status": qualification.selection_bias_status.value,
+        "selection_bias_evidence_digest": None,
+        "selection_bias_rejections": [
+            item.value
+            for item in qualification.rejection_reasons[
+                len(qualification.economic_rejection_reasons) :
+            ]
+        ],
+    }
+    expected_namespace = uuid5(arch151._ROOT_NAMESPACE, "development-qualification/v3")
+    expected_id = uuid5(
+        expected_namespace,
+        arch151._canonical_json(material).decode("utf-8"),
+    )
+    predecessor_id = uuid5(
+        uuid5(arch151._ROOT_NAMESPACE, "development-qualification/v2"),
+        arch151._canonical_json(
+            {**material, "schema": "arch151-development-qualification/v2"}
+        ).decode("utf-8"),
+    )
+
+    assert arch151._QUALIFICATION_SCHEMA == "arch151-development-qualification/v3"
+    assert arch151._QUALIFICATION_NAMESPACE == expected_namespace
+    assert qualification.qualification_id == expected_id
+    assert qualification.qualification_id != predecessor_id
+
+
 def test_fold_metrics_reject_invalid_and_preserve_zero_trade_undefined_pf() -> None:
     dates = arch151._published_sessions_for_year(2019)
     zeros = (Decimal(0),) * len(dates)
@@ -2660,23 +2792,57 @@ def test_fold_metrics_reject_invalid_and_preserve_zero_trade_undefined_pf() -> N
             trips,
             Decimal(1),
             Decimal(1),
+            Decimal(1),
+            Decimal(1),
             Decimal("0.25"),
         )
     zero_trade = arch151.FoldMetrics(
-        dates, zeros, trips, Decimal(0), Decimal(0), Decimal(0)
+        dates, zeros, trips, Decimal(0), Decimal(0), Decimal(0), Decimal(0), Decimal(0)
     )
     assert zero_trade.profit_factor.state is arch151.ProfitFactorState.UNDEFINED
-    with pytest.raises(Arch151Error, match="invalid gross"):
-        arch151.FoldMetrics(dates, zeros, trips, Decimal(-1), Decimal(1), Decimal(0))
+    with pytest.raises(Arch151Error, match="invalid gross or realized net"):
+        arch151.FoldMetrics(
+            dates,
+            zeros,
+            trips,
+            Decimal(-1),
+            Decimal(1),
+            Decimal(0),
+            Decimal(0),
+            Decimal(0),
+        )
     with pytest.raises(ValueError, match="finite"):
-        arch151.FoldMetrics(dates, zeros, trips, Decimal(1), Decimal(1), Decimal("NaN"))
+        arch151.FoldMetrics(
+            dates,
+            zeros,
+            trips,
+            Decimal(1),
+            Decimal(1),
+            Decimal(1),
+            Decimal(1),
+            Decimal("NaN"),
+        )
     with pytest.raises(ValueError, match="turnover cannot be negative"):
         arch151.FoldMetrics(
-            dates, zeros, trips, Decimal(1), Decimal(1), Decimal("-0.01")
+            dates,
+            zeros,
+            trips,
+            Decimal(1),
+            Decimal(1),
+            Decimal(1),
+            Decimal(1),
+            Decimal("-0.01"),
         )
     with pytest.raises(Arch151Error, match="aligned full-session"):
         arch151.FoldMetrics(
-            dates, zeros[:-1], trips, Decimal(1), Decimal(1), Decimal("0.25")
+            dates,
+            zeros[:-1],
+            trips,
+            Decimal(1),
+            Decimal(1),
+            Decimal(1),
+            Decimal(1),
+            Decimal("0.25"),
         )
 
 
@@ -2684,7 +2850,7 @@ def test_invalid_fold_evidence_fails_before_undefined_pf_qualification() -> None
     slot = CANONICAL_SLOTS[0]
     batch = _evaluation_batch_for_slot(slot)
     metrics = batch.records[0].metrics
-    with pytest.raises(Arch151Error, match="invalid gross"):
+    with pytest.raises(Arch151Error, match="invalid gross or realized net"):
         replace(metrics, gross_positive_trade_pnl=Decimal("-1"))
 
     zero_profiles = {
@@ -2712,23 +2878,32 @@ def test_development_aggregate_uses_summed_pf_and_chained_drawdown() -> None:
             "return_events": ((250, Decimal("0.20")), (251, Decimal("-0.15"))),
             "gross_positive": Decimal("2"),
             "gross_negative": Decimal("1"),
+            "net_positive": Decimal("2"),
+            "net_negative": Decimal(0),
             "annual_turnover": Decimal("0.10"),
         },
         2020: {
             "return_events": ((0, Decimal("-0.10")), (251, Decimal("0.20"))),
             "gross_positive": Decimal("0.1"),
             "gross_negative": Decimal("10"),
+            "net_positive": Decimal(0),
+            "net_negative": Decimal("1"),
             "annual_turnover": Decimal("0.20"),
         },
+        2021: {"net_positive": Decimal(0), "net_negative": Decimal(0)},
+        2022: {"net_positive": Decimal(0), "net_negative": Decimal(0)},
+        2023: {"net_positive": Decimal(0), "net_negative": Decimal(0)},
     }
     batch = _evaluation_batch_for_slot(slot, profiles)
     aggregate = arch151.aggregate_development_economics(
         batch, arch151.FillCostCase.STRESS
     )
     assert aggregate.profit_factor.state is arch151.ProfitFactorState.FINITE
-    assert aggregate.profit_factor.finite_value.quantize(Decimal("0.000001")) == (
-        Decimal("0.578571")
-    )
+    assert aggregate.profit_factor.finite_value == Decimal(2)
+    assert aggregate.pre_cost_profit_factor.state is arch151.ProfitFactorState.FINITE
+    assert aggregate.pre_cost_profit_factor.finite_value.quantize(
+        Decimal("0.000001")
+    ) == Decimal("0.578571")
     assert aggregate.max_drawdown > Decimal("0.23")
     assert aggregate.max_drawdown > max(
         record.metrics.max_drawdown
@@ -2738,17 +2913,85 @@ def test_development_aggregate_uses_summed_pf_and_chained_drawdown() -> None:
     assert aggregate.turnover == Decimal("0.21")
 
 
+def test_cost_case_pf_uses_realized_net_totals_for_annual_and_aggregate_gates() -> None:
+    slot = CANONICAL_SLOTS[0]
+    profiles = {
+        year: {
+            "gross_positive": Decimal("0.04"),
+            "gross_negative": Decimal("0.01"),
+            "annual_turnover": Decimal("0.1"),
+            "economics_cases": {
+                arch151.FillCostCase.ZERO: {
+                    "return_events": (
+                        (
+                            len(arch151._published_sessions_for_year(year)) - 1,
+                            Decimal("0.02"),
+                        ),
+                    ),
+                    "net_positive": Decimal("0.03"),
+                    "net_negative": Decimal("0.01"),
+                },
+                arch151.FillCostCase.BASE: {
+                    "return_events": (
+                        (
+                            len(arch151._published_sessions_for_year(year)) - 1,
+                            Decimal("0.01"),
+                        ),
+                    ),
+                    "net_positive": Decimal("0.02"),
+                    "net_negative": Decimal("0.01"),
+                },
+                arch151.FillCostCase.STRESS: {
+                    "return_events": (
+                        (
+                            len(arch151._published_sessions_for_year(year)) - 1,
+                            Decimal("-0.001"),
+                        ),
+                    ),
+                    "net_positive": Decimal("0.009"),
+                    "net_negative": Decimal("0.01"),
+                },
+            },
+        }
+        for year in arch151.SCORED_YEARS
+    }
+    batch = _evaluation_batch_for_slot(slot, profiles)
+    zero = arch151.aggregate_development_economics(batch, arch151.FillCostCase.ZERO)
+    base = arch151.aggregate_development_economics(batch, arch151.FillCostCase.BASE)
+    stress = arch151.aggregate_development_economics(batch, arch151.FillCostCase.STRESS)
+
+    assert zero.profit_factor.finite_value == Decimal(3)
+    assert base.profit_factor.finite_value == Decimal(2)
+    assert stress.profit_factor.finite_value == Decimal("0.9")
+    assert stress.pre_cost_profit_factor.finite_value == Decimal(4)
+    assert stress.profitable_scored_years == 0
+    rejected = arch151.qualify_development(batch)
+    assert (
+        arch151.QualificationRejection.STRESS_PROFIT_FACTOR_NOT_ABOVE_ONE
+        in rejected.economic_rejection_reasons
+    )
+
+
 def test_profit_factor_preserves_zero_trade_win_loss_and_mixed_states() -> None:
     dates = arch151._published_sessions_for_year(2019)
     zeros = (Decimal(0),) * len(dates)
     no_trades = (0,) * len(dates)
     zero_trade = arch151.FoldMetrics(
-        dates, zeros, no_trades, Decimal(0), Decimal(0), Decimal(0)
+        dates,
+        zeros,
+        no_trades,
+        Decimal(0),
+        Decimal(0),
+        Decimal(0),
+        Decimal(0),
+        Decimal(0),
     )
     all_wins = arch151.FoldMetrics(
         dates,
         (Decimal("0.01"), *zeros[1:]),
         (1, *no_trades[1:]),
+        Decimal("2"),
+        Decimal(0),
         Decimal("2"),
         Decimal(0),
         Decimal("0.1"),
@@ -2759,9 +3002,11 @@ def test_profit_factor_preserves_zero_trade_win_loss_and_mixed_states() -> None:
         (1, *no_trades[1:]),
         Decimal(0),
         Decimal("2"),
+        Decimal(0),
+        Decimal("2"),
         Decimal("0.1"),
     )
-    mixed = arch151.ProfitFactor.from_gross_totals(Decimal("3"), Decimal("2"))
+    mixed = arch151.ProfitFactor.from_totals(Decimal("3"), Decimal("2"))
 
     assert zero_trade.profit_factor.state is arch151.ProfitFactorState.UNDEFINED
     assert zero_trade.profit_factor.arch150_report_value() is None
@@ -2771,9 +3016,16 @@ def test_profit_factor_preserves_zero_trade_win_loss_and_mixed_states() -> None:
         (1, *no_trades[1:]),
         Decimal(0),
         Decimal(0),
+        Decimal(0),
+        Decimal("0.01"),
         Decimal("0.1"),
     )
-    assert zero_gross_trade.profit_factor.state is arch151.ProfitFactorState.UNDEFINED
+    assert zero_gross_trade.profit_factor.state is arch151.ProfitFactorState.FINITE
+    assert zero_gross_trade.profit_factor.finite_value == Decimal(0)
+    assert (
+        zero_gross_trade.pre_cost_profit_factor.state
+        is arch151.ProfitFactorState.UNDEFINED
+    )
     assert zero_gross_trade.completed_round_trips == 1
     assert all_wins.profit_factor.state is arch151.ProfitFactorState.POSITIVE_INFINITY
     assert all_wins.profit_factor.arch150_report_value() == "Infinity"
@@ -2783,11 +3035,18 @@ def test_profit_factor_preserves_zero_trade_win_loss_and_mixed_states() -> None:
     assert not all_losses.profit_factor.exceeds_one
     assert mixed.state is arch151.ProfitFactorState.FINITE
     assert mixed.finite_value == Decimal("1.5")
-    with pytest.raises(Arch151Error, match="invalid gross"):
-        arch151.ProfitFactor.from_gross_totals(Decimal("-1"), Decimal("0"))
+    with pytest.raises(Arch151Error, match="invalid trade P&L"):
+        arch151.ProfitFactor.from_totals(Decimal("-1"), Decimal("0"))
     with pytest.raises(Arch151Error, match="zero-trade fold"):
         arch151.FoldMetrics(
-            dates, zeros, no_trades, Decimal("1"), Decimal(0), Decimal(0)
+            dates,
+            zeros,
+            no_trades,
+            Decimal("1"),
+            Decimal(0),
+            Decimal("1"),
+            Decimal(0),
+            Decimal(0),
         )
 
 
@@ -2864,17 +3123,17 @@ def test_profit_factor_ranking_orders_infinity_finite_and_undefined() -> None:
     suffix = (Decimal("0.5"), Decimal("0.1"), Decimal("0.25"), UUID(int=1))
     infinite = arch151._ranking_key(
         *common,
-        arch151.ProfitFactor.from_gross_totals(Decimal(1), Decimal(0)),
+        arch151.ProfitFactor.from_totals(Decimal(1), Decimal(0)),
         *suffix,
     )
     finite = arch151._ranking_key(
         *common,
-        arch151.ProfitFactor.from_gross_totals(Decimal(1), Decimal(2)),
+        arch151.ProfitFactor.from_totals(Decimal(1), Decimal(2)),
         *suffix,
     )
     undefined = arch151._ranking_key(
         *common,
-        arch151.ProfitFactor.from_gross_totals(Decimal(0), Decimal(0)),
+        arch151.ProfitFactor.from_totals(Decimal(0), Decimal(0)),
         *suffix,
     )
     assert infinite < finite < undefined
@@ -2885,6 +3144,7 @@ def test_development_qualification_rejections_are_independently_testable() -> No
         CANONICAL_SLOTS[0].slot_id,
         arch151.FillCostCase.STRESS,
         Decimal("0.10"),
+        Decimal("1.5"),
         Decimal("1.5"),
         5,
         5,
@@ -3088,6 +3348,20 @@ def test_dsr_reference_values_and_complete_population_freeze_are_deterministic()
     assert calculation.status is arch151.SelectionBiasStatus.DSR_VERIFIED
     assert calculation.effective_trial_count == 64
     assert len(calculation.evidence) == len(CANONICAL_SLOTS) == 32
+    assert len(calculation.trial_diagnostics) == 32
+    assert calculation.affected_trial_slot_ids == ()
+    assert (
+        calculation.descriptive_economic_order
+        == arch151.rank_descriptive_economic_population(batches)
+    )
+    assert set(calculation.descriptive_economic_order) == {
+        slot.slot_id for slot in CANONICAL_SLOTS
+    }
+    assert all(
+        item.status is arch151.DsrTrialStatus.SHARPE_AVAILABLE
+        and item.unavailable_reason is None
+        for item in calculation.trial_diagnostics
+    )
     assert tuple(item.candidate_slot_id for item in calculation.evidence) == tuple(
         slot.slot_id for slot in CANONICAL_SLOTS
     )
@@ -3098,6 +3372,20 @@ def test_dsr_reference_values_and_complete_population_freeze_are_deterministic()
     )
     assert calculation.evidence[0].probability >= Decimal("0.95")
     assert all(item.probability < Decimal("0.95") for item in calculation.evidence[1:])
+    assert arch151._DSR_CALCULATION_NAMESPACE == uuid5(
+        arch151._ROOT_NAMESPACE, "dsr-population-calculation/v2"
+    )
+    predecessor_material = {
+        "schema": "arch151-dsr-population-calculation/v1",
+        "population_digest": calculation.population_digest,
+        "status": arch151.SelectionBiasStatus.DSR_VERIFIED.value,
+        "evidence_ids": [str(item.evidence_id) for item in calculation.evidence],
+    }
+    predecessor_id = uuid5(
+        uuid5(arch151._ROOT_NAMESPACE, "dsr-population-calculation/v1"),
+        arch151._canonical_json(predecessor_material).decode("utf-8"),
+    )
+    assert calculation.calculation_id != predecessor_id
     with pytest.raises(Arch151Error, match="identity does not match canonical inputs"):
         replace(calculation, calculation_id=UUID(int=17))
     assert (
@@ -3131,6 +3419,40 @@ def test_dsr_reference_values_and_complete_population_freeze_are_deterministic()
         arch151.authorize_holdout(freeze)
 
 
+def test_bailey_lopez_de_prado_paper_example_matches_eq1_and_eq2() -> None:
+    # Bailey & López de Prado (2014), The Deflated Sharpe Ratio, Eqs. 1–2:
+    # https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2460551
+    with localcontext() as context:
+        context.prec = 60
+        sessions_per_year = Decimal(250)
+        annualized_trial_variance = Decimal("0.5")
+        trial_count = Decimal(100)
+        expected_trial_sharpe = Decimal("2.5") / sessions_per_year.sqrt()
+        expected_max_standard_normal = (
+            Decimal(1) - Decimal("0.577215664901532860606512090082402431")
+        ) * arch151._normal_quantile(Decimal(1) - Decimal(1) / trial_count) + Decimal(
+            "0.577215664901532860606512090082402431"
+        ) * arch151._normal_quantile(
+            Decimal(1) - Decimal(1) / (trial_count * Decimal(1).exp())
+        )
+        expected_maximum = (
+            annualized_trial_variance / sessions_per_year
+        ).sqrt() * expected_max_standard_normal
+        variance = (
+            Decimal(1)
+            - Decimal(-3) * expected_trial_sharpe
+            + ((Decimal(10) - Decimal(1)) / Decimal(4)) * expected_trial_sharpe**2
+        )
+        dsr_probability = arch151._normal_cdf(
+            (expected_trial_sharpe - expected_maximum)
+            * Decimal(1249).sqrt()
+            / variance.sqrt()
+        )
+
+    assert abs(expected_maximum - Decimal("0.1132")) < Decimal("0.0001")
+    assert abs(dsr_probability - Decimal("0.9004")) < Decimal("0.0002")
+
+
 def test_dsr_unavailable_keeps_all_slots_and_never_drops_undefined_trial() -> None:
     batches = list(_dsr_evaluation_population())
     first = batches[0]
@@ -3158,6 +3480,35 @@ def test_dsr_unavailable_keeps_all_slots_and_never_drops_undefined_trial() -> No
         is arch151.DsrUnavailableReason.UNDEFINED_TRIAL_SHARPE
     )
     assert calculation.evidence == ()
+    assert calculation.effective_trial_count == max(64, 32 + 29) == 64
+    assert tuple(
+        item.candidate_slot_id for item in calculation.trial_diagnostics
+    ) == tuple(slot.slot_id for slot in CANONICAL_SLOTS)
+    assert calculation.affected_trial_slot_ids == (CANONICAL_SLOTS[0].slot_id,)
+    assert calculation.trial_diagnostics[0].status is (
+        arch151.DsrTrialStatus.SHARPE_UNAVAILABLE
+    )
+    assert (
+        calculation.trial_diagnostics[0].unavailable_reason
+        is arch151.DsrUnavailableReason.UNDEFINED_TRIAL_SHARPE
+    )
+    assert all(
+        item.status is arch151.DsrTrialStatus.SHARPE_AVAILABLE
+        for item in calculation.trial_diagnostics[1:]
+    )
+    assert len(calculation.descriptive_economic_order) == 32
+    assert set(calculation.descriptive_economic_order) == {
+        slot.slot_id for slot in CANONICAL_SLOTS
+    }
+    freeze = arch151.freeze_final_candidate_set(
+        tuple(batches), _selection_bias_calculation=calculation
+    )
+    assert (
+        freeze.status
+        is arch151.FinalFreezeStatus.ZERO_CANDIDATES_STATISTICAL_EVIDENCE_UNAVAILABLE
+    )
+    assert freeze.candidate_slot_id is None
+    assert freeze.ranking_order == ()
     with pytest.raises(Arch151Error, match="identity does not match canonical inputs"):
         replace(calculation, calculation_id=UUID(int=18))
     with pytest.raises(Arch151Error, match="all 32 complete canonical"):
@@ -3166,11 +3517,14 @@ def test_dsr_unavailable_keeps_all_slots_and_never_drops_undefined_trial() -> No
 
 def test_dsr_invalid_moments_and_degenerate_formula_fail_closed(monkeypatch) -> None:
     batches = _dsr_evaluation_population()
-    monkeypatch.setattr(
-        arch151,
-        "_trial_return_statistics",
-        lambda _returns: arch151.DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS,
-    )
+    original_statistics = arch151._trial_return_statistics
+
+    def one_invalid_trial(returns):
+        if returns[0] == Decimal("0.0011"):
+            return arch151.DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+        return original_statistics(returns)
+
+    monkeypatch.setattr(arch151, "_trial_return_statistics", one_invalid_trial)
     invalid = arch151.compute_selection_bias_evidence(batches)
     assert (
         invalid.status is arch151.SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
@@ -3180,6 +3534,14 @@ def test_dsr_invalid_moments_and_degenerate_formula_fail_closed(monkeypatch) -> 
         is arch151.DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
     )
     assert invalid.evidence == ()
+    assert invalid.affected_trial_slot_ids == (CANONICAL_SLOTS[0].slot_id,)
+    assert invalid.trial_diagnostics[0].unavailable_reason is (
+        arch151.DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+    )
+    assert all(
+        item.status is arch151.DsrTrialStatus.SHARPE_AVAILABLE
+        for item in invalid.trial_diagnostics[1:]
+    )
 
     def degenerate_statistics(returns):
         if returns[0] == Decimal("0.0011"):
@@ -3197,6 +3559,128 @@ def test_dsr_invalid_moments_and_degenerate_formula_fail_closed(monkeypatch) -> 
         is arch151.DsrUnavailableReason.DEGENERATE_DSR_VARIANCE
     )
     assert degenerate.evidence == ()
+    assert degenerate.affected_trial_slot_ids == (CANONICAL_SLOTS[0].slot_id,)
+    assert degenerate.trial_diagnostics[0].daily_sharpe == Decimal(1)
+    assert degenerate.trial_diagnostics[0].unavailable_reason is (
+        arch151.DsrUnavailableReason.DEGENERATE_DSR_VARIANCE
+    )
+
+
+def test_dsr_mixed_inactive_and_invalid_candidates_preserve_all_slots(
+    monkeypatch,
+) -> None:
+    batches = list(_dsr_evaluation_population())
+    first = batches[0]
+    zero_return_records = tuple(
+        replace(
+            record,
+            metrics=replace(
+                record.metrics,
+                session_net_returns=(Decimal(0),)
+                * len(record.metrics.session_net_returns),
+                round_trips_by_session=(0,)
+                * len(record.metrics.round_trips_by_session),
+                gross_positive_trade_pnl=Decimal(0),
+                gross_negative_trade_pnl=Decimal(0),
+                net_positive_trade_pnl=Decimal(0),
+                net_negative_trade_pnl=Decimal(0),
+                annual_turnover=Decimal(0),
+            ),
+        )
+        for record in first.records
+    )
+    batches[0] = arch151.DevelopmentEvaluationBatch(first.slot_id, zero_return_records)
+    original_statistics = arch151._trial_return_statistics
+
+    def invalidate_second_trial(returns):
+        if returns[0] == Decimal("-0.0011"):
+            return arch151.DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+        return original_statistics(returns)
+
+    monkeypatch.setattr(arch151, "_trial_return_statistics", invalidate_second_trial)
+    calculation = arch151.compute_selection_bias_evidence(tuple(batches))
+
+    assert calculation.effective_trial_count == 64
+    assert calculation.unavailable_reason is (
+        arch151.DsrUnavailableReason.UNDEFINED_TRIAL_SHARPE
+    )
+    assert calculation.affected_trial_slot_ids == (
+        CANONICAL_SLOTS[0].slot_id,
+        CANONICAL_SLOTS[1].slot_id,
+    )
+    assert tuple(
+        item.candidate_slot_id for item in calculation.trial_diagnostics
+    ) == tuple(slot.slot_id for slot in CANONICAL_SLOTS)
+    assert calculation.trial_diagnostics[0].unavailable_reason is (
+        arch151.DsrUnavailableReason.UNDEFINED_TRIAL_SHARPE
+    )
+    assert calculation.trial_diagnostics[1].unavailable_reason is (
+        arch151.DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+    )
+    assert all(
+        item.status is arch151.DsrTrialStatus.SHARPE_AVAILABLE
+        for item in calculation.trial_diagnostics[2:]
+    )
+    assert len(calculation.descriptive_economic_order) == 32
+    assert set(calculation.descriptive_economic_order) == {
+        slot.slot_id for slot in CANONICAL_SLOTS
+    }
+
+
+def test_zero_dispersion_marks_all_32_slots_unavailable_and_preserves_order() -> None:
+    batches = tuple(_evaluation_batch_for_slot(slot) for slot in CANONICAL_SLOTS)
+    calculation = arch151.compute_selection_bias_evidence(batches)
+
+    assert (
+        calculation.unavailable_reason
+        is arch151.DsrUnavailableReason.ZERO_TRIAL_SHARPE_VARIANCE
+    )
+    assert calculation.affected_trial_slot_ids == tuple(
+        slot.slot_id for slot in CANONICAL_SLOTS
+    )
+    assert all(
+        item.status is arch151.DsrTrialStatus.SHARPE_AVAILABLE
+        and item.daily_sharpe is not None
+        and item.unavailable_reason
+        is arch151.DsrUnavailableReason.ZERO_TRIAL_SHARPE_VARIANCE
+        for item in calculation.trial_diagnostics
+    )
+    assert len(calculation.descriptive_economic_order) == 32
+    assert calculation.effective_trial_count == 64
+
+
+def test_valid_dsr_with_no_economic_survivor_is_not_statistical_unavailability() -> (
+    None
+):
+    batches = []
+    for batch in _dsr_evaluation_population():
+        records = tuple(
+            replace(
+                record,
+                metrics=replace(
+                    record.metrics,
+                    round_trips_by_session=tuple(
+                        1 if index < 20 else 0
+                        for index, _ in enumerate(record.metrics.round_trips_by_session)
+                    ),
+                ),
+            )
+            for record in batch.records
+        )
+        batches.append(arch151.DevelopmentEvaluationBatch(batch.slot_id, records))
+
+    calculation = arch151.compute_selection_bias_evidence(tuple(batches))
+    freeze = arch151.freeze_final_candidate_set(
+        tuple(batches), _selection_bias_calculation=calculation
+    )
+
+    assert calculation.status is arch151.SelectionBiasStatus.DSR_VERIFIED
+    assert not calculation.affected_trial_slot_ids
+    assert not freeze.economically_qualified_slot_ids
+    assert freeze.candidate_slot_id is None
+    assert (
+        freeze.status is arch151.FinalFreezeStatus.ZERO_CANDIDATES_NO_QUALIFIED_SURVIVOR
+    )
 
 
 def test_ranking_uses_every_frozen_lexicographic_tie_break() -> None:
@@ -3244,6 +3728,26 @@ def test_public_synthetic_ranking_preserves_all_canonical_slots() -> None:
         arch151.rank_synthetic_candidate_population(
             (materials[1], materials[0], *materials[2:])
         )
+
+
+def test_ranking_uses_stress_realized_net_pf_not_pre_cost_pf() -> None:
+    materials = tuple(_synthetic_ranking_material(slot) for slot in CANONICAL_SLOTS)
+    materials = list(materials)
+    materials[0] = _synthetic_ranking_material(
+        CANONICAL_SLOTS[0],
+        net_profit_factor=Decimal("0.9"),
+        pre_cost_profit_factor=Decimal("100"),
+    )
+    materials[1] = _synthetic_ranking_material(
+        CANONICAL_SLOTS[1],
+        net_profit_factor=Decimal("2"),
+        pre_cost_profit_factor=Decimal("0.5"),
+    )
+
+    ranked = arch151.rank_synthetic_candidate_population(tuple(materials))
+
+    assert ranked[0] == CANONICAL_SLOTS[1].slot_id
+    assert ranked[-1] == CANONICAL_SLOTS[0].slot_id
 
 
 def test_final_freeze_requires_full_population_and_fails_closed_on_degenerate_dsr() -> (
@@ -3322,6 +3826,393 @@ def test_canonical_entry_windows_are_structurally_reachable_from_session_grid() 
             program.entry_window.contains(item.completed_signal_bar.completed_at)
             for item in opportunities
         )
+
+
+def test_later_period_calendar_population_and_non_authorizing() -> None:
+    freeze = _one_candidate_final_freeze()
+    holdout = arch151.qualify_later_period(
+        freeze,
+        _later_period_evidence(arch151.LaterPeriodKind.HOLDOUT_2024_2025),
+    )
+    assert holdout.status is arch151.LaterPeriodStatus.PASS
+    assert holdout.passed
+    assert holdout.expected_session_count == holdout.observed_session_count == 502
+    assert holdout.expected_month_count == holdout.observed_month_count == 24
+    assert holdout.calendar_partition_net_returns[0][0] == 2024
+    assert holdout.calendar_partition_net_returns[1][0] == 2025
+    assert holdout.aggregate_net_return is not None and holdout.aggregate_net_return > 0
+    assert holdout.profit_factor is not None
+    assert holdout.profit_factor.state is arch151.ProfitFactorState.POSITIVE_INFINITY
+    assert holdout.active_session_fraction == 1
+    assert holdout.average_completed_round_trips_per_year == Decimal("251")
+    assert holdout.maximum_positive_month_pnl_share is not None
+    assert holdout.maximum_positive_month_pnl_share <= Decimal("0.40")
+
+    extension_sessions, extension_months = arch151._later_period_calendar(
+        arch151.LaterPeriodKind.EXTENSION_2026_JAN_OCT
+    )
+    active_months = set(extension_months[:6])
+    active_dates = set()
+    for month in extension_months[:6]:
+        active_dates.update(
+            session
+            for session in extension_sessions
+            if (session.year, session.month) == month
+        )
+        if len(active_dates) >= 66:
+            break
+    active_dates = set(sorted(active_dates)[:62])
+    outcomes = {
+        session: ((Decimal("1"),) if session in active_dates else ())
+        for session in extension_sessions
+    }
+    monthly_positive_returns = {
+        session: (
+            Decimal("0.001")
+            if (session.year, session.month) in active_months
+            else Decimal(0)
+        )
+        for session in extension_sessions
+    }
+    extension = arch151.qualify_later_period(
+        freeze,
+        _later_period_evidence(
+            arch151.LaterPeriodKind.EXTENSION_2026_JAN_OCT,
+            returns_by_session=monthly_positive_returns,
+            outcomes_by_session=outcomes,
+        ),
+    )
+    assert extension.status is arch151.LaterPeriodStatus.PASS
+    assert extension.expected_session_count == extension.observed_session_count == 204
+    assert extension.expected_month_count == extension.observed_month_count == 10
+    assert extension.positive_month_count == 6
+    assert extension.active_session_fraction is not None
+    assert extension.active_session_fraction >= Decimal("0.30")
+    assert extension.profit_factor is not None
+    assert extension.profit_factor.state is arch151.ProfitFactorState.POSITIVE_INFINITY
+
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="authenticated"):
+        arch151.authorize_holdout(freeze, holdout, object())
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="authenticated"):
+        arch151.authorize_extension(freeze, object(), holdout)
+    with pytest.raises(arch151.AuthorizationUnavailableError):
+        arch151.AuthenticatedHoldoutPass()
+    with pytest.raises(arch151.AuthorizationUnavailableError):
+        arch151.AuthenticatedExtensionPass()
+    with pytest.raises(arch151.AuthorizationUnavailableError):
+        arch151.classify_research_survivor(
+            freeze, object(), object(), object(), object()
+        )
+
+
+def test_holdout_boundaries_accept_inclusive_limits() -> None:
+    freeze = _one_candidate_final_freeze()
+    sessions, _months = arch151._later_period_calendar(
+        arch151.LaterPeriodKind.HOLDOUT_2024_2025
+    )
+    active_dates = sessions[:151]
+    active_date_set = set(active_dates)
+    outcomes = {
+        session: ((Decimal(0), Decimal(0)) if index < 9 else (Decimal(0),))
+        if session in active_date_set
+        else ()
+        for index, session in enumerate(sessions)
+    }
+    for month, amount in (
+        ((2024, 1), Decimal("4")),
+        ((2024, 2), Decimal("3")),
+        ((2024, 3), Decimal("3")),
+    ):
+        session = next(day for day in active_dates if (day.year, day.month) == month)
+        values = list(outcomes[session])
+        values[0] = amount
+        outcomes[session] = tuple(values)
+    returns = {session: Decimal("0.001") for session in sessions}
+    returns[sessions[0]] = Decimal("-0.15")
+    result = arch151.qualify_later_period(
+        freeze,
+        _later_period_evidence(
+            arch151.LaterPeriodKind.HOLDOUT_2024_2025,
+            returns_by_session=returns,
+            outcomes_by_session=outcomes,
+        ),
+    )
+
+    assert result.status is arch151.LaterPeriodStatus.PASS
+    assert result.max_drawdown == Decimal("0.15")
+    assert result.average_completed_round_trips_per_year == Decimal("80")
+    with localcontext() as context:
+        context.prec = 60
+        assert result.active_session_fraction == Decimal(151) / Decimal(502)
+    assert result.maximum_positive_month_pnl_share == Decimal("0.4")
+
+
+def test_later_period_completeness_candidate_and_economics_bindings_fail_closed() -> (
+    None
+):
+    freeze = _one_candidate_final_freeze()
+    evidence = _later_period_evidence(arch151.LaterPeriodKind.HOLDOUT_2024_2025)
+
+    missing_session = replace(evidence, sessions=evidence.sessions[1:])
+    incomplete = arch151.qualify_later_period(freeze, missing_session)
+    assert incomplete.status is arch151.LaterPeriodStatus.INCOMPLETE
+    assert (
+        arch151.LaterPeriodRejection.SESSION_POPULATION_INCOMPLETE
+        in incomplete.rejection_reasons
+    )
+
+    one_month_removed = tuple(
+        row
+        for row in evidence.sessions
+        if (row.session_date.year, row.session_date.month) != (2024, 1)
+    )
+    missing_month = arch151.qualify_later_period(
+        freeze, replace(evidence, sessions=one_month_removed)
+    )
+    assert missing_month.status is arch151.LaterPeriodStatus.INCOMPLETE
+    assert (
+        arch151.LaterPeriodRejection.CALENDAR_MONTH_POPULATION_INCOMPLETE
+        in missing_month.rejection_reasons
+    )
+
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="frozen candidate"):
+        arch151.qualify_later_period(
+            freeze,
+            replace(evidence, candidate_slot_id=CANONICAL_SLOTS[1].slot_id),
+        )
+    with pytest.raises(Arch151Error, match="STRESS"):
+        arch151.qualify_later_period(
+            freeze, replace(evidence, economics_case=arch151.FillCostCase.BASE)
+        )
+
+    altered_trade = replace(evidence.trades[0], net_pnl=Decimal("2"))
+    invalid = arch151.qualify_later_period(
+        freeze, replace(evidence, trades=(altered_trade, *evidence.trades[1:]))
+    )
+    assert invalid.status is arch151.LaterPeriodStatus.INVALID
+    assert invalid.rejection_reasons == (
+        arch151.LaterPeriodRejection.SESSION_TRADE_RECONCILIATION_INVALID,
+    )
+    assert invalid.aggregate_net_return is None
+
+
+def _distributed_session_dates(
+    sessions: tuple[date, ...], *, base_per_month: int, extra_count: int
+) -> tuple[date, ...]:
+    groups: dict[tuple[int, int], list[date]] = {}
+    for session in sessions:
+        groups.setdefault((session.year, session.month), []).append(session)
+    selected = [
+        session for values in groups.values() for session in values[:base_per_month]
+    ]
+    remaining = extra_count
+    for values in groups.values():
+        if not remaining:
+            break
+        if len(values) > base_per_month:
+            selected.append(values[base_per_month])
+            remaining -= 1
+    assert remaining == 0
+    return tuple(sorted(selected))
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_rejection"),
+    [
+        (
+            "net_return",
+            arch151.LaterPeriodRejection.HOLDOUT_NET_RETURN_NOT_POSITIVE,
+        ),
+        (
+            "calendar_year",
+            arch151.LaterPeriodRejection.HOLDOUT_YEAR_RETURN_NOT_POSITIVE,
+        ),
+        (
+            "profit_factor",
+            arch151.LaterPeriodRejection.HOLDOUT_PROFIT_FACTOR_NOT_ABOVE_1_10,
+        ),
+        (
+            "drawdown",
+            arch151.LaterPeriodRejection.HOLDOUT_MAX_DRAWDOWN_ABOVE_15_PERCENT,
+        ),
+        (
+            "active_fraction",
+            arch151.LaterPeriodRejection.HOLDOUT_ACTIVE_SESSION_FRACTION_BELOW_30_PERCENT,
+        ),
+        (
+            "annual_frequency",
+            arch151.LaterPeriodRejection.HOLDOUT_AVERAGE_ROUND_TRIPS_BELOW_80,
+        ),
+        (
+            "concentration",
+            arch151.LaterPeriodRejection.HOLDOUT_POSITIVE_PNL_CONCENTRATION_ABOVE_40_PERCENT,
+        ),
+        (
+            "positive_pnl_unavailable",
+            arch151.LaterPeriodRejection.HOLDOUT_POSITIVE_PNL_UNAVAILABLE,
+        ),
+    ],
+)
+def test_holdout_stress_thresholds_produce_typed_rejections(
+    case: str, expected_rejection: arch151.LaterPeriodRejection
+) -> None:
+    freeze = _one_candidate_final_freeze()
+    sessions, _months = arch151._later_period_calendar(
+        arch151.LaterPeriodKind.HOLDOUT_2024_2025
+    )
+    returns: dict[date, Decimal] = {}
+    outcomes: dict[date, tuple[Decimal, ...]] = {}
+    if case == "net_return":
+        returns = {session: Decimal(0) for session in sessions}
+    elif case == "calendar_year":
+        returns = {
+            session: Decimal("-0.0005") for session in sessions if session.year == 2025
+        }
+    elif case == "profit_factor":
+        outcomes = {session: (Decimal("1.10"), Decimal("-1")) for session in sessions}
+    elif case == "drawdown":
+        returns[sessions[0]] = Decimal("-0.20")
+    elif case == "active_fraction":
+        selected = _distributed_session_dates(sessions, base_per_month=3, extra_count=8)
+        outcomes = {
+            session: ((Decimal("1"), Decimal("1")) if session in selected else ())
+            for session in sessions
+        }
+    elif case == "annual_frequency":
+        selected = _distributed_session_dates(
+            sessions, base_per_month=6, extra_count=14
+        )
+        outcomes = {
+            session: ((Decimal("1"),) if session in selected else ())
+            for session in sessions
+        }
+    elif case == "concentration":
+        outcomes = {
+            session: ((Decimal("1000"),) if session == sessions[0] else (Decimal("1"),))
+            for session in sessions
+        }
+    elif case == "positive_pnl_unavailable":
+        outcomes = {session: (Decimal("-1"),) for session in sessions}
+    else:
+        raise AssertionError(case)
+
+    qualified = arch151.qualify_later_period(
+        freeze,
+        _later_period_evidence(
+            arch151.LaterPeriodKind.HOLDOUT_2024_2025,
+            returns_by_session=returns,
+            outcomes_by_session=outcomes,
+        ),
+    )
+    assert qualified.status is arch151.LaterPeriodStatus.FAIL
+    assert expected_rejection in qualified.rejection_reasons
+
+
+@pytest.mark.parametrize(
+    ("case", "expected_rejection"),
+    [
+        (
+            "net_return",
+            arch151.LaterPeriodRejection.EXTENSION_NET_RETURN_NOT_POSITIVE,
+        ),
+        (
+            "profit_factor",
+            arch151.LaterPeriodRejection.EXTENSION_PROFIT_FACTOR_NOT_ABOVE_1_05,
+        ),
+        (
+            "drawdown",
+            arch151.LaterPeriodRejection.EXTENSION_MAX_DRAWDOWN_ABOVE_15_PERCENT,
+        ),
+        (
+            "positive_months",
+            arch151.LaterPeriodRejection.EXTENSION_POSITIVE_MONTHS_BELOW_6,
+        ),
+        (
+            "active_fraction",
+            arch151.LaterPeriodRejection.EXTENSION_ACTIVE_SESSION_FRACTION_BELOW_30_PERCENT,
+        ),
+    ],
+)
+def test_extension_stress_thresholds_produce_typed_rejections(
+    case: str, expected_rejection: arch151.LaterPeriodRejection
+) -> None:
+    freeze = _one_candidate_final_freeze()
+    sessions, months = arch151._later_period_calendar(
+        arch151.LaterPeriodKind.EXTENSION_2026_JAN_OCT
+    )
+    returns: dict[date, Decimal] = {}
+    outcomes: dict[date, tuple[Decimal, ...]] = {}
+    if case == "net_return":
+        returns = {session: Decimal(0) for session in sessions}
+    elif case == "profit_factor":
+        outcomes = {session: (Decimal("1.05"), Decimal("-1")) for session in sessions}
+    elif case == "drawdown":
+        returns = {session: Decimal("0.005") for session in sessions}
+        returns[sessions[0]] = Decimal("-0.20")
+    elif case == "positive_months":
+        positive_months = set(months[:5])
+        returns = {
+            session: (
+                Decimal("0.001")
+                if (session.year, session.month) in positive_months
+                else Decimal(0)
+            )
+            for session in sessions
+        }
+    elif case == "active_fraction":
+        selected = _distributed_session_dates(
+            tuple(
+                session
+                for session in sessions
+                if (session.year, session.month) in set(months[:6])
+            ),
+            base_per_month=10,
+            extra_count=1,
+        )
+        outcomes = {
+            session: ((Decimal("1"),) if session in selected else ())
+            for session in sessions
+        }
+        returns = {
+            session: (
+                Decimal("0.001")
+                if (session.year, session.month) in set(months[:6])
+                else Decimal(0)
+            )
+            for session in sessions
+        }
+    else:
+        raise AssertionError(case)
+
+    qualified = arch151.qualify_later_period(
+        freeze,
+        _later_period_evidence(
+            arch151.LaterPeriodKind.EXTENSION_2026_JAN_OCT,
+            returns_by_session=returns,
+            outcomes_by_session=outcomes,
+        ),
+    )
+    assert qualified.status is arch151.LaterPeriodStatus.FAIL
+    assert expected_rejection in qualified.rejection_reasons
+
+
+def test_later_period_authorization_requires_real_source_owned_ordered_evidence() -> (
+    None
+):
+    freeze = _one_candidate_final_freeze()
+    synthetic = arch151.qualify_later_period(
+        freeze,
+        _later_period_evidence(arch151.LaterPeriodKind.HOLDOUT_2024_2025),
+    )
+    assert synthetic.passed
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="authenticated"):
+        arch151.authorize_holdout(freeze, synthetic, synthetic)
+    with pytest.raises(arch151.AuthorizationUnavailableError):
+        arch151.authorize_extension(freeze, synthetic, synthetic)
+    forged_development = object.__new__(arch151.AuthenticatedDevelopmentEvidence)
+    object.__setattr__(forged_development, "_seal", object())
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="authenticated"):
+        arch151.authorize_holdout(freeze, forged_development, synthetic)
 
 
 def test_d1r_adapter_is_fixed_and_reuses_arch150_acceptance_without_reading_files(

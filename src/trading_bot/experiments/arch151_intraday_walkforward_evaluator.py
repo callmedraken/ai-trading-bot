@@ -8,7 +8,7 @@ protected-effect surface.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass, fields, is_dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, localcontext
 from enum import Enum, StrEnum
@@ -16,6 +16,7 @@ from hashlib import sha256
 from types import MappingProxyType
 from uuid import UUID, uuid5
 
+from trading_bot.experiments import arch150_intraday_data as arch150_data
 from trading_bot.experiments import arch151_intraday_walkforward as arch151
 
 type SourceHistory = arch151.Arch150D1RSourceHistory | arch151._SyntheticSourceHistory
@@ -33,10 +34,14 @@ _SIGNAL_NAMESPACE = uuid5(_NAMESPACE, "signal/v1")
 _SIGNAL_OUTCOME_NAMESPACE = uuid5(_NAMESPACE, "signal-outcome/v1")
 _SESSION_NAMESPACE = uuid5(_NAMESPACE, "session/v2")
 _RESULT_NAMESPACE = uuid5(_NAMESPACE, "slot-year/v1")
+_BENCHMARK_NAMESPACE = uuid5(_NAMESPACE, "passive-spy-benchmark/v1")
+_DIAGNOSTICS_NAMESPACE = uuid5(_NAMESPACE, "research-diagnostics/v1")
 _SOURCE_BINDING_NAMESPACE = uuid5(_NAMESPACE, "development-source-binding/v1")
-_BATCH_NAMESPACE = uuid5(_NAMESPACE, "canonical-year-batch/v2")
-_DEVELOPMENT_RUN_NAMESPACE = uuid5(_NAMESPACE, "development-evaluation-run/v2")
-_DEVELOPMENT_REPORT_NAMESPACE = uuid5(_DEVELOPMENT_RUN_NAMESPACE, "canonical-report/v1")
+_BATCH_NAMESPACE = uuid5(_NAMESPACE, "canonical-year-batch/v3")
+_DEVELOPMENT_RUN_SCHEMA = "arch151-development-evaluation-run/v4"
+_DEVELOPMENT_REPORT_SCHEMA = "arch151-development-evaluation-report/v3"
+_DEVELOPMENT_RUN_NAMESPACE = uuid5(_NAMESPACE, "development-evaluation-run/v4")
+_DEVELOPMENT_REPORT_NAMESPACE = uuid5(_DEVELOPMENT_RUN_NAMESPACE, "canonical-report/v3")
 _SOURCE_BINDING_SEAL = object()
 _CANONICAL_YEAR_BATCH_SEAL = object()
 _DEVELOPMENT_RUN_SEAL = object()
@@ -77,6 +82,27 @@ class SignalDisposition(StrEnum):
     EXECUTED = "EXECUTED"
     EXPIRED = "EXPIRED"
     BLOCKED = "BLOCKED"
+
+
+class BenchmarkStatus(StrEnum):
+    AVAILABLE = "AVAILABLE"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class BenchmarkUnavailableReason(StrEnum):
+    FIRST_SESSION_OPEN_UNOBSERVED = "FIRST_SESSION_OPEN_UNOBSERVED"
+    LAST_SESSION_CLOSE_UNOBSERVED = "LAST_SESSION_CLOSE_UNOBSERVED"
+
+
+class DiagnosticScope(StrEnum):
+    SCORED_YEAR = "SCORED_YEAR"
+    FIVE_YEAR_CAMPAIGN = "FIVE_YEAR_CAMPAIGN"
+
+
+class CostPathRelationship(StrEnum):
+    IDENTICAL_ENTRY_EXIT_PATH = "IDENTICAL_ENTRY_EXIT_PATH"
+    ENTRY_EXIT_PATH_CHANGED = "ENTRY_EXIT_PATH_CHANGED"
+    INCOMPLETE = "INCOMPLETE"
 
 
 class DevelopmentSourceKind(StrEnum):
@@ -259,6 +285,9 @@ class TradeRecord:
     equity_before: Decimal
     equity_after: Decimal
     gross_exposure_fraction: Decimal
+    mfe_return: Decimal | None = None
+    mae_return: Decimal | None = None
+    excursion_minute_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -443,6 +472,209 @@ class SlotYearReplay:
 
 
 @dataclass(frozen=True, slots=True)
+class NumericDistribution:
+    count: int
+    mean: Decimal | None
+    median: Decimal | None
+    minimum: Decimal | None
+    first_quartile: Decimal | None
+    third_quartile: Decimal | None
+    maximum: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class MonthlyReturnDiagnostic:
+    year: int
+    month: int
+    session_count: int
+    complete: bool
+    net_return: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class ExitReasonDiagnostic:
+    reason: ExitReason
+    trade_count: int
+    gross_pnl: Decimal
+    net_pnl: Decimal
+
+
+@dataclass(frozen=True, slots=True)
+class TradeDiagnostic:
+    trade_id: UUID
+    signal_timestamp: datetime
+    entry_timestamp: datetime
+    exit_timestamp: datetime
+    exit_reason: ExitReason
+    gross_pnl: Decimal
+    net_pnl: Decimal
+    adverse_cost: Decimal
+    holding_minutes: Decimal
+    mfe_return: Decimal | None
+    mae_return: Decimal | None
+    excursion_minute_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class RejectionReasonDiagnostic:
+    reason: RejectionReason
+    count: int
+
+
+@dataclass(frozen=True, slots=True)
+class EconomicDiagnostic:
+    diagnostic_id: UUID
+    scope: DiagnosticScope
+    slot_id: UUID
+    program_id: UUID
+    symbol: str
+    scored_year: int | None
+    cost_case: arch151.FillCostCase
+    replay_ids: tuple[UUID, ...]
+    complete: bool
+    trade_count: int
+    trades: tuple[TradeDiagnostic, ...]
+    gross_trade_pnl: Decimal
+    net_trade_pnl: Decimal
+    total_adverse_cost: Decimal
+    gross_trade_expectancy: Decimal | None
+    net_trade_expectancy: Decimal | None
+    net_win_rate: Decimal | None
+    average_net_win: Decimal | None
+    average_net_loss: Decimal | None
+    net_payoff_ratio: Decimal | None
+    compounded_net_return: Decimal | None
+    monthly_returns: tuple[MonthlyReturnDiagnostic, ...]
+    positive_month_count: int
+    available_month_count: int
+    positive_month_fraction: Decimal | None
+    holding_minutes: NumericDistribution
+    time_in_market_minutes: Decimal
+    published_session_minutes: int
+    time_in_market_fraction: Decimal | None
+    exits_by_reason: tuple[ExitReasonDiagnostic, ...]
+    generated_signals: int
+    eligible_signals: int
+    executed_signals: int
+    expired_signals: int
+    blocked_signals: int
+    rejections_by_reason: tuple[RejectionReasonDiagnostic, ...]
+    mfe_returns: NumericDistribution
+    mae_returns: NumericDistribution
+
+
+@dataclass(frozen=True, slots=True)
+class CostDragDiagnostic:
+    slot_id: UUID
+    scored_year: int | None
+    cost_case: arch151.FillCostCase
+    reference_case: arch151.FillCostCase
+    path_relationship: CostPathRelationship
+    net_return_delta: Decimal | None
+    adverse_cost_delta: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class PassiveBenchmarkYear:
+    benchmark_id: UUID
+    source_digest: str
+    scored_year: int
+    adjustment: str
+    adjustment_semantics: str
+    price_basis: str
+    status: BenchmarkStatus
+    unavailable_reason: BenchmarkUnavailableReason | None
+    scheduled_session_count: int
+    start_timestamp: datetime | None
+    start_price: Decimal | None
+    end_timestamp: datetime | None
+    end_price: Decimal | None
+    adjusted_price_return: Decimal | None
+
+    def __post_init__(self) -> None:
+        if (
+            self.adjustment != arch150_data.ADJUSTMENT
+            or self.adjustment_semantics != arch150_data.ADJUSTMENT_SEMANTICS
+            or self.price_basis != arch150_data.PRICE_BASIS
+        ):
+            raise EvaluationIntegrityError(
+                "SPY benchmark price basis is not source-owned"
+            )
+        if self.status is BenchmarkStatus.AVAILABLE:
+            if (
+                self.unavailable_reason is not None
+                or self.start_timestamp is None
+                or self.start_price is None
+                or self.end_timestamp is None
+                or self.end_price is None
+                or self.adjusted_price_return is None
+            ):
+                raise EvaluationIntegrityError("available SPY benchmark is incomplete")
+            with localcontext(arch151._DECIMAL_CONTEXT):
+                expected_return = self.end_price / self.start_price - Decimal(1)
+            if self.adjusted_price_return != expected_return:
+                raise EvaluationIntegrityError(
+                    "SPY benchmark return does not reconcile"
+                )
+        elif (
+            self.status is not BenchmarkStatus.UNAVAILABLE
+            or self.unavailable_reason is None
+            or self.adjusted_price_return is not None
+        ):
+            raise EvaluationIntegrityError(
+                "unavailable SPY benchmark must not be zero-filled"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class PassiveBenchmarkCampaign:
+    benchmark_id: UUID
+    source_digest: str
+    annual_benchmark_ids: tuple[UUID, ...]
+    adjustment: str
+    adjustment_semantics: str
+    price_basis: str
+    status: BenchmarkStatus
+    unavailable_reason: BenchmarkUnavailableReason | None
+    start_timestamp: datetime | None
+    start_price: Decimal | None
+    end_timestamp: datetime | None
+    end_price: Decimal | None
+    adjusted_price_return: Decimal | None
+
+    def __post_init__(self) -> None:
+        if (
+            len(self.annual_benchmark_ids) != len(arch151.SCORED_YEARS)
+            or self.adjustment != arch150_data.ADJUSTMENT
+            or self.adjustment_semantics != arch150_data.ADJUSTMENT_SEMANTICS
+            or self.price_basis != arch150_data.PRICE_BASIS
+        ):
+            raise EvaluationIntegrityError("campaign benchmark provenance is invalid")
+        if self.status is BenchmarkStatus.AVAILABLE:
+            if (
+                self.unavailable_reason is not None
+                or self.start_timestamp is None
+                or self.start_price is None
+                or self.end_timestamp is None
+                or self.end_price is None
+                or self.adjusted_price_return is None
+            ):
+                raise EvaluationIntegrityError("campaign benchmark is incomplete")
+            with localcontext(arch151._DECIMAL_CONTEXT):
+                expected_return = self.end_price / self.start_price - Decimal(1)
+            if self.adjusted_price_return != expected_return:
+                raise EvaluationIntegrityError(
+                    "campaign benchmark return does not reconcile"
+                )
+        elif (
+            self.status is not BenchmarkStatus.UNAVAILABLE
+            or self.unavailable_reason is None
+            or self.adjusted_price_return is not None
+        ):
+            raise EvaluationIntegrityError("campaign benchmark cannot be zero-filled")
+
+
+@dataclass(frozen=True, slots=True)
 class CanonicalYearBatch:
     batch_id: UUID
     scored_year: int
@@ -450,6 +682,7 @@ class CanonicalYearBatch:
     manifest_fingerprint: str
     source_digest: str
     evaluations: tuple[SlotYearReplay, ...]
+    passive_spy_benchmark: PassiveBenchmarkYear
     source_binding: DevelopmentSourceBinding
     _seal: object
 
@@ -466,6 +699,14 @@ class CanonicalYearBatch:
             raise EvaluationIntegrityError(
                 "canonical year batch source binding is invalid"
             )
+        if (
+            type(self.passive_spy_benchmark) is not PassiveBenchmarkYear
+            or self.passive_spy_benchmark.source_digest != self.source_digest
+            or self.passive_spy_benchmark.scored_year != self.scored_year
+            or self.passive_spy_benchmark.benchmark_id
+            != _passive_benchmark_year_id(self.passive_spy_benchmark)
+        ):
+            raise EvaluationIntegrityError("canonical year batch benchmark is unbound")
 
     @property
     def complete(self) -> bool:
@@ -488,6 +729,7 @@ class DevelopmentEvaluationRun:
     slot_batches: tuple[arch151.DevelopmentEvaluationBatch, ...]
     qualifications: tuple[arch151.DevelopmentQualification, ...]
     selection_bias: arch151.SelectionBiasCalculation
+    passive_spy_benchmark: PassiveBenchmarkCampaign
     ranking_order: tuple[UUID, ...]
     final_freeze: arch151.FinalCandidateFreeze
     source_binding: DevelopmentSourceBinding
@@ -515,6 +757,15 @@ class DevelopmentEvaluationRun:
             raise EvaluationIntegrityError(
                 "development run must contain all five folds"
             )
+        expected_benchmark = _passive_benchmark_campaign(
+            tuple(item.passive_spy_benchmark for item in self.year_batches)
+        )
+        if (
+            type(self.passive_spy_benchmark) is not PassiveBenchmarkCampaign
+            or self.passive_spy_benchmark.source_digest != self.source_digest
+            or self.passive_spy_benchmark != expected_benchmark
+        ):
+            raise EvaluationIntegrityError("development run benchmark is not canonical")
         if len(self.slot_batches) != len(arch151.CANONICAL_SLOTS):
             raise EvaluationIntegrityError("development run must contain all 32 slots")
         if sum(len(item.records) for item in self.slot_batches) != 480:
@@ -537,6 +788,7 @@ class DevelopmentEvaluationRun:
             self.slot_batches,
             self.selection_bias,
             self.qualifications,
+            self.passive_spy_benchmark,
             self.ranking_order,
             self.final_freeze,
         )
@@ -594,7 +846,7 @@ class DevelopmentEvaluationReport:
             raise EvaluationIntegrityError("development report identity is invalid")
         expected_id = _canonical_id(
             _DEVELOPMENT_REPORT_NAMESPACE,
-            "arch151-development-evaluation-report/v1",
+            _DEVELOPMENT_REPORT_SCHEMA,
             {"run_id": str(run_id), "sha256": sha256_digest},
         )
         if report_id != expected_id:
@@ -706,6 +958,45 @@ class _PreparationCache:
         )
 
 
+class _FamilyACalibrationCache:
+    """Reuse symbol/year source measures across A parameter variants."""
+
+    def __init__(self, history: SourceHistory) -> None:
+        self.history = history
+        self.source_digest = _history_digest(history)
+        self._measures: dict[
+            tuple[str, str, int], tuple[arch151.FamilyASessionMeasure, ...]
+        ] = {}
+        self._calibrations: dict[
+            tuple[str, UUID, str, int], arch151.FamilyACalibration
+        ] = {}
+
+    def calibration(
+        self,
+        program: arch151.Arch151Program,
+        symbol: str,
+        scored_year: int,
+    ) -> arch151.FamilyACalibration:
+        measure_key = (self.source_digest, symbol, scored_year)
+        if measure_key not in self._measures:
+            self._measures[measure_key] = (
+                arch151._family_a_historical_measures_from_source_history(
+                    self.history, symbol, scored_year
+                )
+            )
+        calibration_key = (
+            self.source_digest,
+            arch151.program_id(program),
+            symbol,
+            scored_year,
+        )
+        if calibration_key not in self._calibrations:
+            self._calibrations[calibration_key] = arch151.calibrate_family_a(
+                program, self._measures[measure_key], scored_year
+            )
+        return self._calibrations[calibration_key]
+
+
 def _canonical_id(namespace: UUID, schema: str, material: object) -> UUID:
     canonical = arch151._canonical_json({"schema": schema, "material": material})
     return uuid5(namespace, canonical.decode("utf-8"))
@@ -744,6 +1035,305 @@ def _canonical_output_material(value: object) -> object:
     if value is None or type(value) in (bool, int, str):
         return value
     raise TypeError(f"unsupported canonical evaluator output: {type(value).__name__}")
+
+
+def _passive_benchmark_year_material(record: PassiveBenchmarkYear) -> dict[str, object]:
+    return {
+        "schema": "arch151-passive-spy-year-benchmark/v1",
+        "source_digest": record.source_digest,
+        "scored_year": record.scored_year,
+        "adjustment": record.adjustment,
+        "adjustment_semantics": record.adjustment_semantics,
+        "price_basis": record.price_basis,
+        "status": record.status.value,
+        "unavailable_reason": (
+            record.unavailable_reason.value
+            if record.unavailable_reason is not None
+            else None
+        ),
+        "scheduled_session_count": record.scheduled_session_count,
+        "start_timestamp": (
+            record.start_timestamp.astimezone(UTC).isoformat()
+            if record.start_timestamp is not None
+            else None
+        ),
+        "start_price": (
+            arch151._decimal_text(record.start_price)
+            if record.start_price is not None
+            else None
+        ),
+        "end_timestamp": (
+            record.end_timestamp.astimezone(UTC).isoformat()
+            if record.end_timestamp is not None
+            else None
+        ),
+        "end_price": (
+            arch151._decimal_text(record.end_price)
+            if record.end_price is not None
+            else None
+        ),
+        "adjusted_price_return": (
+            arch151._decimal_text(record.adjusted_price_return)
+            if record.adjusted_price_return is not None
+            else None
+        ),
+    }
+
+
+def _passive_benchmark_year_id(record: PassiveBenchmarkYear) -> UUID:
+    return _canonical_id(
+        _BENCHMARK_NAMESPACE,
+        "arch151-passive-spy-year-benchmark/v1",
+        _passive_benchmark_year_material(record),
+    )
+
+
+def _passive_benchmark_campaign_material(
+    record: PassiveBenchmarkCampaign,
+) -> dict[str, object]:
+    return {
+        "schema": "arch151-passive-spy-campaign-benchmark/v1",
+        "source_digest": record.source_digest,
+        "annual_benchmark_ids": [str(item) for item in record.annual_benchmark_ids],
+        "adjustment": record.adjustment,
+        "adjustment_semantics": record.adjustment_semantics,
+        "price_basis": record.price_basis,
+        "status": record.status.value,
+        "unavailable_reason": (
+            record.unavailable_reason.value
+            if record.unavailable_reason is not None
+            else None
+        ),
+        "start_timestamp": (
+            record.start_timestamp.astimezone(UTC).isoformat()
+            if record.start_timestamp is not None
+            else None
+        ),
+        "start_price": (
+            arch151._decimal_text(record.start_price)
+            if record.start_price is not None
+            else None
+        ),
+        "end_timestamp": (
+            record.end_timestamp.astimezone(UTC).isoformat()
+            if record.end_timestamp is not None
+            else None
+        ),
+        "end_price": (
+            arch151._decimal_text(record.end_price)
+            if record.end_price is not None
+            else None
+        ),
+        "adjusted_price_return": (
+            arch151._decimal_text(record.adjusted_price_return)
+            if record.adjusted_price_return is not None
+            else None
+        ),
+    }
+
+
+def _passive_benchmark_campaign_id(record: PassiveBenchmarkCampaign) -> UUID:
+    return _canonical_id(
+        _BENCHMARK_NAMESPACE,
+        "arch151-passive-spy-campaign-benchmark/v1",
+        _passive_benchmark_campaign_material(record),
+    )
+
+
+def _passive_benchmark_year(
+    history: SourceHistory, scored_year: int
+) -> PassiveBenchmarkYear:
+    sessions = arch151._published_sessions_for_year(scored_year)
+    if not sessions:
+        raise EvaluationIntegrityError("SPY benchmark year has no published sessions")
+    first_date, last_date = sessions[0], sessions[-1]
+    first_schedule = arch151._SESSION_AUTHORITY.schedule_for(first_date)
+    last_schedule = arch151._SESSION_AUTHORITY.schedule_for(last_date)
+    if first_schedule is None or last_schedule is None:
+        raise EvaluationIntegrityError("SPY benchmark schedule is unavailable")
+    first_open = first_schedule.opens_at.astimezone(UTC)
+    final_minute = last_schedule.closes_at.astimezone(UTC) - timedelta(minutes=1)
+    first_projection = next(
+        (
+            projection
+            for projection in history._session_projections
+            if projection.symbol == "SPY" and projection.session_date == first_date
+        ),
+        None,
+    )
+    last_projection = next(
+        (
+            projection
+            for projection in history._session_projections
+            if projection.symbol == "SPY" and projection.session_date == last_date
+        ),
+        None,
+    )
+    start_bar = next(
+        (
+            item
+            for item in (first_projection.minutes if first_projection else ())
+            if item.timestamp == first_open
+        ),
+        None,
+    )
+    end_bar = next(
+        (
+            item
+            for item in (last_projection.minutes if last_projection else ())
+            if item.timestamp == final_minute
+        ),
+        None,
+    )
+    reason = (
+        BenchmarkUnavailableReason.FIRST_SESSION_OPEN_UNOBSERVED
+        if start_bar is None
+        else (
+            BenchmarkUnavailableReason.LAST_SESSION_CLOSE_UNOBSERVED
+            if end_bar is None
+            else None
+        )
+    )
+    if reason is None:
+        status = BenchmarkStatus.AVAILABLE
+        start_timestamp = start_bar.timestamp
+        start_price = start_bar.open
+        end_timestamp = end_bar.completed_at
+        end_price = end_bar.close
+        with localcontext(arch151._DECIMAL_CONTEXT):
+            adjusted_return = end_price / start_price - Decimal(1)
+    else:
+        status = BenchmarkStatus.UNAVAILABLE
+        start_timestamp = start_bar.timestamp if start_bar is not None else None
+        start_price = start_bar.open if start_bar is not None else None
+        end_timestamp = end_bar.completed_at if end_bar is not None else None
+        end_price = end_bar.close if end_bar is not None else None
+        adjusted_return = None
+    provisional = PassiveBenchmarkYear(
+        UUID(int=0),
+        _history_digest(history),
+        scored_year,
+        arch150_data.ADJUSTMENT,
+        arch150_data.ADJUSTMENT_SEMANTICS,
+        arch150_data.PRICE_BASIS,
+        status,
+        reason,
+        len(sessions),
+        start_timestamp,
+        start_price,
+        end_timestamp,
+        end_price,
+        adjusted_return,
+    )
+    return replace(provisional, benchmark_id=_passive_benchmark_year_id(provisional))
+
+
+def _passive_benchmark_campaign(
+    benchmarks: tuple[PassiveBenchmarkYear, ...],
+) -> PassiveBenchmarkCampaign:
+    if (
+        type(benchmarks) is not tuple
+        or tuple(item.scored_year for item in benchmarks) != arch151.SCORED_YEARS
+        or len({item.source_digest for item in benchmarks}) != 1
+        or any(
+            item.benchmark_id != _passive_benchmark_year_id(item) for item in benchmarks
+        )
+    ):
+        raise EvaluationIntegrityError("campaign SPY benchmarks are not canonical")
+    first, last = benchmarks[0], benchmarks[-1]
+    if first.start_price is None:
+        status = BenchmarkStatus.UNAVAILABLE
+        reason = BenchmarkUnavailableReason.FIRST_SESSION_OPEN_UNOBSERVED
+        start_timestamp = start_price = None
+    elif last.end_price is None:
+        status = BenchmarkStatus.UNAVAILABLE
+        reason = BenchmarkUnavailableReason.LAST_SESSION_CLOSE_UNOBSERVED
+        start_timestamp = first.start_timestamp
+        start_price = first.start_price
+    else:
+        status = BenchmarkStatus.AVAILABLE
+        reason = None
+        start_timestamp = first.start_timestamp
+        start_price = first.start_price
+    if status is BenchmarkStatus.AVAILABLE:
+        end_timestamp = last.end_timestamp
+        end_price = last.end_price
+        assert start_price is not None and end_price is not None
+        with localcontext(arch151._DECIMAL_CONTEXT):
+            adjusted_return = end_price / start_price - Decimal(1)
+    else:
+        end_timestamp = last.end_timestamp
+        end_price = last.end_price
+        adjusted_return = None
+    provisional = PassiveBenchmarkCampaign(
+        UUID(int=0),
+        benchmarks[0].source_digest,
+        tuple(item.benchmark_id for item in benchmarks),
+        arch150_data.ADJUSTMENT,
+        arch150_data.ADJUSTMENT_SEMANTICS,
+        arch150_data.PRICE_BASIS,
+        status,
+        reason,
+        start_timestamp,
+        start_price,
+        end_timestamp,
+        end_price,
+        adjusted_return,
+    )
+    return replace(
+        provisional,
+        benchmark_id=_passive_benchmark_campaign_id(provisional),
+    )
+
+
+def _synthetic_passive_benchmark_for_test(
+    source_digest: str,
+    scored_year: int,
+    *,
+    start_price: Decimal | None = Decimal("100"),
+    end_price: Decimal | None = Decimal("110"),
+    unavailable_reason: BenchmarkUnavailableReason | None = None,
+) -> PassiveBenchmarkYear:
+    """Private seam for report-composition tests; never grants source authority."""
+
+    sessions = arch151._published_sessions_for_year(scored_year)
+    first_schedule = arch151._SESSION_AUTHORITY.schedule_for(sessions[0])
+    last_schedule = arch151._SESSION_AUTHORITY.schedule_for(sessions[-1])
+    assert first_schedule is not None and last_schedule is not None
+    if unavailable_reason is None:
+        if start_price is None or end_price is None:
+            raise ValueError("available synthetic benchmark requires both endpoints")
+        status = BenchmarkStatus.AVAILABLE
+        start_timestamp = first_schedule.opens_at.astimezone(UTC)
+        end_timestamp = last_schedule.closes_at.astimezone(UTC)
+        with localcontext(arch151._DECIMAL_CONTEXT):
+            adjusted_return = end_price / start_price - Decimal(1)
+    else:
+        status = BenchmarkStatus.UNAVAILABLE
+        adjusted_return = None
+        start_timestamp = (
+            first_schedule.opens_at.astimezone(UTC) if start_price is not None else None
+        )
+        end_timestamp = (
+            last_schedule.closes_at.astimezone(UTC) if end_price is not None else None
+        )
+    provisional = PassiveBenchmarkYear(
+        UUID(int=0),
+        source_digest,
+        scored_year,
+        arch150_data.ADJUSTMENT,
+        arch150_data.ADJUSTMENT_SEMANTICS,
+        arch150_data.PRICE_BASIS,
+        status,
+        unavailable_reason,
+        len(sessions),
+        start_timestamp,
+        start_price,
+        end_timestamp,
+        end_price,
+        adjusted_return,
+    )
+    return replace(provisional, benchmark_id=_passive_benchmark_year_id(provisional))
 
 
 def _history_digest(history: SourceHistory) -> str:
@@ -800,9 +1390,10 @@ def _canonical_year_batch_id(
     source_binding: DevelopmentSourceBinding,
     scored_year: int,
     evaluations: tuple[SlotYearReplay, ...],
+    passive_spy_benchmark: PassiveBenchmarkYear,
 ) -> UUID:
     material = {
-        "schema": "arch151-canonical-year-batch/v2",
+        "schema": "arch151-canonical-year-batch/v3",
         "source_binding_id": str(source_binding.binding_id),
         "source_digest": source_binding.source_digest,
         "manifest_id": str(arch151.CANONICAL_MANIFEST.manifest_id),
@@ -812,8 +1403,9 @@ def _canonical_year_batch_id(
             {"replay_id": str(item.replay_id), "replay_digest": item.replay_digest}
             for item in evaluations
         ],
+        "passive_spy_benchmark_id": str(passive_spy_benchmark.benchmark_id),
     }
-    return _canonical_id(_BATCH_NAMESPACE, "arch151-canonical-year-batch/v2", material)
+    return _canonical_id(_BATCH_NAMESPACE, "arch151-canonical-year-batch/v3", material)
 
 
 def _slot_program(slot: arch151.TrialSlot) -> arch151.Arch151Program:
@@ -1545,6 +2137,41 @@ def _exit_position(
     return next_cash, fill, trade
 
 
+def _trade_with_observed_excursions(
+    trade: TradeRecord, minutes: tuple[arch151.OneMinuteBar, ...]
+) -> TradeRecord:
+    """Bind MFE/MAE from fully held observed minutes only.
+
+    The minute containing an intrabar exit is excluded because its OHLC order is
+    unknown. A minute is included only when its completion is no later than the
+    exit fill timestamp. This intentionally leaves an immediate same-minute
+    trade without an excursion estimate.
+    """
+
+    held_minutes = tuple(
+        item
+        for item in minutes
+        if item.symbol == trade.symbol
+        and item.session_date == trade.session_date
+        and item.timestamp >= trade.entry.timestamp
+        and item.completed_at <= trade.exit.timestamp
+    )
+    if not held_minutes:
+        return replace(
+            trade, mfe_return=None, mae_return=None, excursion_minute_count=0
+        )
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        entry_price = trade.entry.execution_price
+        mfe = max(item.high / entry_price - Decimal(1) for item in held_minutes)
+        mae = min(item.low / entry_price - Decimal(1) for item in held_minutes)
+    return replace(
+        trade,
+        mfe_return=mfe,
+        mae_return=mae,
+        excursion_minute_count=len(held_minutes),
+    )
+
+
 def _simulate_session_from_tape(
     *,
     history_digest: str,
@@ -1660,6 +2287,7 @@ def _simulate_session_from_tape(
                     cash=cash,
                     fill_ordinal=len(fills),
                 )
+                trade = _trade_with_observed_excursions(trade, minutes)
                 fills.append(exit_fill)
                 trades.append(trade)
                 with localcontext(arch151._DECIMAL_CONTEXT):
@@ -1796,6 +2424,7 @@ def _simulate_session_from_tape(
                             cash=cash,
                             fill_ordinal=len(fills),
                         )
+                        trade = _trade_with_observed_excursions(trade, minutes)
                         fills.append(exit_fill)
                         trades.append(trade)
                         with localcontext(arch151._DECIMAL_CONTEXT):
@@ -2079,6 +2708,9 @@ def _simulate_slot_year_cases(
     history: SourceHistory,
     slot: arch151.TrialSlot,
     year: int,
+    *,
+    preparation_cache: _PreparationCache | None = None,
+    calibration_cache: _FamilyACalibrationCache | None = None,
 ) -> tuple[SlotYearReplay, ...]:
     history_digest = _history_digest(history)
     program = _slot_program(slot)
@@ -2088,9 +2720,16 @@ def _simulate_slot_year_cases(
     calibration = None
     if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT:
         try:
-            calibration = arch151.calibrate_family_a_from_source_history(
-                history, program, slot.symbol, year
-            )
+            if calibration_cache is None:
+                calibration = arch151.calibrate_family_a_from_source_history(
+                    history, program, slot.symbol, year
+                )
+            else:
+                if calibration_cache.source_digest != history_digest:
+                    raise EvaluationIntegrityError(
+                        "Family A calibration cache belongs to another source"
+                    )
+                calibration = calibration_cache.calibration(program, slot.symbol, year)
         except arch151.UnavailableIndicatorError:
             first_session = arch151._published_sessions_for_year(year)[0]
             schedule = arch151._SESSION_AUTHORITY.schedule_for(first_session)
@@ -2110,7 +2749,7 @@ def _simulate_slot_year_cases(
                 _slot_year_failure(history_digest, slot, year, case, failure)
                 for case in cases
             )
-    cache = _PreparationCache(history)
+    cache = preparation_cache or _PreparationCache(history)
     sessions_by_case: dict[arch151.FillCostCase, list[SessionReplayRecord]] = {
         case: [] for case in cases
     }
@@ -2180,14 +2819,36 @@ def simulate_canonical_year(
     history_digest = _history_digest(history)
     if type(scored_year) is not int or scored_year not in arch151.SCORED_YEARS:
         raise ValueError("scored year is outside the frozen walk-forward period")
-    evaluations = tuple(
-        evaluation
-        for slot in arch151.CANONICAL_SLOTS
-        for evaluation in _simulate_slot_year_cases(history, slot, scored_year)
-    )
+    evaluations_list: list[SlotYearReplay] = []
+    active_program_id: UUID | None = None
+    program_cache: _PreparationCache | None = None
+    calibration_cache = _FamilyACalibrationCache(history)
+    for slot in arch151.CANONICAL_SLOTS:
+        if slot.program_id != active_program_id:
+            active_program_id = slot.program_id
+            program = _slot_program(slot)
+            program_cache = (
+                _PreparationCache(history)
+                if program.family is arch151.StrategyFamily.CROSS_ETF_TREND_PULLBACK
+                else None
+            )
+        # Family D prepares both ETFs for either execution slot. The manifest
+        # orders its two symbols adjacently, so one program-scoped cache reuses
+        # those immutable prefixes without retaining features across programs.
+        evaluations_list.extend(
+            _simulate_slot_year_cases(
+                history,
+                slot,
+                scored_year,
+                preparation_cache=program_cache,
+                calibration_cache=calibration_cache,
+            )
+        )
+    evaluations = tuple(evaluations_list)
     source_binding = _development_source_binding(history)
+    passive_spy_benchmark = _passive_benchmark_year(history, scored_year)
     material = {
-        "schema": "arch151-canonical-year-batch/v2",
+        "schema": "arch151-canonical-year-batch/v3",
         "source_binding_id": str(source_binding.binding_id),
         "source_digest": history_digest,
         "manifest_id": str(arch151.CANONICAL_MANIFEST.manifest_id),
@@ -2197,14 +2858,16 @@ def simulate_canonical_year(
             {"replay_id": str(item.replay_id), "replay_digest": item.replay_digest}
             for item in evaluations
         ],
+        "passive_spy_benchmark_id": str(passive_spy_benchmark.benchmark_id),
     }
     return CanonicalYearBatch(
-        _canonical_id(_BATCH_NAMESPACE, "arch151-canonical-year-batch/v2", material),
+        _canonical_id(_BATCH_NAMESPACE, "arch151-canonical-year-batch/v3", material),
         scored_year,
         arch151.CANONICAL_MANIFEST.manifest_id,
         arch151.CANONICAL_MANIFEST.fingerprint,
         history_digest,
         evaluations,
+        passive_spy_benchmark,
         source_binding,
         _CANONICAL_YEAR_BATCH_SEAL,
     )
@@ -2266,6 +2929,27 @@ def _fold_metrics_from_slot_year(replay: SlotYearReplay) -> arch151.FoldMetrics:
         gross_negative = sum(
             (max(-trade.gross_pnl, Decimal(0)) for trade in replay.trades), Decimal(0)
         )
+        net_positive = sum(
+            (max(trade.net_pnl, Decimal(0)) for trade in replay.trades), Decimal(0)
+        )
+        net_negative = sum(
+            (max(-trade.net_pnl, Decimal(0)) for trade in replay.trades), Decimal(0)
+        )
+        realized_net_total = net_positive - net_negative
+        total_gross = sum((trade.gross_pnl for trade in replay.trades), Decimal(0))
+        total_adverse_cost = sum(
+            (trade.total_adverse_cost for trade in replay.trades), Decimal(0)
+        )
+    if (
+        replay.positive_net_pnl != net_positive
+        or replay.negative_net_pnl != net_negative
+        or replay.net_return != realized_net_total
+        or replay.gross_trade_pnl != total_gross
+        or replay.total_adverse_cost != total_adverse_cost
+    ):
+        raise EvaluationIntegrityError(
+            "slot-year realized P&L totals do not reconcile to trade outcomes"
+        )
     if (
         type(replay.turnover) is not Decimal
         or not replay.turnover.is_finite()
@@ -2278,6 +2962,8 @@ def _fold_metrics_from_slot_year(replay: SlotYearReplay) -> arch151.FoldMetrics:
         tuple(round_trips),
         gross_positive,
         gross_negative,
+        net_positive,
+        net_negative,
         replay.turnover,
     )
 
@@ -2305,7 +2991,10 @@ def compose_development_evaluation(
         or batch.manifest_fingerprint != arch151.CANONICAL_MANIFEST.fingerprint
         or batch.batch_id
         != _canonical_year_batch_id(
-            batch.source_binding, batch.scored_year, batch.evaluations
+            batch.source_binding,
+            batch.scored_year,
+            batch.evaluations,
+            batch.passive_spy_benchmark,
         )
         for batch in year_batches
     ):
@@ -2380,12 +3069,16 @@ def compose_development_evaluation(
     freeze = arch151.freeze_final_candidate_set(
         batches, _selection_bias_calculation=selection
     )
+    passive_spy_benchmark = _passive_benchmark_campaign(
+        tuple(batch.passive_spy_benchmark for batch in year_batches)
+    )
     run_id = _development_run_id(
         first.source_binding,
         year_batches,
         batches,
         selection,
         qualifications,
+        passive_spy_benchmark,
         ranking_order,
         freeze,
     )
@@ -2396,6 +3089,7 @@ def compose_development_evaluation(
         batches,
         qualifications,
         selection,
+        passive_spy_benchmark,
         ranking_order,
         freeze,
         first.source_binding,
@@ -2409,11 +3103,12 @@ def _development_run_id(
     slot_batches: tuple[arch151.DevelopmentEvaluationBatch, ...],
     selection_bias: arch151.SelectionBiasCalculation,
     qualifications: tuple[arch151.DevelopmentQualification, ...],
+    passive_spy_benchmark: PassiveBenchmarkCampaign,
     ranking_order: tuple[UUID, ...],
     final_freeze: arch151.FinalCandidateFreeze,
 ) -> UUID:
     material = {
-        "schema": "arch151-development-evaluation-run/v2",
+        "schema": _DEVELOPMENT_RUN_SCHEMA,
         "source_binding_id": str(source_binding.binding_id),
         "source_digest": source_binding.source_digest,
         "manifest_id": str(arch151.CANONICAL_MANIFEST.manifest_id),
@@ -2422,12 +3117,13 @@ def _development_run_id(
         "slot_batch_digests": [item.batch_digest for item in slot_batches],
         "selection_bias_calculation_id": str(selection_bias.calculation_id),
         "qualification_ids": [str(item.qualification_id) for item in qualifications],
+        "passive_spy_benchmark_id": str(passive_spy_benchmark.benchmark_id),
         "ranking_order": [str(item) for item in ranking_order],
         "freeze_id": str(final_freeze.freeze_id),
     }
     return _canonical_id(
         _DEVELOPMENT_RUN_NAMESPACE,
-        "arch151-development-evaluation-run/v2",
+        _DEVELOPMENT_RUN_SCHEMA,
         material,
     )
 
@@ -2440,6 +3136,9 @@ def _aggregate_report_material(
         "economics_case": aggregate.economics_case.value,
         "net_return": arch151._decimal_text(aggregate.net_return),
         "profit_factor": aggregate.profit_factor.canonical_material(),
+        "pre_cost_profit_factor": (
+            aggregate.pre_cost_profit_factor.canonical_material()
+        ),
         "positive_scored_years": aggregate.positive_scored_years,
         "profitable_scored_years": aggregate.profitable_scored_years,
         "worst_scored_year_return": arch151._decimal_text(
@@ -2532,6 +3231,440 @@ def _slot_year_report_material(replay: SlotYearReplay) -> dict[str, object]:
     }
 
 
+def _distribution_summary(values: tuple[Decimal, ...]) -> NumericDistribution:
+    ordered = tuple(sorted(values))
+    if not ordered:
+        return NumericDistribution(0, None, None, None, None, None, None)
+    count = len(ordered)
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        if count % 2:
+            median = ordered[count // 2]
+        else:
+            median = (ordered[count // 2 - 1] + ordered[count // 2]) / Decimal(2)
+        mean = sum(ordered, Decimal(0)) / Decimal(count)
+    first_rank = max(1, (count + 3) // 4)
+    third_rank = max(1, (3 * count + 3) // 4)
+    return NumericDistribution(
+        count,
+        mean,
+        median,
+        ordered[0],
+        ordered[first_rank - 1],
+        ordered[third_rank - 1],
+        ordered[-1],
+    )
+
+
+def _holding_minutes(trade: TradeRecord) -> Decimal:
+    elapsed = trade.exit.timestamp - trade.entry.timestamp
+    whole_seconds = elapsed.days * 86_400 + elapsed.seconds
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        return Decimal(whole_seconds) / Decimal(60)
+
+
+def _economic_diagnostic_material(record: EconomicDiagnostic) -> dict[str, object]:
+    return {
+        item.name: _canonical_output_material(getattr(record, item.name))
+        for item in fields(record)
+        if item.name != "diagnostic_id"
+    }
+
+
+def _economic_diagnostic_id(record: EconomicDiagnostic) -> UUID:
+    return _canonical_id(
+        _DIAGNOSTICS_NAMESPACE,
+        "arch151-economic-diagnostic/v1",
+        _economic_diagnostic_material(record),
+    )
+
+
+def _monthly_return_diagnostics(
+    replays: tuple[SlotYearReplay, ...], years: tuple[int, ...]
+) -> tuple[MonthlyReturnDiagnostic, ...]:
+    scheduled = tuple(
+        session
+        for year in years
+        for session in arch151._published_sessions_for_year(year)
+    )
+    sessions_by_date = {
+        item.session_date: item for replay in replays for item in replay.sessions
+    }
+    if len(sessions_by_date) != sum(len(item.sessions) for item in replays):
+        raise EvaluationIntegrityError("diagnostic session dates are duplicated")
+    result: list[MonthlyReturnDiagnostic] = []
+    for year in years:
+        for month in range(1, 13):
+            month_sessions = tuple(
+                item for item in scheduled if item.year == year and item.month == month
+            )
+            if not month_sessions:
+                continue
+            session_records = tuple(
+                sessions_by_date.get(item) for item in month_sessions
+            )
+            complete = all(
+                item is not None and item.session_return is not None
+                for item in session_records
+            )
+            if complete:
+                with localcontext(arch151._DECIMAL_CONTEXT):
+                    compounded = Decimal(1)
+                    for item in session_records:
+                        assert item is not None and item.session_return is not None
+                        compounded *= Decimal(1) + item.session_return
+                    monthly_return = compounded - Decimal(1)
+            else:
+                monthly_return = None
+            result.append(
+                MonthlyReturnDiagnostic(
+                    year, month, len(month_sessions), complete, monthly_return
+                )
+            )
+    return tuple(result)
+
+
+def _sum_trade_values(
+    trades: tuple[TradeRecord, ...], reason: ExitReason, *, gross: bool
+) -> Decimal:
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        return sum(
+            (
+                (item.gross_pnl if gross else item.net_pnl)
+                for item in trades
+                if item.exit_reason is reason
+            ),
+            Decimal(0),
+        )
+
+
+def _economic_diagnostic(
+    replays: tuple[SlotYearReplay, ...], scope: DiagnosticScope
+) -> EconomicDiagnostic:
+    if not replays or type(replays) is not tuple:
+        raise EvaluationIntegrityError("economic diagnostics need replay records")
+    first = replays[0]
+    if any(
+        item.slot.slot_id != first.slot.slot_id
+        or item.cost_case is not first.cost_case
+        or item.source_digest != first.source_digest
+        for item in replays
+    ):
+        raise EvaluationIntegrityError("economic diagnostic mixes replay identities")
+    if scope is DiagnosticScope.SCORED_YEAR:
+        if len(replays) != 1:
+            raise EvaluationIntegrityError("annual diagnostic requires one replay")
+        years = (first.scored_year,)
+    elif scope is DiagnosticScope.FIVE_YEAR_CAMPAIGN:
+        if tuple(item.scored_year for item in replays) != arch151.SCORED_YEARS:
+            raise EvaluationIntegrityError(
+                "campaign diagnostic requires five ordered years"
+            )
+        years = arch151.SCORED_YEARS
+    else:
+        raise TypeError("diagnostic scope must use the closed enum")
+    sessions = tuple(session for item in replays for session in item.sessions)
+    trades = tuple(trade for item in replays for trade in item.trades)
+    complete = all(item.complete and item.failure is None for item in replays)
+    expected_sessions = tuple(
+        session
+        for year in years
+        for session in arch151._published_sessions_for_year(year)
+    )
+    complete = (
+        complete and tuple(item.session_date for item in sessions) == expected_sessions
+    )
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        gross_trade_pnl = sum((item.gross_pnl for item in trades), Decimal(0))
+        net_trade_pnl = sum((item.net_pnl for item in trades), Decimal(0))
+        adverse_cost = sum((item.total_adverse_cost for item in trades), Decimal(0))
+    net_wins = tuple(item.net_pnl for item in trades if item.net_pnl > 0)
+    net_losses = tuple(-item.net_pnl for item in trades if item.net_pnl < 0)
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        gross_expectancy = (
+            sum((item.gross_pnl for item in trades), Decimal(0)) / Decimal(len(trades))
+            if trades
+            else None
+        )
+        net_expectancy = (
+            sum((item.net_pnl for item in trades), Decimal(0)) / Decimal(len(trades))
+            if trades
+            else None
+        )
+        win_rate = Decimal(len(net_wins)) / Decimal(len(trades)) if trades else None
+        average_win = (
+            sum(net_wins, Decimal(0)) / Decimal(len(net_wins)) if net_wins else None
+        )
+        average_loss = (
+            sum(net_losses, Decimal(0)) / Decimal(len(net_losses))
+            if net_losses
+            else None
+        )
+        payoff = (
+            average_win / average_loss
+            if average_win is not None and average_loss is not None and average_loss > 0
+            else None
+        )
+        compounded_return = None
+        if complete:
+            compounded = Decimal(1)
+            for session in sessions:
+                assert session.session_return is not None
+                compounded *= Decimal(1) + session.session_return
+            compounded_return = compounded - Decimal(1)
+        held_minutes = sum((_holding_minutes(item) for item in trades), Decimal(0))
+    months = _monthly_return_diagnostics(replays, years)
+    available_months = tuple(item for item in months if item.net_return is not None)
+    positive_month_count = sum(item.net_return > 0 for item in available_months)
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        positive_month_fraction = (
+            Decimal(positive_month_count) / Decimal(len(available_months))
+            if available_months
+            else None
+        )
+    scheduled_minutes = 0
+    for year in years:
+        for session_date in arch151._published_sessions_for_year(year):
+            schedule = arch151._SESSION_AUTHORITY.schedule_for(session_date)
+            assert schedule is not None
+            scheduled_minutes += int(
+                (schedule.closes_at - schedule.opens_at).total_seconds() // 60
+            )
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        time_fraction = held_minutes / Decimal(scheduled_minutes) if complete else None
+    exit_records = tuple(
+        ExitReasonDiagnostic(
+            reason,
+            sum(item.exit_reason is reason for item in trades),
+            _sum_trade_values(trades, reason, gross=True),
+            _sum_trade_values(trades, reason, gross=False),
+        )
+        for reason in ExitReason
+    )
+    rejection_counts = tuple(
+        RejectionReasonDiagnostic(
+            reason,
+            sum(
+                rejection.reason is reason
+                for session in sessions
+                for rejection in session.signal_rejections
+            ),
+        )
+        for reason in RejectionReason
+    )
+    diagnostic = EconomicDiagnostic(
+        UUID(int=0),
+        scope,
+        first.slot.slot_id,
+        first.slot.program_id,
+        first.slot.symbol,
+        first.scored_year if scope is DiagnosticScope.SCORED_YEAR else None,
+        first.cost_case,
+        tuple(item.replay_id for item in replays),
+        complete,
+        len(trades),
+        tuple(
+            TradeDiagnostic(
+                item.trade_id,
+                item.signal_timestamp,
+                item.entry.timestamp,
+                item.exit.timestamp,
+                item.exit_reason,
+                item.gross_pnl,
+                item.net_pnl,
+                item.total_adverse_cost,
+                _holding_minutes(item),
+                item.mfe_return,
+                item.mae_return,
+                item.excursion_minute_count,
+            )
+            for item in trades
+        ),
+        gross_trade_pnl,
+        net_trade_pnl,
+        adverse_cost,
+        gross_expectancy,
+        net_expectancy,
+        win_rate,
+        average_win,
+        average_loss,
+        payoff,
+        compounded_return,
+        months,
+        positive_month_count,
+        len(available_months),
+        positive_month_fraction,
+        _distribution_summary(tuple(_holding_minutes(item) for item in trades)),
+        held_minutes,
+        scheduled_minutes,
+        time_fraction,
+        exit_records,
+        sum(item.generated_signal_count for item in sessions),
+        sum(item.eligible_signal_count for item in sessions),
+        sum(item.executed_signal_count for item in sessions),
+        sum(item.expired_signal_count for item in sessions),
+        sum(item.blocked_signal_count for item in sessions),
+        rejection_counts,
+        _distribution_summary(
+            tuple(item.mfe_return for item in trades if item.mfe_return is not None)
+        ),
+        _distribution_summary(
+            tuple(item.mae_return for item in trades if item.mae_return is not None)
+        ),
+    )
+    return replace(diagnostic, diagnostic_id=_economic_diagnostic_id(diagnostic))
+
+
+def _trade_path_signature(replay: SlotYearReplay) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        (
+            item.signal_timestamp,
+            item.entry.timestamp,
+            item.exit.timestamp,
+            item.exit_reason,
+        )
+        for item in replay.trades
+    )
+
+
+def _cost_drag_diagnostic(
+    replay: SlotYearReplay,
+    zero_replay: SlotYearReplay,
+    scope: DiagnosticScope,
+    replay_group: tuple[SlotYearReplay, ...],
+    zero_group: tuple[SlotYearReplay, ...],
+) -> CostDragDiagnostic:
+    if replay.cost_case is arch151.FillCostCase.ZERO:
+        raise EvaluationIntegrityError("ZERO cannot be a compared cost case")
+    if scope is DiagnosticScope.SCORED_YEAR:
+        if len(replay_group) != 1 or len(zero_group) != 1:
+            raise EvaluationIntegrityError("annual cost comparison has mixed years")
+    if scope is DiagnosticScope.FIVE_YEAR_CAMPAIGN and (
+        tuple(item.scored_year for item in replay_group) != arch151.SCORED_YEARS
+        or tuple(item.scored_year for item in zero_group) != arch151.SCORED_YEARS
+    ):
+        raise EvaluationIntegrityError("campaign cost comparison lacks exact years")
+    if any(
+        item.slot.slot_id != replay.slot.slot_id
+        or item.cost_case is not replay.cost_case
+        for item in replay_group
+    ) or any(
+        item.slot.slot_id != zero_replay.slot.slot_id
+        or item.cost_case is not arch151.FillCostCase.ZERO
+        for item in zero_group
+    ):
+        raise EvaluationIntegrityError("cost comparison mixes slots or economics")
+    if not all(item.complete for item in (*replay_group, *zero_group)):
+        relationship = CostPathRelationship.INCOMPLETE
+    elif tuple(_trade_path_signature(item) for item in replay_group) == tuple(
+        _trade_path_signature(item) for item in zero_group
+    ):
+        relationship = CostPathRelationship.IDENTICAL_ENTRY_EXIT_PATH
+    else:
+        relationship = CostPathRelationship.ENTRY_EXIT_PATH_CHANGED
+    compared = _economic_diagnostic(replay_group, scope)
+    zero = _economic_diagnostic(zero_group, scope)
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        delta = (
+            compared.compounded_net_return - zero.compounded_net_return
+            if compared.compounded_net_return is not None
+            and zero.compounded_net_return is not None
+            else None
+        )
+        cost_delta = compared.total_adverse_cost - zero.total_adverse_cost
+    return CostDragDiagnostic(
+        replay.slot.slot_id,
+        replay.scored_year if scope is DiagnosticScope.SCORED_YEAR else None,
+        replay.cost_case,
+        arch151.FillCostCase.ZERO,
+        relationship,
+        delta,
+        cost_delta,
+    )
+
+
+def _research_diagnostics_material(
+    run: DevelopmentEvaluationRun,
+) -> dict[str, object]:
+    replays_by_key = {
+        (item.slot.slot_id, item.scored_year, item.cost_case): item
+        for batch in run.year_batches
+        for item in batch.evaluations
+    }
+    annual = tuple(
+        _economic_diagnostic(
+            (replays_by_key[(slot.slot_id, year, case)],),
+            DiagnosticScope.SCORED_YEAR,
+        )
+        for slot in arch151.CANONICAL_SLOTS
+        for year in arch151.SCORED_YEARS
+        for case in arch151.EVALUATION_ECONOMICS_ORDER
+    )
+    campaigns: list[EconomicDiagnostic] = []
+    cost_drag: list[CostDragDiagnostic] = []
+    for slot in arch151.CANONICAL_SLOTS:
+        for case in arch151.EVALUATION_ECONOMICS_ORDER:
+            case_replays = tuple(
+                replays_by_key[(slot.slot_id, year, case)]
+                for year in arch151.SCORED_YEARS
+            )
+            campaigns.append(
+                _economic_diagnostic(case_replays, DiagnosticScope.FIVE_YEAR_CAMPAIGN)
+            )
+            if case is not arch151.FillCostCase.ZERO:
+                zero_replays = tuple(
+                    replays_by_key[(slot.slot_id, year, arch151.FillCostCase.ZERO)]
+                    for year in arch151.SCORED_YEARS
+                )
+                cost_drag.append(
+                    _cost_drag_diagnostic(
+                        case_replays[0],
+                        zero_replays[0],
+                        DiagnosticScope.FIVE_YEAR_CAMPAIGN,
+                        case_replays,
+                        zero_replays,
+                    )
+                )
+    for slot in arch151.CANONICAL_SLOTS:
+        for year in arch151.SCORED_YEARS:
+            zero = replays_by_key[(slot.slot_id, year, arch151.FillCostCase.ZERO)]
+            for case in (arch151.FillCostCase.BASE, arch151.FillCostCase.STRESS):
+                cost_drag.append(
+                    _cost_drag_diagnostic(
+                        replays_by_key[(slot.slot_id, year, case)],
+                        zero,
+                        DiagnosticScope.SCORED_YEAR,
+                        (replays_by_key[(slot.slot_id, year, case)],),
+                        (zero,),
+                    )
+                )
+    benchmarks = tuple(item.passive_spy_benchmark for item in run.year_batches)
+    return {
+        "schema": "arch151-research-diagnostics/v1",
+        "qualification_or_ranking_input": False,
+        "annual_slot_economics": [
+            _economic_diagnostic_material(item) for item in annual
+        ],
+        "five_year_slot_economics": [
+            _economic_diagnostic_material(item) for item in campaigns
+        ],
+        "cost_drag_vs_zero": [_canonical_output_material(item) for item in cost_drag],
+        "passive_spy_benchmark": {
+            "metric": "ADJUSTED_PRICE_RETURN",
+            "dividend_cashflow_total_return_reconstructed": False,
+            "adjustment": arch150_data.ADJUSTMENT,
+            "adjustment_semantics": arch150_data.ADJUSTMENT_SEMANTICS,
+            "price_basis": arch150_data.PRICE_BASIS,
+            "annual": [_canonical_output_material(item) for item in benchmarks],
+            "five_year": _canonical_output_material(run.passive_spy_benchmark),
+        },
+        "mfe_mae_convention": (
+            "entry-execution-price-relative extrema from observed one-minute bars "
+            "fully held through bar completion; exclude the exit minute when its "
+            "intrabar order is unknown"
+        ),
+    }
+
+
 def _development_report_material(run: DevelopmentEvaluationRun) -> dict[str, object]:
     records = [
         {
@@ -2571,6 +3704,15 @@ def _development_report_material(run: DevelopmentEvaluationRun) -> dict[str, obj
             if selection.unavailable_reason is not None
             else None
         ),
+        "trial_diagnostics": [
+            item.canonical_material() for item in selection.trial_diagnostics
+        ],
+        "affected_trial_slot_ids": [
+            str(item) for item in selection.affected_trial_slot_ids
+        ],
+        "descriptive_economic_order": [
+            str(item) for item in selection.descriptive_economic_order
+        ],
         "evidence": [
             {
                 "evidence_id": str(item.evidence_id),
@@ -2610,7 +3752,7 @@ def _development_report_material(run: DevelopmentEvaluationRun) -> dict[str, obj
     ]
     freeze = run.final_freeze
     return {
-        "schema": "arch151-development-evaluation-report/v1",
+        "schema": _DEVELOPMENT_REPORT_SCHEMA,
         "run": {
             "run_id": str(run.run_id),
             "source_digest": run.source_digest,
@@ -2632,6 +3774,9 @@ def _development_report_material(run: DevelopmentEvaluationRun) -> dict[str, obj
                 "source_binding_id": str(item.source_binding.binding_id),
                 "manifest_id": str(item.manifest_id),
                 "manifest_fingerprint": item.manifest_fingerprint,
+                "passive_spy_benchmark_id": str(
+                    item.passive_spy_benchmark.benchmark_id
+                ),
                 "replay_outputs": [
                     {
                         "replay_id": str(replay.replay_id),
@@ -2659,6 +3804,7 @@ def _development_report_material(run: DevelopmentEvaluationRun) -> dict[str, obj
         "fold_records": records,
         "qualifications": qualifications,
         "selection_bias": selection_material,
+        "research_diagnostics": _research_diagnostics_material(run),
         "ranking_order": [str(item) for item in run.ranking_order],
         "final_freeze": {
             "freeze_id": str(freeze.freeze_id),
@@ -2718,7 +3864,7 @@ def serialize_development_evaluation(
     digest = sha256(canonical).hexdigest()
     report_id = _canonical_id(
         _DEVELOPMENT_REPORT_NAMESPACE,
-        "arch151-development-evaluation-report/v1",
+        _DEVELOPMENT_REPORT_SCHEMA,
         {"run_id": str(run.run_id), "sha256": digest},
     )
     return DevelopmentEvaluationReport(
@@ -2731,6 +3877,141 @@ def serialize_development_evaluation(
         record_count=run.fold_evaluation_count,
         canonical_json_bytes=canonical,
         sha256_digest=digest,
+    )
+
+
+def authenticate_development_evidence(
+    run: DevelopmentEvaluationRun,
+    report: DevelopmentEvaluationReport,
+    source_attestation: object,
+) -> arch151.AuthenticatedDevelopmentEvidence:
+    """Bind accepted-source run/report/freeze/DSR to the operator's receipt.
+
+    Synthetic histories and caller-built reports are rejected. This issuer has
+    no custody, holdout, extension, or later-period reader surface.
+    """
+
+    if (
+        type(run) is not DevelopmentEvaluationRun
+        or getattr(run, "_seal", None) is not _DEVELOPMENT_RUN_SEAL
+        or type(report) is not DevelopmentEvaluationReport
+        or getattr(report, "_seal", None) is not _DEVELOPMENT_REPORT_SEAL
+    ):
+        raise arch151.AuthorizationUnavailableError(
+            "authenticated evidence requires a sealed source-owned run and report"
+        )
+    if run.source_binding.kind is not DevelopmentSourceKind.ARCH150_D1R_ACCEPTED:
+        raise arch151.AuthorizationUnavailableError(
+            "synthetic development runs cannot issue authenticated development evidence"
+        )
+    selection = run.selection_bias
+    freeze = run.final_freeze
+    if (
+        run.fold_evaluation_count != 480
+        or len(run.year_batches) != len(arch151.SCORED_YEARS)
+        or any(not batch.complete for batch in run.year_batches)
+        or tuple(batch.scored_year for batch in run.year_batches)
+        != arch151.SCORED_YEARS
+        or report.record_count != 480
+        or report.run_id != run.run_id
+        or report.source_binding_id != run.source_binding.binding_id
+        or report.manifest_id != arch151.CANONICAL_MANIFEST.manifest_id
+        or report.manifest_fingerprint != arch151.CANONICAL_MANIFEST.fingerprint
+        or sha256(report.canonical_json_bytes).hexdigest() != report.sha256
+        or serialize_development_evaluation(run) != report
+        or freeze.status is not arch151.FinalFreezeStatus.ONE_CANDIDATE_FROZEN
+        or freeze.candidate_slot_id is None
+        or freeze.selection_bias_status is not arch151.SelectionBiasStatus.DSR_VERIFIED
+        or selection.status is not arch151.SelectionBiasStatus.DSR_VERIFIED
+        or freeze.selection_bias_calculation_id != selection.calculation_id
+        or freeze.batch_digests != tuple(item.batch_digest for item in run.slot_batches)
+        or freeze.selection_bias_evidence_digests
+        != tuple(item.evidence_digest for item in selection.evidence)
+        or len(selection.evidence) != len(arch151.CANONICAL_SLOTS)
+        or len(selection.trial_diagnostics) != len(arch151.CANONICAL_SLOTS)
+    ):
+        raise arch151.AuthorizationUnavailableError(
+            "development run, report, freeze, or full DSR population is "
+            "incomplete or inconsistent"
+        )
+    for slot, batch, evidence in zip(
+        arch151.CANONICAL_SLOTS, run.slot_batches, selection.evidence, strict=True
+    ):
+        if (
+            batch.slot_id != slot.slot_id
+            or evidence.candidate_slot_id != slot.slot_id
+            or evidence.development_batch_digest != batch.batch_digest
+            or evidence.population_digest != selection.population_digest
+            or evidence.ledger_id != arch151.SELECTION_BIAS_INPUT.ledger_id
+            or evidence.effective_trial_count
+            != arch151.SELECTION_BIAS_INPUT.effective_trial_count
+        ):
+            raise arch151.AuthorizationUnavailableError(
+                "development DSR evidence does not bind the full canonical population"
+            )
+    candidate_index = next(
+        index
+        for index, slot in enumerate(arch151.CANONICAL_SLOTS)
+        if slot.slot_id == freeze.candidate_slot_id
+    )
+    candidate_evidence = selection.evidence[candidate_index]
+    candidate_qualification = run.qualifications[candidate_index]
+    if (
+        candidate_qualification.slot_id != freeze.candidate_slot_id
+        or not candidate_qualification.qualified
+        or candidate_evidence.probability
+        < arch151.SELECTION_BIAS_INPUT.minimum_probability
+    ):
+        raise arch151.AuthorizationUnavailableError(
+            "the frozen candidate is not qualified by the complete development evidence"
+        )
+    from trading_bot.experiments import (
+        arch151_intraday_walkforward_operator as operator,
+    )
+
+    source_attestation = operator._validate_development_source_attestation(
+        run, report, source_attestation
+    )
+    source_revision = source_attestation.source_revision
+    current_revision = operator._read_source_revision()
+    if current_revision != source_revision:
+        raise arch151.AuthorizationUnavailableError(
+            "operator source attestation revision differs from current source"
+        )
+    invocation_id = source_attestation.invocation_id
+    source_revision_digest = source_attestation.source_revision_digest
+    return arch151.AuthenticatedDevelopmentEvidence(
+        _seal=arch151._AUTHENTICATED_DEVELOPMENT_EVIDENCE_SEAL,
+        freeze_id=freeze.freeze_id,
+        freeze_fingerprint=freeze.fingerprint,
+        candidate_slot_id=freeze.candidate_slot_id,
+        source_manifest_id=freeze.source_manifest_id,
+        manifest_fingerprint=arch151.CANONICAL_MANIFEST.fingerprint,
+        batch_digests=tuple(item.batch_digest for item in run.slot_batches),
+        year_batch_ids=tuple(item.batch_id for item in run.year_batches),
+        run_id=run.run_id,
+        report_id=report.report_id,
+        report_sha256=report.sha256,
+        record_count=report.record_count,
+        source_kind=run.source_binding.kind.value,
+        source_binding_id=run.source_binding.binding_id,
+        source_digest=run.source_digest,
+        source_branch=source_revision.branch,
+        source_origin=source_revision.origin,
+        source_head=source_revision.head,
+        source_tree=source_revision.tree,
+        invocation_id=invocation_id,
+        source_revision_digest=source_revision_digest,
+        selection_bias_calculation_id=selection.calculation_id,
+        selection_bias_population_digest=selection.population_digest,
+        selection_bias_ledger_id=arch151.SELECTION_BIAS_INPUT.ledger_id,
+        selection_bias_effective_trial_count=selection.effective_trial_count,
+        selection_bias_evidence_ids=tuple(
+            item.evidence_id for item in selection.evidence
+        ),
+        selection_bias_evidence_digests=tuple(
+            item.evidence_digest for item in selection.evidence
+        ),
     )
 
 
@@ -2754,7 +4035,12 @@ def evaluate_full_development_history(
 
 
 __all__ = (
+    "BenchmarkStatus",
+    "BenchmarkUnavailableReason",
     "CanonicalYearBatch",
+    "CostDragDiagnostic",
+    "CostPathRelationship",
+    "DiagnosticScope",
     "DevelopmentEvaluationReport",
     "DevelopmentEvaluationRun",
     "DevelopmentSourceBinding",
@@ -2763,6 +4049,12 @@ __all__ = (
     "ExitReason",
     "FillRecord",
     "FillSide",
+    "EconomicDiagnostic",
+    "ExitReasonDiagnostic",
+    "MonthlyReturnDiagnostic",
+    "NumericDistribution",
+    "PassiveBenchmarkCampaign",
+    "PassiveBenchmarkYear",
     "ReplayFailureEvidence",
     "ReplayFailureKind",
     "SignalDisposition",
@@ -2770,8 +4062,10 @@ __all__ = (
     "SessionReplayRecord",
     "SignalRejection",
     "SlotYearReplay",
+    "TradeDiagnostic",
     "TradeRecord",
     "compose_development_evaluation",
+    "authenticate_development_evidence",
     "evaluate_full_development_history",
     "serialize_development_evaluation",
     "simulate_canonical_year",

@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import json
-import tracemalloc
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, localcontext
 from functools import cache
 from hashlib import sha256
-from time import perf_counter
 from types import MappingProxyType
 from uuid import UUID, uuid5
 
@@ -321,70 +319,22 @@ def _synthetic_campaign_measures(
 
 
 def _synthetic_five_year_campaign_history():
-    """Generate 20 full ETF sessions plus one non-idle B setup per year."""
-
-    minutes: list[arch151.OneMinuteBar] = []
-    session_count = 0
-    generated_bars = 0
+    """Generate a complete signal session and exact SPY endpoints per year."""
+    minutes = []
     for year in arch151.SCORED_YEARS:
-        sessions = arch151._published_sessions_for_year(year)
-        selected = tuple(
-            sessions[index * (len(sessions) - 1) // 3] for index in range(4)
+        signal_session = arch151._published_sessions_for_year(year)[1]
+        minutes.extend(_campaign_signal_session_minutes(signal_session))
+        benchmark = _synthetic_benchmark_history(year)
+        minutes.extend(
+            minute
+            for projection in benchmark._session_projections
+            for minute in projection.minutes
         )
-        signal_session = selected[1]
-        b_program, b_history, *_ = _b_history(session=signal_session)
-        assert b_program.key is arch151.ProgramKey.B5_01
-        b_projection = next(
-            item
-            for item in b_history._session_projections
-            if item.symbol == "SPY" and item.session_date == signal_session
-        )
-        b_minutes = {item.timestamp: item for item in b_projection.minutes}
-        for session in selected:
-            schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
-            assert schedule is not None
-            count = int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
-            for symbol in arch151.INITIAL_UNIVERSE:
-                for offset in range(count):
-                    timestamp = schedule.opens_at + timedelta(minutes=offset)
-                    supplied = (
-                        b_minutes.get(timestamp)
-                        if (symbol == "SPY" and session == signal_session)
-                        else None
-                    )
-                    if supplied is not None:
-                        minute = supplied
-                    else:
-                        close = (
-                            Decimal("101")
-                            if (
-                                year == arch151.SCORED_YEARS[-1]
-                                and session == sessions[-1]
-                                and offset == count - 1
-                                and symbol == "SPY"
-                            )
-                            else Decimal("100")
-                        )
-                        minute = arch151.OneMinuteBar(
-                            symbol,
-                            timestamp,
-                            Decimal("100"),
-                            max(Decimal("100"), close) + Decimal("0.01"),
-                            min(Decimal("100"), close) - Decimal("0.01"),
-                            close,
-                            100,
-                        )
-                    minutes.append(minute)
-                    generated_bars += 1
-            session_count += 1
-    assert session_count == 20
-    return arch151._test_only_synthetic_source_history(minutes), generated_bars
+    return arch151._test_only_synthetic_source_history(minutes)
 
 
-def _synthetic_single_year_campaign_history():
+def _campaign_signal_session_minutes(session: date) -> tuple[arch151.OneMinuteBar, ...]:
     """Generate one complete SPY/QQQ session containing a B5 trade setup."""
-
-    session = arch151._published_sessions_for_year(2023)[1]
     program, b_history, *_ = _b_history(session=session)
     assert program.key is arch151.ProgramKey.B5_01
     projection = next(
@@ -397,7 +347,7 @@ def _synthetic_single_year_campaign_history():
     assert schedule is not None
     count = int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
     minutes = tuple(
-        supplied_minutes.get(timestamp)
+        (supplied_minutes.get(timestamp) if symbol == "SPY" else None)
         or arch151.OneMinuteBar(
             symbol,
             timestamp,
@@ -411,7 +361,7 @@ def _synthetic_single_year_campaign_history():
         for offset in range(count)
         for timestamp in (schedule.opens_at + timedelta(minutes=offset),)
     )
-    return arch151._test_only_synthetic_source_history(minutes), len(minutes)
+    return minutes
 
 
 def _slot_for(program: arch151.Arch151Program, symbol: str = "SPY"):
@@ -444,7 +394,7 @@ def _a_prior_minutes(symbol: str) -> tuple[arch151.OneMinuteBar, ...]:
         session
         for session in arch151._SESSION_AUTHORITY.published.sessions
         if date(2016, 1, 1) <= session < date(2019, 1, 1)
-    )[-60:]
+    )[-61:]
     result: list[arch151.OneMinuteBar] = []
     for session in prior_sessions:
         schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
@@ -466,7 +416,8 @@ def _a_prior_minutes(symbol: str) -> tuple[arch151.OneMinuteBar, ...]:
     return tuple(result)
 
 
-def _a_history(program: arch151.Arch151Program, symbol: str):
+@cache
+def _a_history(symbol: str):
     session = SESSION
     schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
     assert schedule is not None
@@ -935,7 +886,7 @@ def _d_history(program: arch151.Arch151Program, symbol: str):
 
 def _source_for_program(program: arch151.Arch151Program, symbol: str):
     if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT:
-        history, session = _a_history(program, symbol)
+        history, session = _a_history(symbol)
         return history, session, None, evaluator.ExitReason.MAXIMUM_HOLD
     if program.family is arch151.StrategyFamily.OPENING_RANGE_RETEST:
         history, signal_time = _b_all_program_history(program, symbol)
@@ -1279,7 +1230,7 @@ def test_a_trailing_stop_from_a_completed_bar_is_prospective_and_monotonic() -> 
         for item in arch151.CANONICAL_PROGRAMS
         if item.key is arch151.ProgramKey.A5_01
     )
-    history, _ = _a_history(program, "SPY")
+    history, _ = _a_history("SPY")
     baseline = evaluator._simulate_session(
         history, _slot_for(program), SESSION, arch151.FillCostCase.ZERO
     )
@@ -1558,42 +1509,12 @@ def test_family_d_program_pair_cache_matches_independent_reference(
 def test_family_a_calibration_cache_matches_per_program_reference(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    program = next(
-        item
-        for item in arch151.CANONICAL_PROGRAMS
-        if item.key is arch151.ProgramKey.A5_01
-    )
-    history, _session = _a_history(program, "SPY")
     eligible_prior = tuple(
         session
         for session in arch151._SESSION_AUTHORITY.published.sessions
         if date(2016, 1, 1) <= session < date(2019, 1, 1)
     )
-    extra_session = eligible_prior[-61]
-    schedule = arch151._SESSION_AUTHORITY.schedule_for(extra_session)
-    assert schedule is not None
-    extra_minutes = tuple(
-        arch151.OneMinuteBar(
-            "SPY",
-            schedule.opens_at + timedelta(minutes=offset),
-            Decimal("100"),
-            Decimal("100.01"),
-            Decimal("99.99"),
-            Decimal("100"),
-            100,
-        )
-        for offset in range(
-            int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
-        )
-    )
-    all_minutes = tuple(
-        minute
-        for projection in history._session_projections
-        for minute in projection.minutes
-    )
-    history = arch151._test_only_synthetic_source_history(
-        (*extra_minutes, *all_minutes)
-    )
+    history, _session = _a_history("SPY")
     programs = _programs_for_family(arch151.StrategyFamily.NOISE_VWAP_BREAKOUT)
     original_measure_source = arch151._family_a_historical_measures_from_source_history
     measured_sources: list[tuple[str, int]] = []
@@ -1633,39 +1554,43 @@ def test_generated_five_year_simulation_composes_non_idle_480_records(
         "_family_a_historical_measures_from_source_history",
         _synthetic_campaign_measures,
     )
-    history, source_minute_count = _synthetic_five_year_campaign_history()
-    traced = False
-    try:
-        tracemalloc.start()
-        traced = True
-        campaign_started = perf_counter()
-        year_batches = []
-        year_seconds = []
-        for year in arch151.SCORED_YEARS:
-            year_started = perf_counter()
-            year_batch = evaluator.simulate_canonical_year(history, year)
-            year_seconds.append(perf_counter() - year_started)
-            assert year_batch.complete
-            assert len(year_batch.evaluations) == 96
-            assert any(item.trades for item in year_batch.evaluations)
-            year_batches.append(year_batch)
-        run = evaluator.compose_development_evaluation(tuple(year_batches))
-        elapsed_seconds = perf_counter() - campaign_started
-        _current_bytes, peak_bytes = tracemalloc.get_traced_memory()
-    finally:
-        if traced:
-            tracemalloc.stop()
+    history = _synthetic_five_year_campaign_history()
+    expected_binding = evaluator._synthetic_source_binding_for_test(
+        history.source_digest
+    )
+    expected_rows = tuple(
+        (slot, case)
+        for slot in arch151.CANONICAL_SLOTS
+        for case in arch151.EVALUATION_ECONOMICS_ORDER
+    )
+    year_batches = tuple(
+        evaluator.simulate_canonical_year(history, year)
+        for year in arch151.SCORED_YEARS
+    )
+    for batch in year_batches:
+        assert batch.complete
+        assert batch.source_binding == expected_binding
+        assert batch.source_digest == history.source_digest
+        assert (
+            tuple((item.slot, item.cost_case) for item in batch.evaluations)
+            == expected_rows
+        )
+        assert all(
+            item.source_digest == history.source_digest for item in batch.evaluations
+        )
+        assert {item.cost_case for item in batch.evaluations if item.trades} == set(
+            arch151.EVALUATION_ECONOMICS_ORDER
+        )
+        assert batch.passive_spy_benchmark.status is evaluator.BenchmarkStatus.AVAILABLE
+
+    run = evaluator.compose_development_evaluation(year_batches)
 
     assert run.fold_evaluation_count == 480
     assert tuple(item.scored_year for item in run.year_batches) == arch151.SCORED_YEARS
     assert len(run.slot_batches) == 32
-    print(
-        "ARCH151_SYNTHETIC_PERF "
-        f"full_sessions=20 minute_bars={source_minute_count} "
-        f"per_year_seconds={tuple(round(item, 3) for item in year_seconds)} "
-        f"sim_and_compose_seconds={elapsed_seconds:.3f} "
-        f"peak_traced_mib={peak_bytes / (1024 * 1024):.2f}"
-    )
+    assert run.year_batches == year_batches
+    assert run.source_binding == expected_binding
+    assert run.source_digest == history.source_digest
 
 
 def test_passive_spy_benchmark_binds_exact_adjusted_price_endpoints() -> None:
@@ -1740,19 +1665,46 @@ def test_passive_spy_benchmark_missing_endpoints_are_unavailable_not_zero(
     assert benchmark.adjusted_price_return is None
 
 
+@pytest.fixture(scope="module")
+def family_a_replays() -> MappingProxyType[
+    tuple[arch151.ProgramKey, str], evaluator.SessionReplayRecord
+]:
+    results = {}
+    for symbol in arch151.INITIAL_UNIVERSE:
+        history, _ = _a_history(symbol)
+        calibration_cache = evaluator._FamilyACalibrationCache(history)
+        for program in _programs_for_family(arch151.StrategyFamily.NOISE_VWAP_BREAKOUT):
+            replays = evaluator._simulate_slot_year_cases(
+                history,
+                _slot_for(program, symbol),
+                SESSION.year,
+                calibration_cache=calibration_cache,
+            )
+            base = next(
+                item for item in replays if item.cost_case is arch151.FillCostCase.BASE
+            )
+            results[program.key, symbol] = next(
+                item for item in base.sessions if item.session_date == SESSION
+            )
+    return MappingProxyType(results)
+
+
 @pytest.mark.parametrize(
     "program", arch151.CANONICAL_PROGRAMS, ids=lambda item: item.key.value
 )
 @pytest.mark.parametrize("symbol", arch151.INITIAL_UNIVERSE)
 def test_all_canonical_signals_enter_and_exit_through_unmocked_predicates(
-    program: arch151.Arch151Program, symbol: str
+    program: arch151.Arch151Program, symbol: str, request: pytest.FixtureRequest
 ) -> None:
     history, session, expected_entry, expected_exit = _source_for_program(
         program, symbol
     )
-    record = evaluator._simulate_session(
-        history, _slot_for(program, symbol), session, arch151.FillCostCase.BASE
-    )
+    if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT:
+        record = request.getfixturevalue("family_a_replays")[program.key, symbol]
+    else:
+        record = evaluator._simulate_session(
+            history, _slot_for(program, symbol), session, arch151.FillCostCase.BASE
+        )
 
     assert record.failure is None, program.key
     assert len(record.trades) == 1, (program.key, symbol, record.signal_rejections)
@@ -1843,11 +1795,13 @@ def _idle_session_records_for_year(
 
 
 def _complete_idle_year_batch(
-    year: int, source_digest: str = "a" * 64
+    year: int, *, missing_benchmark_open: bool
 ) -> evaluator.CanonicalYearBatch:
+    source_digest = "a" * 64
     cost_index = {
         case: index for index, case in enumerate(arch151.EVALUATION_ECONOMICS_ORDER)
     }
+    sessions = _idle_session_records_for_year(year)
     evaluations = tuple(
         evaluator.SlotYearReplay(
             UUID(int=year * 1_000_000 + slot.ordinal * 10 + cost_index[cost] + 1),
@@ -1855,7 +1809,7 @@ def _complete_idle_year_batch(
             year,
             cost,
             source_digest,
-            _idle_session_records_for_year(year),
+            sessions,
             (),
             True,
             Decimal(1),
@@ -1874,7 +1828,17 @@ def _complete_idle_year_batch(
         for cost in arch151.EVALUATION_ECONOMICS_ORDER
     )
     source_binding = evaluator._synthetic_source_binding_for_test(source_digest)
-    benchmark = evaluator._synthetic_passive_benchmark_for_test(source_digest, year)
+    benchmark = evaluator._synthetic_passive_benchmark_for_test(
+        source_digest,
+        year,
+        start_price=None if missing_benchmark_open else Decimal("100"),
+        end_price=Decimal("110"),
+        unavailable_reason=(
+            evaluator.BenchmarkUnavailableReason.FIRST_SESSION_OPEN_UNOBSERVED
+            if missing_benchmark_open
+            else None
+        ),
+    )
     return evaluator.CanonicalYearBatch(
         evaluator._canonical_year_batch_id(
             source_binding, year, evaluations, benchmark
@@ -1888,6 +1852,30 @@ def _complete_idle_year_batch(
         source_binding,
         evaluator._CANONICAL_YEAR_BATCH_SEAL,
     )
+
+
+@pytest.fixture(scope="module")
+def idle_year_batches() -> tuple[evaluator.CanonicalYearBatch, ...]:
+    return tuple(
+        _complete_idle_year_batch(
+            year, missing_benchmark_open=year == arch151.SCORED_YEARS[1]
+        )
+        for year in arch151.SCORED_YEARS
+    )
+
+
+@pytest.fixture(scope="module")
+def idle_run(
+    idle_year_batches: tuple[evaluator.CanonicalYearBatch, ...],
+) -> evaluator.DevelopmentEvaluationRun:
+    return evaluator.compose_development_evaluation(idle_year_batches)
+
+
+@pytest.fixture(scope="module")
+def idle_report(
+    idle_run: evaluator.DevelopmentEvaluationRun,
+) -> evaluator.DevelopmentEvaluationReport:
+    return evaluator.serialize_development_evaluation(idle_run)
 
 
 def _one_trade_full_year_replay(
@@ -2093,53 +2081,30 @@ def test_economic_diagnostics_retain_expired_and_blocked_signal_counts() -> None
     )
 
 
-def test_unavailable_annual_benchmark_is_retained_without_zero_fill_or_dropout() -> (
-    None
-):
-    year_batches = tuple(
-        _complete_idle_year_batch(year) for year in arch151.SCORED_YEARS
-    )
-    original = year_batches[1]
-    unavailable = evaluator._synthetic_passive_benchmark_for_test(
-        original.source_digest,
-        original.scored_year,
-        start_price=None,
-        end_price=Decimal("110"),
-        unavailable_reason=(
-            evaluator.BenchmarkUnavailableReason.FIRST_SESSION_OPEN_UNOBSERVED
-        ),
-    )
-    changed = replace(
-        original,
-        batch_id=evaluator._canonical_year_batch_id(
-            original.source_binding,
-            original.scored_year,
-            original.evaluations,
-            unavailable,
-        ),
-        passive_spy_benchmark=unavailable,
-    )
-    run = evaluator.compose_development_evaluation(
-        (year_batches[0], changed, *year_batches[2:])
-    )
-
-    report = evaluator.serialize_development_evaluation(run)
-    payload = json.loads(report.canonical_json_bytes)
+def test_unavailable_annual_benchmark_is_retained_without_zero_fill_or_dropout(
+    idle_run: evaluator.DevelopmentEvaluationRun,
+    idle_report: evaluator.DevelopmentEvaluationReport,
+) -> None:
+    run = idle_run
+    payload = json.loads(idle_report.canonical_json_bytes)
     benchmark = payload["research_diagnostics"]["passive_spy_benchmark"]
 
     assert len(benchmark["annual"]) == len(arch151.SCORED_YEARS) == 5
     assert benchmark["annual"][1]["status"] == evaluator.BenchmarkStatus.UNAVAILABLE
     assert benchmark["annual"][1]["adjusted_price_return"] is None
+    assert benchmark["annual"][1]["unavailable_reason"] == (
+        evaluator.BenchmarkUnavailableReason.FIRST_SESSION_OPEN_UNOBSERVED
+    )
     assert benchmark["five_year"]["status"] == evaluator.BenchmarkStatus.AVAILABLE
     assert run.fold_evaluation_count == 480
     assert len(run.qualifications) == len(arch151.CANONICAL_SLOTS) == 32
 
 
-def test_development_composition_preserves_all_480_fold_slot_cost_records() -> None:
-    year_batches = tuple(
-        _complete_idle_year_batch(year) for year in arch151.SCORED_YEARS
-    )
-    run = evaluator.compose_development_evaluation(year_batches)
+def test_development_composition_preserves_all_480_fold_slot_cost_records(
+    idle_run: evaluator.DevelopmentEvaluationRun,
+) -> None:
+    run = idle_run
+    year_batches = run.year_batches
 
     assert len(run.year_batches) == 5
     assert (
@@ -2182,16 +2147,15 @@ def test_development_composition_preserves_all_480_fold_slot_cost_records() -> N
         evaluator.compose_development_evaluation((*year_batches[:-1], changed_last))
 
 
-def test_source_owned_report_binds_all_records_provenance_dsr_and_freeze() -> None:
-    run = evaluator.compose_development_evaluation(
-        tuple(_complete_idle_year_batch(year) for year in arch151.SCORED_YEARS)
-    )
+def test_source_owned_report_binds_all_records_provenance_dsr_and_freeze(
+    idle_run: evaluator.DevelopmentEvaluationRun,
+    idle_report: evaluator.DevelopmentEvaluationReport,
+) -> None:
+    run = idle_run
 
-    report = evaluator.serialize_development_evaluation(run)
-    repeated = evaluator.serialize_development_evaluation(run)
+    report = idle_report
     payload = json.loads(report.canonical_json_bytes)
 
-    assert report == repeated
     assert report.run_id == run.run_id
     assert report.source_binding_id == run.source_binding.binding_id
     assert report.manifest_id == arch151.CANONICAL_MANIFEST.manifest_id
@@ -2373,14 +2337,16 @@ def test_source_owned_report_binds_all_records_provenance_dsr_and_freeze() -> No
     )
 
 
-def test_unissued_development_batch_run_and_report_constructors_fail_closed() -> None:
+def test_unissued_development_batch_run_and_report_constructors_fail_closed(
+    idle_run: evaluator.DevelopmentEvaluationRun,
+) -> None:
     with pytest.raises(arch151.AuthorizationUnavailableError, match="source adapter"):
         evaluator.DevelopmentSourceBinding(
             kind=evaluator.DevelopmentSourceKind.SYNTHETIC_TEST_ONLY,
             source_digest="a" * 64,
         )
 
-    batch = _complete_idle_year_batch(arch151.SCORED_YEARS[0])
+    batch = idle_run.year_batches[0]
     with pytest.raises(arch151.AuthorizationUnavailableError, match="evaluator"):
         evaluator.CanonicalYearBatch(
             batch.batch_id,
@@ -2394,9 +2360,7 @@ def test_unissued_development_batch_run_and_report_constructors_fail_closed() ->
             None,
         )
 
-    run = evaluator.compose_development_evaluation(
-        tuple(_complete_idle_year_batch(year) for year in arch151.SCORED_YEARS)
-    )
+    run = idle_run
     with pytest.raises(arch151.AuthorizationUnavailableError, match="composed"):
         evaluator.serialize_development_evaluation(replace(run, _seal=None))
 
@@ -2415,11 +2379,9 @@ def test_unissued_development_batch_run_and_report_constructors_fail_closed() ->
 
 def test_synthetic_development_report_cannot_issue_authenticated_evidence(
     monkeypatch: pytest.MonkeyPatch,
+    idle_run: evaluator.DevelopmentEvaluationRun,
+    idle_report: evaluator.DevelopmentEvaluationReport,
 ) -> None:
-    run = evaluator.compose_development_evaluation(
-        tuple(_complete_idle_year_batch(year) for year in arch151.SCORED_YEARS)
-    )
-    report = evaluator.serialize_development_evaluation(run)
     source_revision_calls = []
 
     def reject_source_revision():
@@ -2431,21 +2393,17 @@ def test_synthetic_development_report_cannot_issue_authenticated_evidence(
         arch151.AuthorizationUnavailableError,
         match="synthetic development runs cannot issue",
     ):
-        evaluator.authenticate_development_evidence(run, report, object())
+        evaluator.authenticate_development_evidence(idle_run, idle_report, object())
     assert source_revision_calls == []
 
 
 def test_operator_attestation_binds_exact_run_report_and_captured_revision(
     monkeypatch: pytest.MonkeyPatch,
+    idle_run: evaluator.DevelopmentEvaluationRun,
+    idle_report: evaluator.DevelopmentEvaluationReport,
 ) -> None:
-    from trading_bot.experiments import (
-        arch151_intraday_walkforward_operator as operator,
-    )
-
-    run = evaluator.compose_development_evaluation(
-        tuple(_complete_idle_year_batch(year) for year in arch151.SCORED_YEARS)
-    )
-    report = evaluator.serialize_development_evaluation(run)
+    run = idle_run
+    report = idle_report
     revision = operator.SourceRevision(
         operator.EXPECTED_BRANCH,
         operator.EXPECTED_ORIGIN,
@@ -2505,12 +2463,23 @@ def test_operator_attestation_binds_exact_run_report_and_captured_revision(
             run, report, attestation, expected_revision=changed_revision
         )
 
-    other_run = evaluator.compose_development_evaluation(
-        tuple(
-            _complete_idle_year_batch(year, "f" * 64) for year in arch151.SCORED_YEARS
-        )
+    altered_bytes = report.canonical_json_bytes + b" "
+    altered_digest = sha256(altered_bytes).hexdigest()
+    forged_report = evaluator.DevelopmentEvaluationReport(
+        _seal=evaluator._DEVELOPMENT_REPORT_SEAL,
+        report_id=evaluator._canonical_id(
+            evaluator._DEVELOPMENT_REPORT_NAMESPACE,
+            evaluator._DEVELOPMENT_REPORT_SCHEMA,
+            {"run_id": str(run.run_id), "sha256": altered_digest},
+        ),
+        run_id=run.run_id,
+        source_binding_id=report.source_binding_id,
+        manifest_id=report.manifest_id,
+        manifest_fingerprint=report.manifest_fingerprint,
+        record_count=report.record_count,
+        canonical_json_bytes=altered_bytes,
+        sha256_digest=altered_digest,
     )
-    forged_report = evaluator.serialize_development_evaluation(other_run)
     with pytest.raises(
         arch151.AuthorizationUnavailableError, match="does not bind this run"
     ):
@@ -2548,10 +2517,10 @@ def test_operator_attestation_binds_exact_run_report_and_captured_revision(
     assert source_revision_calls == []
 
 
-def test_year_batch_identity_binds_complete_replay_outputs() -> None:
-    year_batches = tuple(
-        _complete_idle_year_batch(year) for year in arch151.SCORED_YEARS
-    )
+def test_year_batch_identity_binds_complete_replay_outputs(
+    idle_year_batches: tuple[evaluator.CanonicalYearBatch, ...],
+) -> None:
+    year_batches = idle_year_batches
     first = year_batches[0]
     replay = first.evaluations[0]
     changed_replay = replace(replay, turnover=Decimal("1"))

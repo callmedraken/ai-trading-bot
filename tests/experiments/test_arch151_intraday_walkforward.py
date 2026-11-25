@@ -4549,16 +4549,17 @@ def test_family_a_source_calibration_uses_only_prior_complete_sessions() -> None
         if date(2022, 1, 1) <= session < date(2023, 1, 1)
     )[-61:]
     assert len(prior_sessions) == 61
-    incomplete_session = prior_sessions[0]
-    incomplete_offset = 100
-    missing = (("SPY", incomplete_session, incomplete_offset),)
-    prior_history = _synthetic_source_history(
-        prior_sessions, symbols=("SPY",), missing_offsets=missing
+    incomplete_session = prior_sessions[-2]
+    incomplete_minute = _full_session_minutes(incomplete_session, "SPY")[100]
+    prior_minutes = tuple(
+        bar
+        for session in prior_sessions
+        for bar in _full_session_minutes(session, "SPY")
+        if bar.timestamp != incomplete_minute.timestamp
     )
-    scored_history = _synthetic_source_history(
-        (*prior_sessions, date(2023, 1, 3)),
-        symbols=("SPY",),
-        missing_offsets=missing,
+    prior_history = arch151._test_only_synthetic_source_history(prior_minutes)
+    scored_history = arch151._test_only_synthetic_source_history(
+        (*prior_minutes, *_full_session_minutes(date(2023, 1, 3), "SPY"))
     )
     program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.A5_01)
     prior = arch151.calibrate_family_a_from_source_history(
@@ -4569,7 +4570,9 @@ def test_family_a_source_calibration_uses_only_prior_complete_sessions() -> None
     )
 
     assert len(prior.calibration_session_dates) == 60
-    assert incomplete_session not in prior.calibration_session_dates
+    assert prior.calibration_session_dates == tuple(
+        session for session in prior_sessions if session != incomplete_session
+    )
     assert all(
         session < date(2023, 1, 1) for session in prior.calibration_session_dates
     )

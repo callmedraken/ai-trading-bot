@@ -226,10 +226,19 @@ def test_full_seven_lane_current_model_is_valid_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     table = runner.FULL_MODULE_TIMINGS_MS
+    historical = runner.FULL_C4_MODULE_TIMINGS_MS
+    assert len(historical) == len(dict(historical)) == 209
+    assert sum(dict(historical).values()) == 1749660
+    assert (
+        hashlib.sha256(
+            json.dumps(dict(historical), sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        == "a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710"
+    )
     paths = tuple(module for module, _ in table)
-    # This is the frozen timing-evidence sample cardinality, not discovery size.
-    assert len(paths) == len(set(paths)) == 209
+    assert len(paths) == len(set(paths))
     assert len(inventory) == len(set(inventory))
+    assert dict(historical).items() <= dict(table).items()
     assert set(paths) <= set(inventory)
     assert all(type(ms) is int and ms > 0 for _, ms in table)
     weights = runner.full_module_weights(inventory)
@@ -238,13 +247,6 @@ def test_full_seven_lane_current_model_is_valid_and_repeatable() -> None:
         **{module: runner.FULL_FALLBACK_MS for module in set(inventory) - set(paths)},
     }
     assert runner.FULL_FALLBACK_MS == 1000
-    assert sum(dict(table).values()) == 1749660
-    assert (
-        hashlib.sha256(
-            json.dumps(dict(table), sort_keys=True, separators=(",", ":")).encode()
-        ).hexdigest()
-        == "a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710"
-    )
     lanes = runner.build_lanes(root, inventory, "full")
     assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 8))
     assert all(lanes.values()) and "serial" not in lanes
@@ -429,9 +431,7 @@ def test_full_duplicate_inventory_is_rejected(monkeypatch) -> None:
         runner.balance_full(("tests/domain/test_future.py",) * 2)
 
 
-def test_synthetic_fixture_contains_frozen_timing_membership_and_future_fallback() -> (
-    None
-):
+def test_synthetic_fixture_contains_timing_membership_and_future_fallback() -> None:
     fixture = _fixture_profiles()["full"]
     historical = dict(runner.FULL_MODULE_TIMINGS_MS)
     assert set(historical) <= set(fixture)
@@ -1044,7 +1044,7 @@ def test_supported_future_modules_grow_without_current_inventory_repins(
 ):
     from .helpers import _profile_inventory
 
-    # Start from the frozen timing evidence plus required classification baselines.
+    # Start from current timings plus the required classification baselines.
     original_table = runner.FULL_MODULE_TIMINGS_MS
     baseline = (
         set(module for module, _ in original_table)
@@ -1095,11 +1095,13 @@ def test_supported_future_modules_grow_without_current_inventory_repins(
         max(sum(weights[module] for module in lane) for lane in lanes.values()) < 300000
     )
     assert runner.FULL_MODULE_TIMINGS_MS == original_table
-    # This is the frozen timing-evidence sample cardinality, not discovery size.
-    assert len(original_table) == 209
-    assert sum(ms for _, ms in original_table) == 1749660
+    historical_table = runner.FULL_C4_MODULE_TIMINGS_MS
+    assert len(historical_table) == 209
+    assert sum(ms for _, ms in historical_table) == 1749660
     assert hashlib.sha256(
-        json.dumps(dict(original_table), sort_keys=True, separators=(",", ":")).encode()
+        json.dumps(
+            dict(historical_table), sort_keys=True, separators=(",", ":")
+        ).encode()
     ).hexdigest() == (
         "a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710"
     )

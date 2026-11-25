@@ -47,9 +47,25 @@ Canonical year-batch identity uses v3 and binds complete replay-output digests p
 
 ### Generated workload and bounded reuse evidence
 
-The generated five-year test feeds 20 complete synthetic XNYS sessions (four per scored year; 15,600 one-minute bars) through the actual simulator and campaign composer. Each scored-year batch contains all 96 slot/economics records and at least one generated trade; the composed run contains all 480 records. With `tracemalloc` active during simulation and composition, the observed end-to-end time was 181.954 seconds, per-year simulation times were 30.379, 31.248, 31.001, 31.269, and 31.999 seconds, and peak traced allocation was 60.20 MiB. The measurement begins after fixture construction, so it excludes input-history construction and is not process RSS. The test records diagnostics but asserts no timing or memory threshold.
+The five-year correctness regression runs the canonical simulator and composer on a generated SPY/QQQ signal session and exact SPY benchmark endpoints for each of the five scored years. It verifies the ordered 96 slot/economics records per batch, trades in all three economics cases each year, all 480 composed records, and exact synthetic source binding from history through replay and composition. Separate regressions exercise actual Family A calibration and compare optimized reuse against independently recalculated references. The correctness regression uses no memory tracing.
 
-For capacity planning only, a linear extrapolation from 20 to the frozen 1,258 scored sessions is 62.9 times the observed workload, or about 11,445 seconds (3.18 hours) under a constant per-session cost. This is a rough scenario, not a runtime guarantee: the generated data is sparse, contains only four sessions per year, runs under tracing, and does not establish scaling under accepted custody or production hardware. No accepted history or real replay was used. Family A source-measure reuse and Family D within-program SPY/QQQ preparation reuse are separately checked against independent per-program reconstruction; these checks establish output equivalence, not a speedup claim.
+The predecessor 20-session workload (four complete synthetic XNYS sessions per year and 15,600 one-minute bars) remains historical performance evidence. At predecessor E1-C1, with `tracemalloc` active during simulation and composition, the recorded end-to-end time was 181.954 seconds. Per-year simulation times were 30.379, 31.248, 31.001, 31.269, and 31.999 seconds, and peak traced allocation was 60.20 MiB. The measurement started after history construction and measured Python allocations. The predecessor test set no performance threshold.
+
+For capacity planning, the prior linear extrapolation from 20 to 1,258 scored sessions gave 11,445 seconds (3.18 hours) at a constant per-session cost. Sparse generated data and allocation tracing limit that estimate. The trace is preserved as historical evidence and has no recurring certification invocation.
+
+The preserved E1-C1 broad-6 artifact from run `45715017377` measured 761.848
+seconds wall time, of which 583.460 seconds were attributed to evaluator tests.
+The E1-C2 focused JUnit estimate for that module is 155.059 seconds, substituting
+targeted recheck timings for revised tests. This estimates the old broad-6 at
+333.449 seconds. Adding that measured weight to the existing placement inputs
+yields seven nonempty lanes with a maximum modeled weight of 291.980 seconds.
+A separate projection sums prior hosted case timings by the new lane membership,
+uses the focused measurements for the changed Arch151 modules and adds the
+largest prior lane overhead (18.381 seconds) to each lane. It estimates a
+249.0-second maximum, with the evaluator in broad-1. Those estimates combine
+different Windows hosts and do not establish actual hosted certification time.
+The lane algorithm, frozen C4 timing evidence and 300-second wall ceiling remain
+in force.
 
 ## 3. Source-only checkpoint and mapped certification
 

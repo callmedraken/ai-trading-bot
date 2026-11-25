@@ -6,7 +6,8 @@ R3M/R3N exact overlays below preserve historical evidence; they do not own curre
 mutable test/workflow bytes. General admit uses the shared FEATURE and
 PROSPECTIVE_DEVELOP evaluator before publication. Canonical mapped profiles
 remain GitHub-owned. Required baselines are unchanged; current FULL placement
-is owned by 146-B1-C4, with distributed canonical execution under C5 below.
+uses the 146-B1-C4 balancer and the timing inputs below, with distributed
+canonical execution under C5.
 
 ## Current canonical retry and inventory policy — pre-B2 correction
 
@@ -31,7 +32,9 @@ frozen required baselines, complete/disjoint classification and exactly-once
 lane coverage. No mutable profile count, directory count, lane-size tuple or
 exact modeled-total tuple is an acceptance pin. The frozen C4 timing table is
 a subset of current FULL; its 209 timings, 1,749,660 ms total and SHA256 remain
-historical evidence. New owned modules receive FULL_FALLBACK_MS (1000 ms).
+historical evidence. Current measured additions are checked against the FULL
+inventory. Owned modules without measured weights receive FULL_FALLBACK_MS
+(1000 ms).
 FULL requires seven deterministic nonempty broad lanes, no serial lane and a
 modeled maximum <300000 ms. ROBINHOOD keeps four lanes; LEGACY/EXHAUSTIVE retain
 their complete/disjoint classification and reviewed serial policy.
@@ -95,7 +98,7 @@ source/run identities and preserved incident details are in the
 
 Canonical FULL executes the seven existing lanes on seven independent hosted
 Windows jobs, with exact matrix identities 1 through 7 and fail-fast disabled.
-Each exact-SHA job reconstructs the full inventory and C4 plan, then selects one
+Each exact-SHA job reconstructs the full inventory and current plan, then selects one
 lane with `--profile full --lane N --ci-source-static`. Duplicate, empty,
 malformed and out-of-range selectors fail closed; other profiles reject selection.
 `results.json` retains the complete plan/inventory plus its SHA256 identity,
@@ -117,16 +120,25 @@ same exact push run, on canonical attempt 1 or reviewed attempt 2. It retains or
 evidence and delegates repository/workflow/SHA/tree/branch proof to the unchanged
 predecessor evaluator. Old shared-runner FULL, missing/duplicate/extra/malformed
 lane names, attempt 3+, partial or ambiguous evidence cannot authorize reuse.
-Frozen R3M/R3N evidence remains historical. C4's map, digest, placement algorithm,
-historical timing evidence and 1000-ms fallback are unchanged. #785 measures contention,
+Frozen R3M/R3N evidence remains historical. The C4 placement algorithm uses its
+frozen timing baseline plus measured additions, with the 1000-ms fallback.
+#785 measures contention,
 not replacement timing authority. See the
 [C5 validation boundary](../validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c5--distributed-canonical-full-execution).
 
-## Current FULL correction — Architecture 146-B1-C4
+## Architecture 151 E1-C2 FULL timing addition
+
+The evaluator test module adds a 155,059-ms weight to the existing FULL timing
+inputs. Its estimate combines the initial focused JUnit duration with targeted
+remeasurements of the changed cases. Hosted E1-C1 run `45715017377` supplied
+the other modules' timing evidence. The planned balance and projection are
+recorded in the [Arch151 validation record](../validation/arch151-intraday-walk-forward-campaign.md#generated-workload-and-bounded-reuse-evidence).
+
+## FULL timing baseline — Architecture 146-B1-C4
 
 Current FULL uses exactly seven deterministic nonempty whole-module lanes,
-`broad-1` through `broad-7`, with no serial lane. Its sole current frozen timing
-map comes from canonical FULL #784 / run `40689830781`, attempt 1: 209 modules,
+`broad-1` through `broad-7`, with no serial lane. The frozen timing baseline
+comes from canonical FULL #784 / run `40689830781`, attempt 1: 209 modules,
 14,722 cases, 14,716 passed, six skipped and zero failed/errors. Every raw module
 total is positive; raw and canonical totals both equal 1,749,660 ms. Sorted
 compact JSON timing-map SHA256:
@@ -139,7 +151,8 @@ lowest-total / lowest-index greedy algorithm yielded module counts 29/29/30/30/3
 under the unchanged 300-second ceiling. Runtime acceptance still requires
 each isolated canonical FULL lane wall strictly below 300 seconds under C5.
 There are no lane pins, runtime
-JUnit reads or adaptive history. Future owned modules retain the 1000-ms fallback.
+JUnit reads or adaptive history. The 1000-ms fallback covers owned modules
+without measured weights.
 The exact counts/order differ from the planning approximation; they follow
 from the frozen map and existing algorithm, with the historical 249.953-second
 maximum. Current inventory may grow; these historical lane counts/totals are

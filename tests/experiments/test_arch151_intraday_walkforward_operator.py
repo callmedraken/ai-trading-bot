@@ -55,8 +55,15 @@ def _revision() -> operator.SourceRevision:
     )
 
 
+@pytest.fixture
+def expected_worktree(monkeypatch: pytest.MonkeyPatch) -> Path:
+    repo_root = Path(__file__).resolve(strict=True).parents[2]
+    monkeypatch.setattr(operator, "EXPECTED_WORKTREE", repo_root)
+    return repo_root
+
+
 def test_source_revision_reads_exact_clean_checkout_identity(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, expected_worktree: Path
 ) -> None:
     outputs = iter(
         (operator.EXPECTED_BRANCH, operator.EXPECTED_ORIGIN, _HEAD, _TREE, "")
@@ -75,9 +82,37 @@ def test_source_revision_reads_exact_clean_checkout_identity(
     assert len(commands) == 5
     assert all(arguments[1] == "-C" for arguments in commands)
     assert all(
-        Path(arguments[2]).resolve() == operator.EXPECTED_WORKTREE
-        for arguments in commands
+        Path(arguments[2]).resolve() == expected_worktree for arguments in commands
     )
+
+
+def test_source_revision_rejects_incorrect_physical_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(operator, "EXPECTED_WORKTREE", tmp_path)
+    monkeypatch.setattr(
+        operator.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("wrong root must fail before Git"),
+    )
+
+    with pytest.raises(operator.OperatorError) as error:
+        operator._read_source_revision()
+    assert error.value.code is operator.OperatorFailureCode.SOURCE_IDENTITY_UNAVAILABLE
+
+
+def test_source_revision_rejects_unavailable_git_identity(
+    monkeypatch: pytest.MonkeyPatch, expected_worktree: Path
+) -> None:
+    monkeypatch.setattr(
+        operator.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=128, stdout=""),
+    )
+
+    with pytest.raises(operator.OperatorError) as error:
+        operator._read_source_revision()
+    assert error.value.code is operator.OperatorFailureCode.SOURCE_IDENTITY_UNAVAILABLE
 
 
 @pytest.mark.parametrize(
@@ -94,6 +129,7 @@ def test_source_revision_reads_exact_clean_checkout_identity(
 )
 def test_source_revision_rejects_branch_origin_or_dirty_checkout(
     monkeypatch: pytest.MonkeyPatch,
+    expected_worktree: Path,
     changed_index: int,
     replacement: str,
     expected_code: operator.OperatorFailureCode,

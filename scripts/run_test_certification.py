@@ -276,7 +276,7 @@ FULL_LANE_PIN_CLASSIFICATIONS: dict[str, str] = {}
 FULL_LANE_COUNT = 7
 FULL_LANE_MAX_MS = 300000
 
-FULL_MODULE_TIMINGS_MS = (
+FULL_C4_MODULE_TIMINGS_MS = (
     ("tests/analytics/test_analyzer.py", 16),
     ("tests/backtesting/test_backtest_engine.py", 29),
     ("tests/backtesting/test_backtest_models.py", 5),
@@ -517,6 +517,14 @@ FULL_MODULE_TIMINGS_MS = (
     ("tests/test_robinhood_prepare_qualification_verifier.py", 1686),
     ("tests/test_robinhood_supervised_qualification.py", 5771),
 )
+
+# Arch151 E1-C2 focused JUnit measurement, replacing changed cases with their
+# targeted recheck timings. The C4 measurements remain a frozen baseline.
+FULL_MODULE_TIMINGS_MS = (
+    *FULL_C4_MODULE_TIMINGS_MS,
+    ("tests/experiments/test_arch151_intraday_walkforward_evaluator.py", 155059),
+)
+
 
 ROBINHOOD_INFRASTRUCTURE_MODULES = (
     "tests/runtime/checkpoint_runner/test_arch131.py",

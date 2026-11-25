@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from functools import cache
 from uuid import UUID, uuid5
@@ -11,6 +11,8 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from trading_bot.experiments import arch150_g1_discovery as arch150_d1r
+from trading_bot.experiments import arch150_intraday_ai as arch150
 from trading_bot.experiments import arch151_intraday_walkforward as arch151
 from trading_bot.experiments.arch148_intraday import HistoricalIntradaySessionAuthority
 from trading_bot.experiments.arch151_intraday_walkforward import (
@@ -202,6 +204,37 @@ def _a_history_measures(scored_year: int = 2023, symbol: str = "SPY"):
             family_a_historical_session_measure(_full_session_minutes(session, symbol))
         )
     return tuple(records)
+
+
+def _synthetic_source_history(
+    sessions: tuple[date, ...] = (_NORMAL_DAY,),
+    *,
+    symbols: tuple[str, ...] = ("SPY", "QQQ"),
+    missing_offsets: tuple[tuple[str, date, int], ...] = (),
+):
+    missing = set(missing_offsets)
+    bars = tuple(
+        minute
+        for symbol in symbols
+        for session in sessions
+        for minute in _full_session_minutes(session, symbol)
+        if (
+            symbol,
+            session,
+            int(
+                (
+                    minute.timestamp - _AUTHORITY.schedule_for(session).opens_at
+                ).total_seconds()
+                // 60
+            ),
+        )
+        not in missing
+    )
+    return arch151._test_only_synthetic_source_history(bars)
+
+
+def _feature_cutoff(session: date = _NORMAL_DAY) -> datetime:
+    return datetime.combine(session, time(14, 0), _NY).astimezone(UTC)
 
 
 def _a_reachable_inputs(program, symbol: str = "SPY"):
@@ -690,6 +723,60 @@ def _evaluation_batch_for_slot(slot, year_profiles=None):
     return arch151.DevelopmentEvaluationBatch(slot.slot_id, tuple(records))
 
 
+def _dsr_evaluation_population():
+    batches = []
+    for slot_index, slot in enumerate(CANONICAL_SLOTS):
+        records = []
+        population_index = 0
+        for fold in arch151.WALK_FORWARD_FOLDS:
+            session_dates = arch151._published_sessions_for_year(fold.scored_year)
+            returns = []
+            round_trips = []
+            for session_index, _session in enumerate(session_dates):
+                if slot_index == 0:
+                    value = (
+                        Decimal("0.0011")
+                        if population_index % 2 == 0
+                        else Decimal("0.0009")
+                    )
+                elif slot_index == 1:
+                    value = (
+                        Decimal("-0.0011")
+                        if population_index % 2 == 0
+                        else Decimal("-0.0009")
+                    )
+                else:
+                    value = (
+                        Decimal("0.001")
+                        if population_index % 2 == 0
+                        else Decimal("-0.0008")
+                    )
+                returns.append(value)
+                round_trips.append(1 if session_index < 100 else 0)
+                population_index += 1
+            metrics = arch151.FoldMetrics(
+                session_dates,
+                tuple(returns),
+                tuple(round_trips),
+                Decimal("0") if slot_index == 1 else Decimal("2"),
+                Decimal("1"),
+                Decimal("0.25"),
+            )
+            for economics_case in arch151.EVALUATION_ECONOMICS_ORDER:
+                records.append(
+                    arch151.FoldEvaluation(
+                        slot.slot_id,
+                        slot.program_id,
+                        slot.symbol,
+                        fold,
+                        economics_case,
+                        metrics,
+                    )
+                )
+        batches.append(arch151.DevelopmentEvaluationBatch(slot.slot_id, tuple(records)))
+    return tuple(batches)
+
+
 def _synthetic_ranking_material(slot, probability=Decimal("0.95")):
     aggregate = arch151.DevelopmentAggregate(
         slot.slot_id,
@@ -851,6 +938,56 @@ def test_sparse_aggregation_respects_published_early_close(
         bar.completed_at <= schedule.closes_at.astimezone(bar.timestamp.tzinfo)
         for bar in result.bars
     )
+
+
+def test_five_minute_sparse_aggregation_matches_arch150_on_early_close_gaps() -> None:
+    session = date(2023, 11, 24)
+    missing_offsets = {2, 17}
+    minutes = tuple(
+        _minute(
+            "SPY",
+            session,
+            offset,
+            open_price=str(100 + offset),
+            high=str(102 + offset),
+            low=str(99 + offset),
+            close=str(101 + offset),
+            volume=offset + 1,
+        )
+        for offset in range(210)
+        if offset not in missing_offsets
+    )
+    arch150_minutes = tuple(
+        arch150.IntradayBar(
+            minute.symbol,
+            minute.timestamp,
+            minute.open,
+            minute.high,
+            minute.low,
+            minute.close,
+            minute.volume,
+            arch150.BarResolution.ONE_MINUTE,
+        )
+        for minute in minutes
+    )
+
+    arch150_result = arch150.aggregate_sparse_five_minute_bars(arch150_minutes)
+    arch151_result = aggregate_sparse_bars(minutes, BarResolution.FIVE_MINUTE)
+
+    def ohlcv(bars):
+        return tuple(
+            (bar.timestamp, bar.open, bar.high, bar.low, bar.close, bar.volume)
+            for bar in bars
+        )
+
+    assert ohlcv(arch151_result.bars) == ohlcv(arch150_result.bars)
+    assert len(arch151_result.bars) == 40
+    schedule = _AUTHORITY.schedule_for(session)
+    assert schedule is not None
+    assert arch151_result.bars[-1].completed_at == schedule.closes_at.astimezone(UTC)
+    assert arch150_result.bars[-1].timestamp + timedelta(
+        minutes=5
+    ) == schedule.closes_at.astimezone(UTC)
 
 
 def test_session_vwap_uses_observed_minute_hlc3_volume_and_resets_per_session() -> None:
@@ -2818,7 +2955,7 @@ def test_qualification_uses_stress_and_fails_closed_without_dsr() -> None:
     )
     assert (
         qualification.selection_bias_status
-        is arch151.SelectionBiasStatus.DSR_COMPUTATION_DEFERRED
+        is arch151.SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
     )
     with pytest.raises(TypeError):
         arch151.qualify_development(batch, selection_bias_probability=Decimal("0.99"))
@@ -2918,7 +3055,7 @@ def test_prior_trial_ledger_is_exact_deduplicated_and_effective_count_is_64() ->
     assert selection.effective_trial_count == max(64, 32 + 29) == 64
     assert selection.required_probability == Decimal("0.95")
     assert selection.probability is None
-    assert selection.status is arch151.SelectionBiasStatus.DSR_COMPUTATION_DEFERRED
+    assert selection.status is arch151.SelectionBiasStatus.DSR_COMPUTATION_REQUIRED
     assert selection.input_id.version == 5
     assert len(selection.fingerprint) == 64
     with pytest.raises(Arch151Error, match="source-owned"):
@@ -2934,6 +3071,132 @@ def test_selection_probability_threshold_is_diagnostic_and_decimal_only() -> Non
     assert not arch151._selection_bias_probability_meets_threshold(Decimal("0.949999"))
     with pytest.raises(TypeError, match="must be a Decimal"):
         arch151._selection_bias_probability_meets_threshold(0.99)  # type: ignore[arg-type]
+
+
+def test_dsr_reference_values_and_complete_population_freeze_are_deterministic() -> (
+    None
+):
+    assert arch151._normal_cdf(Decimal("1.96")) == Decimal(
+        "0.975002104851779565863415730959162809977500220938116608914283"
+    )
+    assert arch151._normal_quantile(Decimal("0.984375")) == Decimal(
+        "2.15387469406145621296370420514771444541699825530527270617670"
+    )
+
+    batches = _dsr_evaluation_population()
+    calculation = arch151.compute_selection_bias_evidence(batches)
+    assert calculation.status is arch151.SelectionBiasStatus.DSR_VERIFIED
+    assert calculation.effective_trial_count == 64
+    assert len(calculation.evidence) == len(CANONICAL_SLOTS) == 32
+    assert tuple(item.candidate_slot_id for item in calculation.evidence) == tuple(
+        slot.slot_id for slot in CANONICAL_SLOTS
+    )
+    assert all(item.observation_count == 1_258 for item in calculation.evidence)
+    assert all(
+        item.population_digest == calculation.population_digest
+        for item in calculation.evidence
+    )
+    assert calculation.evidence[0].probability >= Decimal("0.95")
+    assert all(item.probability < Decimal("0.95") for item in calculation.evidence[1:])
+    with pytest.raises(Arch151Error, match="identity does not match canonical inputs"):
+        replace(calculation, calculation_id=UUID(int=17))
+    assert (
+        arch151.compute_selection_bias_evidence(batches).calculation_id
+        == calculation.calculation_id
+    )
+
+    ranked = arch151.rank_verified_candidate_population(batches, calculation)
+    assert len(ranked) == len(set(ranked)) == 32
+    assert set(ranked) == {slot.slot_id for slot in CANONICAL_SLOTS}
+    assert ranked[0] == CANONICAL_SLOTS[0].slot_id
+    qualification = arch151.qualify_development(batches[0], calculation.evidence[0])
+    assert qualification.qualified
+    rejected = arch151.qualify_development(batches[1], calculation.evidence[1])
+    assert not rejected.economically_qualified
+    assert (
+        QualificationRejection.SELECTION_BIAS_PROBABILITY_BELOW_THRESHOLD
+        in rejected.rejection_reasons
+    )
+    assert CANONICAL_SLOTS[1].slot_id in ranked
+
+    freeze = arch151.freeze_final_candidate_set(
+        batches, _selection_bias_calculation=calculation
+    )
+    assert freeze.status is arch151.FinalFreezeStatus.ONE_CANDIDATE_FROZEN
+    assert freeze.candidate_slot_id == CANONICAL_SLOTS[0].slot_id
+    assert CANONICAL_SLOTS[1].slot_id not in freeze.economically_qualified_slot_ids
+    assert freeze.ranking_order == ranked
+    assert freeze.selection_bias_calculation_id == calculation.calculation_id
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="authenticated"):
+        arch151.authorize_holdout(freeze)
+
+
+def test_dsr_unavailable_keeps_all_slots_and_never_drops_undefined_trial() -> None:
+    batches = list(_dsr_evaluation_population())
+    first = batches[0]
+    changed = tuple(
+        replace(
+            record,
+            metrics=replace(
+                record.metrics,
+                session_net_returns=(Decimal(0),)
+                * len(record.metrics.session_net_returns),
+            ),
+        )
+        if record.economics_case is FillCostCase.STRESS
+        else record
+        for record in first.records
+    )
+    batches[0] = arch151.DevelopmentEvaluationBatch(first.slot_id, changed)
+    calculation = arch151.compute_selection_bias_evidence(tuple(batches))
+    assert (
+        calculation.status
+        is arch151.SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
+    )
+    assert (
+        calculation.unavailable_reason
+        is arch151.DsrUnavailableReason.UNDEFINED_TRIAL_SHARPE
+    )
+    assert calculation.evidence == ()
+    with pytest.raises(Arch151Error, match="identity does not match canonical inputs"):
+        replace(calculation, calculation_id=UUID(int=18))
+    with pytest.raises(Arch151Error, match="all 32 complete canonical"):
+        arch151.compute_selection_bias_evidence(tuple(batches[1:]))
+
+
+def test_dsr_invalid_moments_and_degenerate_formula_fail_closed(monkeypatch) -> None:
+    batches = _dsr_evaluation_population()
+    monkeypatch.setattr(
+        arch151,
+        "_trial_return_statistics",
+        lambda _returns: arch151.DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS,
+    )
+    invalid = arch151.compute_selection_bias_evidence(batches)
+    assert (
+        invalid.status is arch151.SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
+    )
+    assert (
+        invalid.unavailable_reason
+        is arch151.DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+    )
+    assert invalid.evidence == ()
+
+    def degenerate_statistics(returns):
+        if returns[0] == Decimal("0.0011"):
+            return Decimal(1), Decimal(10), Decimal(1), Decimal(1)
+        return Decimal(2), Decimal(0), Decimal(3), Decimal(1)
+
+    monkeypatch.setattr(arch151, "_trial_return_statistics", degenerate_statistics)
+    degenerate = arch151.compute_selection_bias_evidence(batches)
+    assert (
+        degenerate.status
+        is arch151.SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
+    )
+    assert (
+        degenerate.unavailable_reason
+        is arch151.DsrUnavailableReason.DEGENERATE_DSR_VARIANCE
+    )
+    assert degenerate.evidence == ()
 
 
 def test_ranking_uses_every_frozen_lexicographic_tie_break() -> None:
@@ -2983,11 +3246,21 @@ def test_public_synthetic_ranking_preserves_all_canonical_slots() -> None:
         )
 
 
-def test_final_freeze_requires_full_population_and_remains_zero_until_dsr_exists() -> (
+def test_final_freeze_requires_full_population_and_fails_closed_on_degenerate_dsr() -> (
     None
 ):
     batches = tuple(_evaluation_batch_for_slot(slot) for slot in CANONICAL_SLOTS)
-    freeze = arch151.freeze_final_candidate_set(batches)
+    selection = arch151.compute_selection_bias_evidence(batches)
+    assert (
+        selection.status is arch151.SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
+    )
+    assert (
+        selection.unavailable_reason
+        is arch151.DsrUnavailableReason.ZERO_TRIAL_SHARPE_VARIANCE
+    )
+    freeze = arch151.freeze_final_candidate_set(
+        batches, _selection_bias_calculation=selection
+    )
     assert freeze.source_manifest_id == CANONICAL_MANIFEST.manifest_id
     assert freeze.batch_digests == tuple(batch.batch_digest for batch in batches)
     assert freeze.economically_qualified_slot_ids == tuple(
@@ -2997,14 +3270,19 @@ def test_final_freeze_requires_full_population_and_remains_zero_until_dsr_exists
     assert freeze.candidate_program_id is None
     assert (
         freeze.status
-        is arch151.FinalFreezeStatus.ZERO_CANDIDATES_DSR_AUTHORITY_DEFERRED
+        is arch151.FinalFreezeStatus.ZERO_CANDIDATES_STATISTICAL_EVIDENCE_UNAVAILABLE
     )
     assert (
         freeze.selection_bias_status
-        is arch151.SelectionBiasStatus.DSR_COMPUTATION_DEFERRED
+        is arch151.SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
     )
     assert len(freeze.fingerprint) == 64
-    assert arch151.freeze_final_candidate_set(batches).freeze_id == freeze.freeze_id
+    assert (
+        arch151.freeze_final_candidate_set(
+            batches, _selection_bias_calculation=selection
+        ).freeze_id
+        == freeze.freeze_id
+    )
     with pytest.raises(Arch151Error, match="all 32 canonical"):
         arch151.freeze_final_candidate_set(batches[:-1])
     duplicated = (*batches[:-1], batches[0])
@@ -3026,7 +3304,9 @@ def test_final_freeze_requires_full_population_and_remains_zero_until_dsr_exists
         arch151.authorize_holdout(UUID(int=1), True, Decimal("0.99"))
     with pytest.raises(arch151.AuthorizationUnavailableError):
         arch151.authorize_extension(freeze, UUID(int=1), True)
-    with pytest.raises(arch151.AuthorizationUnavailableError, match="unavailable"):
+    with pytest.raises(
+        arch151.AuthorizationUnavailableError, match="complete source population"
+    ):
         arch151.VerifiedSelectionBiasEvidence(probability=Decimal("0.99"))
 
 
@@ -3042,3 +3322,365 @@ def test_canonical_entry_windows_are_structurally_reachable_from_session_grid() 
             program.entry_window.contains(item.completed_signal_bar.completed_at)
             for item in opportunities
         )
+
+
+def test_d1r_adapter_is_fixed_and_reuses_arch150_acceptance_without_reading_files(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert (
+        arch151.ARCH150_D1R_DATASET_ID
+        == arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.dataset_id
+    )
+    assert arch151.ARCH150_D1R_DATASET_SHA256 == (
+        arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.dataset_semantic_sha256
+    )
+    assert arch151.ARCH150_D1R_CUSTODY_ID == (
+        arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.custody_id
+    )
+    assert arch151.ARCH150_D1R_CUSTODY_SHA256 == (
+        arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.custody_semantic_sha256
+    )
+    assert arch151.ARCH150_D1R_EVIDENCE_ID == UUID(
+        "c31bb29d-3d53-5e2f-a01f-55a42ec96295"
+    )
+    assert (
+        arch151.ARCH150_D1R_EVIDENCE_SHA256
+        == (arch150_d1r._SEMANTIC_PINS["evidence.json"][1])
+    )
+    assert arch151.ARCH150_D1R_SCHEDULED_SLOTS_PER_SYMBOL == (
+        arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.scheduled_slots_per_symbol
+    )
+    assert arch151.ARCH150_D1R_OBSERVED_COUNTS == (
+        arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.observed_counts_by_symbol
+    )
+    assert arch151.ARCH150_D1R_MISSING_COUNTS == (
+        arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY.missing_counts_by_symbol
+    )
+    assert arch151.ARCH150_D1R_COMMON_MISSING_COUNT == 64
+    assert arch151.ARCH150_D1R_UNION_MISSING_COUNT == 155
+    assert arch151.ARCH150_D1R_AFFECTED_SESSION_COUNT == 9
+    assert arch151.ARCH150_D1R_FULLY_MISSING_SESSION_COUNTS == (
+        ("SPY", 0),
+        ("QQQ", 0),
+    )
+
+    one = _minute("SPY", _NORMAL_DAY, 0)
+    incomplete_bars = (
+        arch150.IntradayBar(
+            one.symbol,
+            one.timestamp,
+            one.open,
+            one.high,
+            one.low,
+            one.close,
+            one.volume,
+            arch150.BarResolution.ONE_MINUTE,
+        ),
+    )
+    normalized_hashes = dict(arch150._ACCEPTED_NORMALIZED_CSV_SHA256)
+    artifacts = tuple(
+        arch150_d1r.ArtifactCommitment(
+            name,
+            length,
+            normalized_hashes.get(
+                name.removeprefix("normalized/").removesuffix(".csv"), "0" * 64
+            ),
+        )
+        for name, length in arch150_d1r._ARTIFACT_LENGTHS.items()
+    )
+    snapshot = arch150_d1r.InputSnapshot(incomplete_bars, artifacts)
+    roots = []
+
+    def fake_pinned_reader(root):
+        roots.append(root)
+        return snapshot
+
+    monkeypatch.setattr(arch151.arch150_d1r, "_read_pinned_input", fake_pinned_reader)
+    with pytest.raises(arch150.Arch150Error):
+        arch151.load_arch150_d1r_source_history()
+
+    assert roots == [arch150_d1r.ACCEPTED_INPUT_ROOT]
+    bad_artifacts = tuple(
+        replace(item, sha256="0" * 64) if item.name == "normalized/SPY.csv" else item
+        for item in artifacts
+    )
+    monkeypatch.setattr(
+        arch151.arch150_d1r,
+        "_read_pinned_input",
+        lambda root: arch150_d1r.InputSnapshot(incomplete_bars, bad_artifacts),
+    )
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="commitments"):
+        arch151.load_arch150_d1r_source_history()
+    with pytest.raises(TypeError):
+        arch151._adapt_arch150_d1r_snapshot(snapshot)
+
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="accepted Arch150"):
+        arch151._source_session_projections(
+            (("SPY", (_minute("SPY", _NORMAL_DAY, 0),)),),
+            "0" * 64,
+            accepted_dataset=True,
+        )
+    with pytest.raises(TypeError):
+        arch151._source_session_projections((), "0" * 64, production=True)
+
+
+def test_synthetic_history_uses_separate_seal_and_feature_cache_is_source_bound() -> (
+    None
+):
+    history = _synthetic_source_history()
+    assert type(history) is arch151._SyntheticSourceHistory
+    assert not isinstance(history, arch151.Arch150D1RSourceHistory)
+    projection = history._projection_index[
+        ("SPY", _NORMAL_DAY, BarResolution.FIVE_MINUTE)
+    ]
+    evidence = next(
+        item
+        for item in projection.verified_sessions
+        if item.resolution is BarResolution.FIVE_MINUTE
+    )
+    assert type(evidence) is arch151._SyntheticSparseSessionEvidence
+    assert not isinstance(evidence, arch151.VerifiedSparseSession)
+
+    cutoff = _feature_cutoff()
+    prepared = tuple(
+        arch151.prepare_session_features(history, program, symbol, _NORMAL_DAY, cutoff)
+        for program in CANONICAL_PROGRAMS
+        for symbol in ("SPY", "QQQ")
+    )
+    assert len({item.key.cache_id for item in prepared}) == 32
+    for item in prepared:
+        assert item.key.source_digest == history.source_digest
+        assert item.key.cutoff_completed_at == cutoff
+        assert item.decision_bar is not None
+        assert item.decision_bar.completed_at == cutoff
+        assert all(bar.completed_at <= cutoff for bar in item.bars)
+        assert all(
+            observation.bar.completed_at <= cutoff
+            for observation in item.vwap_observations
+        )
+        assert all(point.bar.completed_at <= cutoff for point in item.indicators)
+
+    program = CANONICAL_PROGRAMS[0]
+    earlier = arch151.prepare_session_features(
+        history,
+        program,
+        "SPY",
+        _NORMAL_DAY,
+        cutoff - timedelta(minutes=int(program.resolution)),
+    )
+    other_symbol = arch151.prepare_session_features(
+        history, program, "QQQ", _NORMAL_DAY, cutoff
+    )
+    source_minutes = tuple(
+        _full_session_minutes(_NORMAL_DAY, symbol) for symbol in ("SPY", "QQQ")
+    )
+    first_minute = source_minutes[0][0]
+    changed_first = replace(
+        first_minute,
+        low=Decimal("99.9"),
+        close=Decimal("99.9"),
+    )
+    changed_history = arch151._test_only_synthetic_source_history(
+        (changed_first,) + source_minutes[0][1:] + source_minutes[1]
+    )
+    other_source = arch151.prepare_session_features(
+        changed_history, program, "SPY", _NORMAL_DAY, cutoff
+    )
+    assert earlier.key.cache_id != prepared[0].key.cache_id
+    assert other_symbol.key.cache_id != prepared[0].key.cache_id
+    assert other_source.key.cache_id != prepared[0].key.cache_id
+
+
+def test_sparse_features_reset_after_open_and_in_session_gaps() -> None:
+    missing_open = tuple(
+        (symbol, _NORMAL_DAY, offset)
+        for symbol in ("SPY", "QQQ")
+        for offset in range(15)
+    )
+    history = _synthetic_source_history(missing_offsets=missing_open)
+    a_program = next(
+        item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.A5_01
+    )
+    b_program = next(
+        item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.B5_01
+    )
+    c_program = next(
+        item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.C5_01
+    )
+    d_program = next(
+        item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.D5_01
+    )
+    cutoff = _feature_cutoff()
+
+    a = arch151.prepare_session_features(history, a_program, "SPY", _NORMAL_DAY, cutoff)
+    b = arch151.prepare_session_features(history, b_program, "SPY", _NORMAL_DAY, cutoff)
+    c = arch151.prepare_session_features(history, c_program, "SPY", _NORMAL_DAY, cutoff)
+    d = arch151.prepare_session_features(history, d_program, "SPY", _NORMAL_DAY, cutoff)
+    assert a.family_a_measure is None
+    assert b.opening_range_high is None
+    assert c.bars[0].timestamp > _AUTHORITY.schedule_for(_NORMAL_DAY).opens_at
+    assert d.bars[0].timestamp > _AUTHORITY.schedule_for(_NORMAL_DAY).opens_at
+    assert c.indicators[0].sigma is None
+    assert c.indicators[0].efficiency_ratio is None
+    assert d.indicators[0].ema_fast is None
+    assert d.indicators[0].ema_slow is None
+    assert d.indicators[0].preceding_atr is None
+
+    gap_offsets = tuple(
+        (symbol, _NORMAL_DAY, offset)
+        for symbol in ("SPY", "QQQ")
+        for offset in range(60, 65)
+    )
+    missing_gap = set(gap_offsets)
+    gap_minutes = tuple(
+        _minute(
+            symbol,
+            _NORMAL_DAY,
+            offset,
+            open_price=str(Decimal("100") + Decimal(offset) / Decimal("100")),
+            high=str(Decimal("100") + Decimal(offset) / Decimal("100")),
+            low=str(Decimal("100") + Decimal(offset) / Decimal("100")),
+            close=str(Decimal("100") + Decimal(offset) / Decimal("100")),
+        )
+        for symbol in ("SPY", "QQQ")
+        for offset in range(390)
+        if (symbol, _NORMAL_DAY, offset) not in missing_gap
+    )
+    gap_history = arch151._test_only_synthetic_source_history(gap_minutes)
+    c_gap = arch151.prepare_session_features(
+        gap_history, c_program, "SPY", _NORMAL_DAY, cutoff
+    )
+    d_gap = arch151.prepare_session_features(
+        gap_history, d_program, "SPY", _NORMAL_DAY, cutoff
+    )
+    c_gap_index = next(
+        index
+        for index, point in enumerate(c_gap.indicators)
+        if point.bar.timestamp
+        >= _AUTHORITY.schedule_for(_NORMAL_DAY).opens_at + timedelta(minutes=65)
+    )
+    d_gap_index = next(
+        index
+        for index, point in enumerate(d_gap.indicators)
+        if point.bar.timestamp
+        >= _AUTHORITY.schedule_for(_NORMAL_DAY).opens_at + timedelta(minutes=65)
+    )
+    assert c_gap.indicators[c_gap_index].sigma is None
+    assert c_gap.indicators[c_gap_index].efficiency_ratio is None
+    assert any(point.sigma is not None for point in c_gap.indicators[c_gap_index + 1 :])
+    assert any(
+        point.efficiency_ratio is not None
+        for point in c_gap.indicators[c_gap_index + 1 :]
+    )
+    assert d_gap.indicators[d_gap_index].ema_slow is None
+    assert d_gap.indicators[d_gap_index].preceding_atr is None
+    assert any(
+        point.ema_slow is not None for point in d_gap.indicators[d_gap_index + 1 :]
+    )
+    assert any(
+        point.preceding_atr is not None for point in d_gap.indicators[d_gap_index + 1 :]
+    )
+
+    next_session = next(
+        session
+        for session in _AUTHORITY.published.sessions
+        if session > _NORMAL_DAY and session.year == _NORMAL_DAY.year
+    )
+    two_sessions = _synthetic_source_history((_NORMAL_DAY, next_session))
+    next_day = arch151.prepare_session_features(
+        two_sessions, d_program, "SPY", next_session, _feature_cutoff(next_session)
+    )
+    assert next_day.indicators[0].ema_fast is None
+    assert next_day.indicators[0].ema_slow is None
+    assert next_day.indicators[0].preceding_atr is None
+
+
+def test_observed_only_vwap_binds_the_exact_sparse_source_projection() -> None:
+    schedule = _AUTHORITY.schedule_for(_NORMAL_DAY)
+    assert schedule is not None
+    minutes = tuple(
+        _minute(
+            "SPY",
+            _NORMAL_DAY,
+            offset,
+            open_price="102",
+            high="102",
+            low="102",
+            close="102",
+        )
+        for offset in range(15, 390)
+    )
+    history = arch151._test_only_synthetic_source_history(minutes)
+    projection = history._projection_index[
+        ("SPY", _NORMAL_DAY, BarResolution.FIVE_MINUTE)
+    ]
+    stream = next(
+        item
+        for item in projection.aggregate_streams
+        if item.resolution is BarResolution.FIVE_MINUTE
+    )
+    evidence = next(
+        item
+        for item in projection.verified_sessions
+        if item.resolution is BarResolution.FIVE_MINUTE
+    )
+    observations = dict(projection.vwap_by_resolution)[BarResolution.FIVE_MINUTE]
+    assert stream.bars[0].timestamp == schedule.opens_at + timedelta(minutes=15)
+    assert observations[0].bar == stream.bars[0]
+    assert observations[0].vwap == Decimal("102")
+    assert observations == aggregate_session_vwap(
+        minutes, stream, verified_sessions=(evidence,)
+    )
+
+    changed_minute = replace(
+        minutes[1],
+        low=Decimal("101"),
+        close=Decimal("101"),
+    )
+    changed_history = arch151._test_only_synthetic_source_history(
+        minutes[:1] + (changed_minute,) + minutes[2:]
+    )
+    other_evidence = next(
+        item
+        for item in changed_history._projection_index[
+            ("SPY", _NORMAL_DAY, BarResolution.FIVE_MINUTE)
+        ].verified_sessions
+        if item.resolution is BarResolution.FIVE_MINUTE
+    )
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="not bound"):
+        aggregate_session_vwap(minutes, stream, verified_sessions=(other_evidence,))
+
+
+def test_family_a_source_calibration_uses_only_prior_complete_sessions() -> None:
+    prior_sessions = tuple(
+        session
+        for session in _AUTHORITY.published.sessions
+        if date(2022, 1, 1) <= session < date(2023, 1, 1)
+    )[-61:]
+    assert len(prior_sessions) == 61
+    incomplete_session = prior_sessions[0]
+    incomplete_offset = 100
+    missing = (("SPY", incomplete_session, incomplete_offset),)
+    prior_history = _synthetic_source_history(
+        prior_sessions, symbols=("SPY",), missing_offsets=missing
+    )
+    scored_history = _synthetic_source_history(
+        (*prior_sessions, date(2023, 1, 3)),
+        symbols=("SPY",),
+        missing_offsets=missing,
+    )
+    program = next(item for item in CANONICAL_PROGRAMS if item.key is ProgramKey.A5_01)
+    prior = arch151.calibrate_family_a_from_source_history(
+        prior_history, program, "SPY", 2023
+    )
+    with_scored_year = arch151.calibrate_family_a_from_source_history(
+        scored_history, program, "SPY", 2023
+    )
+
+    assert len(prior.calibration_session_dates) == 60
+    assert incomplete_session not in prior.calibration_session_dates
+    assert all(
+        session < date(2023, 1, 1) for session in prior.calibration_session_dates
+    )
+    assert prior.calibration_id == with_scored_year.calibration_id
+    assert prior.calibration_fingerprint == with_scored_year.calibration_fingerprint

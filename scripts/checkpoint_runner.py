@@ -518,16 +518,48 @@ ARCH151_INTRADAY_WALKFORWARD_NAME: Final = "arch151-intraday-walkforward-foundat
 ARCH151_INTRADAY_WALKFORWARD_BRANCH: Final = (
     "feature/research-arch151-intraday-walkforward-current"
 )
+ARCH151_INTRADAY_WALKFORWARD_PATHS: Final = (
+    "src/trading_bot/experiments/arch151_intraday_walkforward.py",
+    "tests/experiments/test_arch151_intraday_walkforward.py",
+)
 ARCH151_INTRADAY_WALKFORWARD_TESTS: Final = (
     *COMMON_TESTS,
     "tests/runtime/checkpoint_runner/test_source_authority.py",
-    "tests/experiments/test_arch151_intraday_walkforward.py",
+    *ARCH151_INTRADAY_WALKFORWARD_PATHS[1:],
 )
 ARCH151_INTRADAY_WALKFORWARD_RUFF: Final = (
     *COMMON_RUFF_PATHS,
     "tests/runtime/checkpoint_runner/test_source_authority.py",
-    "src/trading_bot/experiments/arch151_intraday_walkforward.py",
-    "tests/experiments/test_arch151_intraday_walkforward.py",
+    *ARCH151_INTRADAY_WALKFORWARD_PATHS,
+)
+ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME: Final = (
+    "arch151-intraday-walkforward-evaluator"
+)
+ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS: Final = (
+    "src/trading_bot/experiments/arch151_intraday_walkforward_evaluator.py",
+    "tests/experiments/test_arch151_intraday_walkforward_evaluator.py",
+    "docs/architecture/151-intraday-walk-forward-campaign.md",
+    "docs/validation/arch151-intraday-walk-forward-campaign.md",
+    "scripts/checkpoint_runner.py",
+    "scripts/source_authority.py",
+    ".github/workflows/checkpoint-source-gates.yml",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+)
+ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    *ARCH151_INTRADAY_WALKFORWARD_PATHS[1:],
+    "tests/experiments/test_arch151_intraday_walkforward_evaluator.py",
+)
+ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "scripts/source_authority.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    *ARCH151_INTRADAY_WALKFORWARD_PATHS,
+    "src/trading_bot/experiments/arch151_intraday_walkforward_evaluator.py",
+    "tests/experiments/test_arch151_intraday_walkforward_evaluator.py",
 )
 AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: Final = "arch-ai-strategy-discovery-g1-engine"
 AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH: Final = (
@@ -855,6 +887,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH150_INTRADAY_AI_NAME,
     ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
     ARCH151_INTRADAY_WALKFORWARD_NAME,
+    ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME,
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
@@ -874,6 +907,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH150_INTRADAY_AI_NAME: "full",
     ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME: "full",
     ARCH151_INTRADAY_WALKFORWARD_NAME: "full",
+    ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME: "full",
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
     ARCH147_P5A_NAME: "full",
@@ -1108,6 +1142,31 @@ def resolve_ci_checkpoint(
             else ARCH150_INTRADAY_AI_NAME
         )
         return selected if selected in specs else None
+    if branch == ARCH151_INTRADAY_WALKFORWARD_BRANCH and set(matches) == {
+        ARCH151_INTRADAY_WALKFORWARD_NAME,
+        ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME,
+    }:
+        if changed_paths is None:
+            # Keep the established foundation default for legacy callers.
+            return ARCH151_INTRADAY_WALKFORWARD_NAME
+        changed = {path.replace("\\", "/").removeprefix("./") for path in changed_paths}
+        foundation_changed = bool(changed & set(ARCH151_INTRADAY_WALKFORWARD_PATHS))
+        evaluator_changed = bool(
+            changed & set(ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS)
+        )
+        if evaluator_changed:
+            return (
+                ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME
+                if ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME in specs
+                else None
+            )
+        if foundation_changed:
+            return (
+                ARCH151_INTRADAY_WALKFORWARD_NAME
+                if ARCH151_INTRADAY_WALKFORWARD_NAME in specs
+                else None
+            )
+        return None
     if len(matches) != 1 or matches[0] not in (
         *CURRENT_ACTIVE_CI_CHECKPOINTS,
         ACTIVE_CI_CHECKPOINTS[0],
@@ -27009,6 +27068,17 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         remote_branch=ARCH151_INTRADAY_WALKFORWARD_BRANCH,
         remote_head_env=None,
     )
+    values[ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME] = CheckpointSpec(
+        ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME,
+        "Source-only Architecture 151 offline walk-forward evaluator",
+        ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_TESTS,
+        ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_RUFF,
+        _arch151_intraday_walkforward_evaluator_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+        remote_head_env=None,
+    )
     values[AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME] = CheckpointSpec(
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         "Source-only G1 daily evaluator and analysis; no campaign authority",
@@ -27669,6 +27739,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH150_INTRADAY_AI_NAME,
         ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
         ARCH151_INTRADAY_WALKFORWARD_NAME,
+        ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -28998,6 +29069,108 @@ def _arch151_intraday_walkforward_authority_check(
         workflow
     ):
         failures.append("Architecture 151 active CI projection drift")
+    return tuple(failures)
+
+
+def _arch151_intraday_walkforward_evaluator_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Register the source-only evaluator successor on the established branch."""
+
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_TESTS
+        or spec.ruff_paths != ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_RUFF
+        or spec.authority_check
+        is not _arch151_intraday_walkforward_evaluator_authority_check
+        or spec.remote_branch != ARCH151_INTRADAY_WALKFORWARD_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME)
+        != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(
+            ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME
+        )
+        != 1
+        or ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME in ACTIVE_CI_CHECKPOINTS
+    ):
+        failures.append("Architecture 151 evaluator source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("Architecture 151 evaluator tests are outside FULL ownership")
+    required_paths = (
+        *ARCH151_INTRADAY_WALKFORWARD_PATHS,
+        *ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS,
+    )
+    for relative in required_paths:
+        if not (repo_root / relative).is_file():
+            failures.append("Architecture 151 evaluator route is missing " + relative)
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    foundation_row = f"              {ARCH151_INTRADAY_WALKFORWARD_NAME} {chr(96)}\n"
+    evaluator_row = (
+        f"              {ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME} {chr(96)}\n"
+    )
+    foundation_path = ARCH151_INTRADAY_WALKFORWARD_PATHS[0]
+    evaluator_path = ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS[0]
+    runner_path = "scripts/checkpoint_runner.py"
+    workflow_path = ".github/workflows/checkpoint-source-gates.yml"
+    if (
+        workflow.count(foundation_row) != 1
+        or workflow.count(evaluator_row) != 1
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "push",
+        )
+        != ARCH151_INTRADAY_WALKFORWARD_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "push",
+            changed_paths=(foundation_path,),
+        )
+        != ARCH151_INTRADAY_WALKFORWARD_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "push",
+            changed_paths=(evaluator_path,),
+        )
+        != ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "push",
+            changed_paths=(
+                ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS[1],
+                foundation_path,
+                runner_path,
+                workflow_path,
+                ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS[2],
+            ),
+        )
+        != ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "push",
+            changed_paths=("README.md",),
+        )
+        is not None
+        or resolve_ci_checkpoint(
+            specs, ARCH151_INTRADAY_WALKFORWARD_BRANCH, "pull_request"
+        )
+        is not None
+        or not _arch147_current_batch_workflow_is_reviewed(workflow)
+    ):
+        failures.append("Architecture 151 evaluator active route selection drift")
     return tuple(failures)
 
 

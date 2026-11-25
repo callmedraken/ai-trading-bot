@@ -1,23 +1,29 @@
 """Architecture 151 frozen intraday walk-forward source contracts.
 
 This module defines the immutable candidate population and pure causal feature
-and execution-policy primitives. It does not read custody, replay strategies,
-acquire data, access providers or credentials, or execute trading effects.
+and execution-policy primitives. Import and pure feature operations do not read
+custody. The fixed-root accepted-custody loader is reserved for a separately
+authorized future operation and is never invoked by import or synthetic tests.
+This module does not replay strategies, acquire data, access providers or
+credentials, or execute trading effects.
 """
 
 from __future__ import annotations
 
 import json
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Context, Decimal, InvalidOperation, localcontext
 from enum import IntEnum, StrEnum
 from hashlib import sha256
+from types import MappingProxyType
 from uuid import NAMESPACE_URL, UUID, uuid5
 from zoneinfo import ZoneInfo
 
+from trading_bot.experiments import arch150_g1_discovery as arch150_d1r
+from trading_bot.experiments import arch150_intraday_ai as arch150
 from trading_bot.experiments.arch148_intraday import (
     HistoricalIntradaySessionAuthority,
 )
@@ -38,7 +44,28 @@ IDENTITY_NAMESPACE_SEED = (
 DEVELOPMENT_START = date(2016, 1, 1)
 SCORED_YEARS = (2019, 2020, 2021, 2022, 2023)
 DEVELOPMENT_END = date(2024, 1, 1)
+DSR_OBSERVATION_COUNT = 1_258
+DSR_DECIMAL_PRECISION = 60
 INITIAL_UNIVERSE = ("SPY", "QQQ")
+ARCH150_D1R_DATASET_ID = UUID("ff5a3847-09c2-5902-b174-9e77eebf7d53")
+ARCH150_D1R_DATASET_SHA256 = (
+    "0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd"
+)
+ARCH150_D1R_CUSTODY_ID = UUID("21e121dc-a9da-538f-bc88-c15fe7ea7f50")
+ARCH150_D1R_CUSTODY_SHA256 = (
+    "5b6ac554eda73b588f2f6d664c14e5c7fca3c151966cb546c17621d0c7e6ad83"
+)
+ARCH150_D1R_EVIDENCE_ID = UUID("c31bb29d-3d53-5e2f-a01f-55a42ec96295")
+ARCH150_D1R_EVIDENCE_SHA256 = (
+    "e58a6e5d95c44b33eb34311f705e6cc26982120689f98ddb207768dc304b4ecd"
+)
+ARCH150_D1R_SCHEDULED_SLOTS_PER_SYMBOL = 781_980
+ARCH150_D1R_OBSERVED_COUNTS = (("SPY", 781_876), ("QQQ", 781_865))
+ARCH150_D1R_MISSING_COUNTS = (("SPY", 104), ("QQQ", 115))
+ARCH150_D1R_COMMON_MISSING_COUNT = 64
+ARCH150_D1R_UNION_MISSING_COUNT = 155
+ARCH150_D1R_AFFECTED_SESSION_COUNT = 9
+ARCH150_D1R_FULLY_MISSING_SESSION_COUNTS = (("SPY", 0), ("QQQ", 0))
 NEW_YORK = ZoneInfo("America/New_York")
 _SESSION_AUTHORITY = HistoricalIntradaySessionAuthority()
 _DECIMAL_CONTEXT = Context(prec=60)
@@ -49,15 +76,22 @@ _SLOT_NAMESPACE = uuid5(_ROOT_NAMESPACE, "trial-slot-identity/v1")
 _MANIFEST_NAMESPACE = uuid5(_ROOT_NAMESPACE, "population-identity/v1")
 _AGGREGATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "sparse-aggregation/v1")
 _CALIBRATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "family-a-calibration/v2")
+_D1R_HISTORY_NAMESPACE = uuid5(_ROOT_NAMESPACE, "arch150-d1r-source-history/v1")
+_FEATURE_CACHE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "session-feature-cache-key/v1")
 _FOLD_NAMESPACE = uuid5(_ROOT_NAMESPACE, "walk-forward-fold/v1")
 _EVALUATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "fold-evaluation/v2")
 _LEDGER_NAMESPACE = uuid5(_ROOT_NAMESPACE, "prior-trial-ledger/v1")
-_SELECTION_INPUT_NAMESPACE = uuid5(_ROOT_NAMESPACE, "selection-bias-input/v1")
-_QUALIFICATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "development-qualification/v1")
-_FINAL_FREEZE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "final-candidate-freeze/v1")
+_SELECTION_INPUT_NAMESPACE = uuid5(_ROOT_NAMESPACE, "selection-bias-input/v2")
+_DSR_EVIDENCE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "verified-dsr-evidence/v1")
+_DSR_CALCULATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "dsr-population-calculation/v1")
+_QUALIFICATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "development-qualification/v2")
+_FINAL_FREEZE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "final-candidate-freeze/v2")
 _FAMILY_A_MEASURE_SEAL = object()
 _FAMILY_A_CALIBRATION_SEAL = object()
 _VERIFIED_SPARSE_SESSION_SEAL = object()
+_SYNTHETIC_SPARSE_SESSION_SEAL = object()
+_D1R_HISTORY_SEAL = object()
+_SYNTHETIC_HISTORY_SEAL = object()
 _PRIOR_LEDGER_SEAL = object()
 _SELECTION_INPUT_SEAL = object()
 _FINAL_FREEZE_SEAL = object()
@@ -672,6 +706,14 @@ def _canonical_json(value: object) -> bytes:
     ).encode("utf-8")
 
 
+def _is_sha256(value: object) -> bool:
+    return (
+        type(value) is str
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
 def _parameter_material(parameters: ProgramParameters) -> dict[str, object]:
     if type(parameters) is NoiseBreakoutParameters:
         return {
@@ -1057,16 +1099,13 @@ class AggregateStream:
 
 @dataclass(frozen=True, slots=True, init=False)
 class VerifiedSparseSession:
-    """Evaluator-owned seal for one complete sparse session projection.
-
-    The source foundation has no production issuer. Its constructor is closed;
-    Family C and D accept only a seal issued by the later evaluator/auth layer.
-    """
+    """Production-issued seal binding one projection to accepted D1R history."""
 
     symbol: str
     resolution: BarResolution
     session_date: date
     bars: tuple[AggregateBar, ...]
+    history_source_digest: str
     minute_source_digest: str | None
     source_digest: str
     _seal: object
@@ -1078,6 +1117,7 @@ class VerifiedSparseSession:
         resolution: BarResolution,
         session_date: date,
         bars: tuple[AggregateBar, ...],
+        history_source_digest: str | None = None,
         source_digest: str,
         minute_source_digest: str | None = None,
         _seal: object = None,
@@ -1091,11 +1131,250 @@ class VerifiedSparseSession:
             ("resolution", resolution),
             ("session_date", session_date),
             ("bars", bars),
+            ("history_source_digest", history_source_digest),
             ("minute_source_digest", minute_source_digest),
             ("source_digest", source_digest),
             ("_seal", _seal),
         ):
             object.__setattr__(self, name, value)
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class _SyntheticSparseSessionEvidence:
+    """Test-only projection evidence, deliberately distinct from production."""
+
+    symbol: str
+    resolution: BarResolution
+    session_date: date
+    bars: tuple[AggregateBar, ...]
+    history_source_digest: str
+    minute_source_digest: str | None
+    source_digest: str
+    _seal: object
+
+    def __init__(
+        self,
+        *,
+        symbol: str,
+        resolution: BarResolution,
+        session_date: date,
+        bars: tuple[AggregateBar, ...],
+        history_source_digest: str,
+        source_digest: str,
+        minute_source_digest: str | None,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _SYNTHETIC_SPARSE_SESSION_SEAL:
+            raise AuthorizationUnavailableError(
+                "synthetic projection evidence is test-only"
+            )
+        for name, value in (
+            ("symbol", symbol),
+            ("resolution", resolution),
+            ("session_date", session_date),
+            ("bars", bars),
+            ("history_source_digest", history_source_digest),
+            ("minute_source_digest", minute_source_digest),
+            ("source_digest", source_digest),
+            ("_seal", _seal),
+        ):
+            object.__setattr__(self, name, value)
+
+
+type _SparseSessionEvidence = VerifiedSparseSession | _SyntheticSparseSessionEvidence
+
+
+@dataclass(frozen=True, slots=True)
+class _SessionSourceProjection:
+    symbol: str
+    session_date: date
+    minutes: tuple[OneMinuteBar, ...]
+    aggregate_streams: tuple[AggregateStream, ...]
+    verified_sessions: tuple[_SparseSessionEvidence, ...]
+    vwap_by_resolution: tuple[tuple[BarResolution, tuple[VwapObservation, ...]], ...]
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class Arch150D1RSourceHistory:
+    """Source-owned projection of the accepted Arch150 D1R sparse custody."""
+
+    source_id: UUID
+    dataset_id: UUID
+    dataset_sha256: str
+    custody_id: UUID
+    custody_sha256: str
+    evidence_id: UUID
+    evidence_sha256: str
+    artifact_commitments: tuple[tuple[str, int, str], ...]
+    source_digest: str
+    _session_projections: tuple[_SessionSourceProjection, ...] = field(
+        repr=False, compare=False
+    )
+    _projection_index: Mapping[
+        tuple[str, date, BarResolution], _SessionSourceProjection
+    ] = field(repr=False, compare=False)
+    _seal: object = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        *,
+        source_id: UUID,
+        dataset_id: UUID,
+        dataset_sha256: str,
+        custody_id: UUID,
+        custody_sha256: str,
+        evidence_id: UUID,
+        evidence_sha256: str,
+        artifact_commitments: tuple[tuple[str, int, str], ...],
+        source_digest: str,
+        session_projections: tuple[_SessionSourceProjection, ...],
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _D1R_HISTORY_SEAL:
+            raise AuthorizationUnavailableError(
+                "Arch150 D1R history requires the fixed accepted-source adapter"
+            )
+        for name, value in (
+            ("source_id", source_id),
+            ("dataset_id", dataset_id),
+            ("dataset_sha256", dataset_sha256),
+            ("custody_id", custody_id),
+            ("custody_sha256", custody_sha256),
+            ("evidence_id", evidence_id),
+            ("evidence_sha256", evidence_sha256),
+            ("artifact_commitments", artifact_commitments),
+            ("source_digest", source_digest),
+            ("_session_projections", session_projections),
+            (
+                "_projection_index",
+                MappingProxyType(
+                    {
+                        (item.symbol, item.session_date, stream.resolution): item
+                        for item in session_projections
+                        for stream in item.aggregate_streams
+                    }
+                ),
+            ),
+            ("_seal", _seal),
+        ):
+            object.__setattr__(self, name, value)
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class _SyntheticSourceHistory:
+    """Private synthetic source fixture; never accepted as D1R authority."""
+
+    source_digest: str
+    _session_projections: tuple[_SessionSourceProjection, ...] = field(
+        repr=False, compare=False
+    )
+    _projection_index: Mapping[
+        tuple[str, date, BarResolution], _SessionSourceProjection
+    ] = field(repr=False, compare=False)
+    _seal: object = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        *,
+        source_digest: str,
+        session_projections: tuple[_SessionSourceProjection, ...],
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _SYNTHETIC_HISTORY_SEAL:
+            raise AuthorizationUnavailableError(
+                "synthetic source history is available only to focused tests"
+            )
+        object.__setattr__(self, "source_digest", source_digest)
+        object.__setattr__(self, "_session_projections", session_projections)
+        object.__setattr__(
+            self,
+            "_projection_index",
+            MappingProxyType(
+                {
+                    (item.symbol, item.session_date, stream.resolution): item
+                    for item in session_projections
+                    for stream in item.aggregate_streams
+                }
+            ),
+        )
+        object.__setattr__(self, "_seal", _seal)
+
+
+@dataclass(frozen=True, slots=True)
+class SessionFeatureCacheKey:
+    """Immutable cache identity for one causal family/symbol/session prefix."""
+
+    source_digest: str
+    symbol: str
+    resolution: BarResolution
+    session_date: date
+    program_id: UUID
+    program_fingerprint: str
+    cutoff_completed_at: datetime
+    cache_id: UUID = field(init=False)
+
+    def __post_init__(self) -> None:
+        if not _is_sha256(self.source_digest) or not _is_sha256(
+            self.program_fingerprint
+        ):
+            raise ValueError("feature cache source/config fingerprints are invalid")
+        if self.symbol not in INITIAL_UNIVERSE:
+            raise Arch151Error("feature cache symbol is outside frozen SPY/QQQ")
+        if type(self.resolution) is not BarResolution:
+            raise TypeError("feature cache resolution must be canonical")
+        if type(self.session_date) is not date or type(self.program_id) is not UUID:
+            raise TypeError("feature cache session/program identity is invalid")
+        if (
+            type(self.cutoff_completed_at) is not datetime
+            or self.cutoff_completed_at.tzinfo is None
+            or self.cutoff_completed_at.utcoffset() is None
+        ):
+            raise TypeError("feature cutoff must be timezone aware")
+        cutoff = self.cutoff_completed_at.astimezone(UTC)
+        object.__setattr__(self, "cutoff_completed_at", cutoff)
+        material = {
+            "schema": "arch151-session-feature-cache-key/v1",
+            "source_digest": self.source_digest,
+            "symbol": self.symbol,
+            "resolution_minutes": int(self.resolution),
+            "session_date": self.session_date.isoformat(),
+            "program_id": str(self.program_id),
+            "program_fingerprint": self.program_fingerprint,
+            "cutoff_completed_at": cutoff.isoformat(timespec="minutes").replace(
+                "+00:00", "Z"
+            ),
+        }
+        object.__setattr__(
+            self,
+            "cache_id",
+            uuid5(_FEATURE_CACHE_NAMESPACE, _canonical_json(material).decode()),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CausalIndicatorPoint:
+    bar: AggregateBar
+    vwap: Decimal
+    normalized_deviation: Decimal | None
+    sigma: Decimal | None
+    efficiency_ratio: Decimal | None
+    ema_fast: Decimal | None
+    ema_slow: Decimal | None
+    preceding_atr: Decimal | None
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedSessionFeatures:
+    """Immutable signal-time prefix; no future aggregate/VWAP values are exposed."""
+
+    key: SessionFeatureCacheKey
+    bars: tuple[AggregateBar, ...]
+    vwap_observations: tuple[VwapObservation, ...]
+    indicators: tuple[CausalIndicatorPoint, ...]
+    decision_bar: AggregateBar | None
+    decision_vwap: VwapObservation | None
+    opening_range_high: Decimal | None
+    family_a_measure: FamilyASessionMeasure | None
 
 
 def _bar_material(bar: OneMinuteBar | AggregateBar) -> dict[str, object]:
@@ -1218,7 +1497,7 @@ def aggregate_session_vwap(
     minute_bars: Iterable[OneMinuteBar],
     aggregate_stream: AggregateStream,
     *,
-    verified_sessions: Sequence[VerifiedSparseSession] = (),
+    verified_sessions: Sequence[_SparseSessionEvidence] = (),
 ) -> tuple[VwapObservation, ...]:
     """Derive bucket-end session VWAP from exact observed one-minute inputs.
 
@@ -1245,12 +1524,9 @@ def aggregate_session_vwap(
         minutes_by_session[minute.session_date].append(minute)
     for aggregate in aggregate_stream.bars:
         aggregates_by_session[aggregate.session_date].append(aggregate)
-    evidence_by_session: dict[date, VerifiedSparseSession] = {}
+    evidence_by_session: dict[date, _SparseSessionEvidence] = {}
     for evidence in tuple(verified_sessions):
-        if (
-            type(evidence) is not VerifiedSparseSession
-            or getattr(evidence, "_seal", None) is not _VERIFIED_SPARSE_SESSION_SEAL
-        ):
+        if not _sparse_session_evidence_is_valid(evidence):
             raise AuthorizationUnavailableError(
                 "post-open VWAP requires evaluator-owned verified session evidence"
             )
@@ -1290,6 +1566,7 @@ def aggregate_session_vwap(
                     evidence.session_date,
                     evidence.bars,
                     evidence.minute_source_digest,
+                    evidence.history_source_digest,
                 )
             ):
                 raise AuthorizationUnavailableError(
@@ -1324,6 +1601,333 @@ def aggregate_session_vwap(
                     raise UnavailableIndicatorError("session VWAP is invalid")
                 observations.append(VwapObservation(aggregate, vwap))
     return tuple(observations)
+
+
+def _d1r_semantic_pins_match() -> bool:
+    expected = {
+        "dataset.json": (str(ARCH150_D1R_DATASET_ID), ARCH150_D1R_DATASET_SHA256),
+        "custody-evidence.json": (
+            str(ARCH150_D1R_CUSTODY_ID),
+            ARCH150_D1R_CUSTODY_SHA256,
+        ),
+        "evidence.json": (str(ARCH150_D1R_EVIDENCE_ID), ARCH150_D1R_EVIDENCE_SHA256),
+    }
+    return (
+        type(arch150_d1r._SEMANTIC_PINS) is dict
+        and arch150_d1r._SEMANTIC_PINS == expected
+    )
+
+
+def _accepted_arch150_dataset_is_valid(dataset: object) -> bool:
+    if (
+        type(dataset) is not arch150.ResearchDataset
+        or dataset._authority_seal is not arch150._DATASET_SEAL
+        or dataset.stage is not arch150.ResearchStage.DISCOVERY
+        or dataset.start != date(2016, 1, 1)
+        or dataset.end_exclusive != date(2024, 1, 1)
+        or dataset.candidate_freeze is not None
+        or dataset._sparse_custody_authority
+        is not arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY
+        or not arch150._sparse_custody_authority_is_valid(
+            dataset._sparse_custody_authority
+        )
+    ):
+        return False
+    authority = dataset._sparse_custody_authority
+    return (
+        authority.dataset_id == ARCH150_D1R_DATASET_ID
+        and authority.dataset_semantic_sha256 == ARCH150_D1R_DATASET_SHA256
+        and authority.custody_id == ARCH150_D1R_CUSTODY_ID
+        and authority.custody_semantic_sha256 == ARCH150_D1R_CUSTODY_SHA256
+        and authority.scheduled_slots_per_symbol
+        == ARCH150_D1R_SCHEDULED_SLOTS_PER_SYMBOL
+        and authority.observed_counts_by_symbol == ARCH150_D1R_OBSERVED_COUNTS
+        and authority.missing_counts_by_symbol == ARCH150_D1R_MISSING_COUNTS
+        and authority.common_missing_count == ARCH150_D1R_COMMON_MISSING_COUNT
+        and authority.union_missing_count == ARCH150_D1R_UNION_MISSING_COUNT
+        and authority.fully_missing_session_counts_by_symbol
+        == ARCH150_D1R_FULLY_MISSING_SESSION_COUNTS
+    )
+
+
+def _source_session_projections(
+    minutes_by_symbol: tuple[tuple[str, tuple[OneMinuteBar, ...]], ...],
+    source_digest: str,
+    *,
+    accepted_dataset: arch150.ResearchDataset | None,
+) -> tuple[_SessionSourceProjection, ...]:
+    if accepted_dataset is not None:
+        if not _accepted_arch150_dataset_is_valid(accepted_dataset):
+            raise AuthorizationUnavailableError(
+                "production projections require accepted Arch150 D1R authority"
+            )
+        if len(minutes_by_symbol) != len(INITIAL_UNIVERSE):
+            raise AuthorizationUnavailableError(
+                "production projection minutes differ from accepted Arch150 source"
+            )
+        for symbol, (actual_symbol, actual_minutes) in zip(
+            INITIAL_UNIVERSE, minutes_by_symbol, strict=True
+        ):
+            source_bars = accepted_dataset.bars.by_symbol[symbol].bars
+            if (
+                actual_symbol != symbol
+                or len(actual_minutes) != len(source_bars)
+                or any(
+                    actual.symbol != source.symbol
+                    or actual.timestamp != source.timestamp
+                    or actual.open != source.open
+                    or actual.high != source.high
+                    or actual.low != source.low
+                    or actual.close != source.close
+                    or actual.volume != source.volume
+                    for actual, source in zip(actual_minutes, source_bars, strict=True)
+                )
+            ):
+                raise AuthorizationUnavailableError(
+                    "production projection minutes differ from accepted Arch150 source"
+                )
+    projections: list[_SessionSourceProjection] = []
+    for symbol, symbol_minutes in minutes_by_symbol:
+        grouped: dict[date, list[OneMinuteBar]] = defaultdict(list)
+        for minute in symbol_minutes:
+            grouped[minute.session_date].append(minute)
+        for session in sorted(grouped):
+            minutes = _validated_minutes(grouped[session])
+            if any(
+                minute.symbol != symbol or minute.session_date != session
+                for minute in minutes
+            ):
+                raise Arch151Error("source projection mixes symbol or session")
+            streams: list[AggregateStream] = []
+            verified: list[_SparseSessionEvidence] = []
+            vwap_values: list[tuple[BarResolution, tuple[VwapObservation, ...]]] = []
+            for resolution in BarResolution:
+                stream = aggregate_sparse_bars(minutes, resolution)
+                if not stream.bars:
+                    raise UnavailableIndicatorError(
+                        "verified source session contains no complete aggregate bucket"
+                    )
+                minute_digest = sha256(
+                    _canonical_json([_bar_material(bar) for bar in minutes])
+                ).hexdigest()
+                evidence_digest = _verified_sparse_session_digest(
+                    symbol,
+                    resolution,
+                    session,
+                    stream.bars,
+                    minute_digest,
+                    source_digest,
+                )
+                if accepted_dataset is not None:
+                    session_evidence: _SparseSessionEvidence = VerifiedSparseSession(
+                        symbol=symbol,
+                        resolution=resolution,
+                        session_date=session,
+                        bars=stream.bars,
+                        history_source_digest=source_digest,
+                        source_digest=evidence_digest,
+                        minute_source_digest=minute_digest,
+                        _seal=_VERIFIED_SPARSE_SESSION_SEAL,
+                    )
+                else:
+                    session_evidence = _SyntheticSparseSessionEvidence(
+                        symbol=symbol,
+                        resolution=resolution,
+                        session_date=session,
+                        bars=stream.bars,
+                        history_source_digest=source_digest,
+                        source_digest=evidence_digest,
+                        minute_source_digest=minute_digest,
+                        _seal=_SYNTHETIC_SPARSE_SESSION_SEAL,
+                    )
+                observations = aggregate_session_vwap(
+                    minutes, stream, verified_sessions=(session_evidence,)
+                )
+                streams.append(stream)
+                verified.append(session_evidence)
+                vwap_values.append((resolution, observations))
+            projections.append(
+                _SessionSourceProjection(
+                    symbol,
+                    session,
+                    minutes,
+                    tuple(streams),
+                    tuple(verified),
+                    tuple(vwap_values),
+                )
+            )
+    return tuple(projections)
+
+
+def _adapt_arch150_d1r_snapshot() -> Arch150D1RSourceHistory:
+    """Read the fixed Arch150 source and bind it through accepted custody."""
+
+    if not _d1r_semantic_pins_match():
+        raise AuthorizationUnavailableError("accepted Arch150 D1R pins drifted")
+    snapshot = arch150_d1r._read_pinned_input(arch150_d1r.ACCEPTED_INPUT_ROOT)
+    if type(snapshot) is not arch150_d1r.InputSnapshot:
+        raise AuthorizationUnavailableError("Arch150 D1R input is not reader-owned")
+    expected_artifact_names = tuple(arch150_d1r._ARTIFACT_LENGTHS)
+    artifacts = snapshot.artifacts
+    expected_normalized_sha256 = {
+        f"normalized/{symbol}.csv": digest
+        for symbol, digest in arch150._ACCEPTED_NORMALIZED_CSV_SHA256
+    }
+    if (
+        type(artifacts) is not tuple
+        or tuple(item.name for item in artifacts) != expected_artifact_names
+        or any(
+            type(item) is not arch150_d1r.ArtifactCommitment
+            or type(item.byte_length) is not int
+            or item.byte_length != arch150_d1r._ARTIFACT_LENGTHS[item.name]
+            or not _is_sha256(item.sha256)
+            or (
+                item.name in expected_normalized_sha256
+                and item.sha256 != expected_normalized_sha256[item.name]
+            )
+            for item in artifacts
+        )
+    ):
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R artifact commitments are incomplete or reordered"
+        )
+    # The fixed reader validates each JSON artifact's inner semantic identity
+    # against _SEMANTIC_PINS and returns its raw-byte commitment here. For the
+    # normalized CSV artifacts, Arch150 also owns the accepted raw-file hashes.
+    if type(snapshot.bars) is not tuple or any(
+        type(bar) is not arch150.IntradayBar for bar in snapshot.bars
+    ):
+        raise AuthorizationUnavailableError("Arch150 D1R bars are not normalized")
+
+    # This is Arch150's accepted identity/count/schedule validator. The adapter
+    # does not duplicate its custody scan or invoke the G1 strategy evaluator.
+    dataset = arch150.open_sparse_discovery_dataset(snapshot.bars)
+    if not _accepted_arch150_dataset_is_valid(dataset):
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R dataset lacks the accepted sparse-custody authority"
+        )
+
+    authority = _SESSION_AUTHORITY.published
+    source_material = {
+        "schema": "arch151-arch150-d1r-source-history/v1",
+        "semantic_contract_version": SEMANTIC_CONTRACT_VERSION,
+        "arch150_dataset_id": str(ARCH150_D1R_DATASET_ID),
+        "arch150_dataset_sha256": ARCH150_D1R_DATASET_SHA256,
+        "arch150_custody_id": str(ARCH150_D1R_CUSTODY_ID),
+        "arch150_custody_sha256": ARCH150_D1R_CUSTODY_SHA256,
+        "arch150_evidence_id": str(ARCH150_D1R_EVIDENCE_ID),
+        "arch150_evidence_sha256": ARCH150_D1R_EVIDENCE_SHA256,
+        "scheduled_slots_per_symbol": ARCH150_D1R_SCHEDULED_SLOTS_PER_SYMBOL,
+        "observed_counts_by_symbol": [
+            list(item) for item in ARCH150_D1R_OBSERVED_COUNTS
+        ],
+        "missing_counts_by_symbol": [list(item) for item in ARCH150_D1R_MISSING_COUNTS],
+        "common_missing_count": ARCH150_D1R_COMMON_MISSING_COUNT,
+        "union_missing_count": ARCH150_D1R_UNION_MISSING_COUNT,
+        "affected_session_count": ARCH150_D1R_AFFECTED_SESSION_COUNT,
+        "fully_missing_session_counts_by_symbol": [
+            list(item) for item in ARCH150_D1R_FULLY_MISSING_SESSION_COUNTS
+        ],
+        "artifact_commitments": [
+            {"name": item.name, "length": item.byte_length, "sha256": item.sha256}
+            for item in artifacts
+        ],
+        "validated_input_digest": dataset.bars.input_digest,
+        "published_xnys_identity": str(authority.identity),
+        "published_xnys_digest": authority.digest,
+    }
+    canonical = _canonical_json(source_material)
+    source_digest = sha256(canonical).hexdigest()
+    source_id = uuid5(_D1R_HISTORY_NAMESPACE, canonical.decode("utf-8"))
+    minutes_by_symbol = tuple(
+        (
+            symbol,
+            tuple(
+                OneMinuteBar(
+                    symbol,
+                    bar.timestamp,
+                    bar.open,
+                    bar.high,
+                    bar.low,
+                    bar.close,
+                    bar.volume,
+                )
+                for bar in dataset.bars.by_symbol[symbol].bars
+            ),
+        )
+        for symbol in INITIAL_UNIVERSE
+    )
+    projections = _source_session_projections(
+        minutes_by_symbol, source_digest, accepted_dataset=dataset
+    )
+    return Arch150D1RSourceHistory(
+        source_id=source_id,
+        dataset_id=ARCH150_D1R_DATASET_ID,
+        dataset_sha256=ARCH150_D1R_DATASET_SHA256,
+        custody_id=ARCH150_D1R_CUSTODY_ID,
+        custody_sha256=ARCH150_D1R_CUSTODY_SHA256,
+        evidence_id=ARCH150_D1R_EVIDENCE_ID,
+        evidence_sha256=ARCH150_D1R_EVIDENCE_SHA256,
+        artifact_commitments=tuple(
+            (item.name, item.byte_length, item.sha256) for item in artifacts
+        ),
+        source_digest=source_digest,
+        session_projections=projections,
+        _seal=_D1R_HISTORY_SEAL,
+    )
+
+
+def load_arch150_d1r_source_history() -> Arch150D1RSourceHistory:
+    """Load and bind accepted Arch150 D1R history without strategy evaluation.
+
+    This future evaluator entry point uses the existing fixed-root Arch150
+    artifact reader and accepted sparse-custody validator. It does not acquire
+    data, invoke the Arch150 G1 evaluator, or open holdout/extension history.
+    """
+
+    return _adapt_arch150_d1r_snapshot()
+
+
+def _test_only_synthetic_source_history(
+    minute_bars: Iterable[OneMinuteBar],
+) -> _SyntheticSourceHistory:
+    """Create a separate synthetic source path for foundation tests only."""
+
+    materialized = tuple(minute_bars)
+    if not materialized or any(type(item) is not OneMinuteBar for item in materialized):
+        raise TypeError("synthetic history requires exact OneMinuteBar values")
+    if any(
+        not DEVELOPMENT_START <= item.session_date < DEVELOPMENT_END
+        for item in materialized
+    ):
+        raise Arch151Error("synthetic development history cannot include 2024+")
+    grouped: dict[str, list[OneMinuteBar]] = {symbol: [] for symbol in INITIAL_UNIVERSE}
+    for item in materialized:
+        grouped[item.symbol].append(item)
+    minutes_by_symbol = tuple(
+        (symbol, tuple(sorted(grouped[symbol], key=lambda item: item.timestamp)))
+        for symbol in INITIAL_UNIVERSE
+        if grouped[symbol]
+    )
+    canonical = _canonical_json(
+        {
+            "schema": "arch151-synthetic-source-history/v1",
+            "bars": [
+                _bar_material(item)
+                for symbol, items in minutes_by_symbol
+                for item in items
+            ],
+        }
+    )
+    source_digest = sha256(canonical).hexdigest()
+    projections = _source_session_projections(
+        minutes_by_symbol, source_digest, accepted_dataset=None
+    )
+    return _SyntheticSourceHistory(
+        source_digest=source_digest,
+        session_projections=projections,
+        _seal=_SYNTHETIC_HISTORY_SEAL,
+    )
 
 
 def contiguous_aggregate_bars(
@@ -1625,6 +2229,150 @@ def calibrate_family_a(
         sha256(canonical).hexdigest(),
         uuid5(_CALIBRATION_NAMESPACE, canonical.decode("utf-8")),
         _seal=_FAMILY_A_CALIBRATION_SEAL,
+    )
+
+
+def _source_history_digest(history: object) -> str:
+    if type(history) is Arch150D1RSourceHistory:
+        if (
+            getattr(history, "_seal", None) is not _D1R_HISTORY_SEAL
+            or history.dataset_id != ARCH150_D1R_DATASET_ID
+            or history.dataset_sha256 != ARCH150_D1R_DATASET_SHA256
+            or history.custody_id != ARCH150_D1R_CUSTODY_ID
+            or history.custody_sha256 != ARCH150_D1R_CUSTODY_SHA256
+            or history.evidence_id != ARCH150_D1R_EVIDENCE_ID
+            or history.evidence_sha256 != ARCH150_D1R_EVIDENCE_SHA256
+            or not _is_sha256(history.source_digest)
+        ):
+            raise AuthorizationUnavailableError(
+                "Arch150 D1R source-history seal is invalid"
+            )
+        return history.source_digest
+    if type(history) is _SyntheticSourceHistory:
+        if getattr(
+            history, "_seal", None
+        ) is not _SYNTHETIC_HISTORY_SEAL or not _is_sha256(history.source_digest):
+            raise AuthorizationUnavailableError(
+                "synthetic source-history evidence is invalid"
+            )
+        return history.source_digest
+    raise AuthorizationUnavailableError(
+        "feature preparation requires source-owned accepted or synthetic history"
+    )
+
+
+def _bind_family_a_measure_to_source(
+    measure: FamilyASessionMeasure, source_identity_digest: str
+) -> FamilyASessionMeasure:
+    bound_digest = sha256(
+        _canonical_json(
+            {
+                "schema": "arch151-family-a-source-measure/v1",
+                "source_identity_digest": source_identity_digest,
+                "measure_digest": measure.source_digest,
+                "symbol": measure.symbol,
+                "scope": measure.measure_scope.value,
+                "session_date": measure.session_date.isoformat(),
+            }
+        )
+    ).hexdigest()
+    return FamilyASessionMeasure(
+        measure.symbol,
+        measure.measure_scope,
+        measure.session_date,
+        measure.session_open,
+        measure.first_30m_close,
+        measure.absolute_return,
+        bound_digest,
+        _seal=_FAMILY_A_MEASURE_SEAL,
+    )
+
+
+def _source_calibration_provenance(history: object) -> str:
+    if type(history) is Arch150D1RSourceHistory:
+        _source_history_digest(history)
+        material: object = {
+            "schema": "arch151-family-a-source-provenance/v1",
+            "dataset_id": str(history.dataset_id),
+            "dataset_sha256": history.dataset_sha256,
+            "custody_id": str(history.custody_id),
+            "custody_sha256": history.custody_sha256,
+            "evidence_id": str(history.evidence_id),
+            "evidence_sha256": history.evidence_sha256,
+        }
+    elif type(history) is _SyntheticSourceHistory:
+        _source_history_digest(history)
+        material = {"schema": "arch151-synthetic-family-a-provenance/v1"}
+    else:
+        raise AuthorizationUnavailableError(
+            "Family A calibration provenance is not source-owned"
+        )
+    return sha256(_canonical_json(material)).hexdigest()
+
+
+def calibrate_family_a_from_source_history(
+    history: Arch150D1RSourceHistory | _SyntheticSourceHistory,
+    program: Arch151Program,
+    symbol: str,
+    scored_year: int,
+) -> FamilyACalibration:
+    """Calibrate A from complete source sessions strictly before scored year."""
+
+    _source_history_digest(history)
+    provenance_digest = _source_calibration_provenance(history)
+    if symbol not in INITIAL_UNIVERSE:
+        raise Arch151Error("Family A calibration symbol is outside frozen SPY/QQQ")
+    if type(scored_year) is not int or scored_year not in SCORED_YEARS:
+        raise ValueError("scored year is outside the five frozen Arch151 years")
+    if (
+        not _is_canonical_program(program)
+        or program.family is not StrategyFamily.NOISE_VWAP_BREAKOUT
+    ):
+        raise UnsupportedProgramError("Family A history needs a canonical A program")
+    measures: list[FamilyASessionMeasure] = []
+    for projection in history._session_projections:
+        if (
+            projection.symbol != symbol
+            or projection.session_date >= date(scored_year, 1, 1)
+            or not projection.aggregate_streams
+            or projection.aggregate_streams[0].resolution
+            is not BarResolution.FIVE_MINUTE
+        ):
+            continue
+        try:
+            measures.append(
+                _bind_family_a_measure_to_source(
+                    family_a_historical_session_measure(projection.minutes),
+                    provenance_digest,
+                )
+            )
+        except UnavailableIndicatorError:
+            # Sparse historical sessions are omitted from the complete-session
+            # calibration population, never repaired or treated as zero.
+            continue
+    return calibrate_family_a(program, tuple(measures), scored_year)
+
+
+def family_a_current_measure_from_source_history(
+    history: Arch150D1RSourceHistory | _SyntheticSourceHistory,
+    symbol: str,
+    session: date,
+) -> FamilyASessionMeasure:
+    """Prepare only the exact observed first 30 minutes for one scored session."""
+
+    _source_history_digest(history)
+    provenance_digest = _source_calibration_provenance(history)
+    if symbol not in INITIAL_UNIVERSE:
+        raise Arch151Error("Family A current symbol is outside frozen SPY/QQQ")
+    if type(session) is not date or session.year not in SCORED_YEARS:
+        raise Arch151Error("Family A current measure is outside scored years")
+    projection = history._projection_index.get(
+        (symbol, session, BarResolution.FIVE_MINUTE)
+    )
+    if projection is None:
+        raise UnavailableIndicatorError("Family A scored-session source is unavailable")
+    return _bind_family_a_measure_to_source(
+        family_a_session_measure(projection.minutes[:30]), provenance_digest
     )
 
 
@@ -1984,27 +2732,45 @@ def _verified_sparse_session_digest(
     session: date,
     bars: tuple[AggregateBar, ...],
     minute_source_digest: str | None,
+    history_source_digest: str,
 ) -> str:
     return sha256(
         _canonical_json(
             {
-                "schema": "arch151-verified-sparse-session/v1",
+                "schema": "arch151-verified-sparse-session/v2",
                 "symbol": symbol,
                 "resolution_minutes": int(resolution),
                 "session_date": session.isoformat(),
                 "bars": [_bar_material(bar) for bar in bars],
                 "minute_source_digest": minute_source_digest,
+                "history_source_digest": history_source_digest,
             }
         )
     ).hexdigest()
+
+
+def _sparse_session_evidence_is_valid(value: object) -> bool:
+    if type(value) is VerifiedSparseSession:
+        return (
+            getattr(value, "_seal", None) is _VERIFIED_SPARSE_SESSION_SEAL
+            and _is_sha256(value.history_source_digest)
+            and _is_sha256(value.source_digest)
+        )
+    if type(value) is _SyntheticSparseSessionEvidence:
+        return (
+            getattr(value, "_seal", None) is _SYNTHETIC_SPARSE_SESSION_SEAL
+            and _is_sha256(value.history_source_digest)
+            and _is_sha256(value.source_digest)
+        )
+    return False
 
 
 def _test_only_verified_sparse_session(
     bars: Sequence[AggregateBar],
     *,
     minute_bars: Sequence[OneMinuteBar] | None = None,
-) -> VerifiedSparseSession:
-    """Private synthetic seam; production code has no sparse-session issuer."""
+) -> _SyntheticSparseSessionEvidence:
+    """Private test seam that cannot construct production verification evidence."""
 
     materialized = tuple(bars)
     if any(type(bar) is not AggregateBar for bar in materialized):
@@ -2027,56 +2793,59 @@ def _test_only_verified_sparse_session(
         minute_source_digest = sha256(
             _canonical_json([_bar_material(bar) for bar in minutes])
         ).hexdigest()
+    synthetic_history_digest = sha256(
+        _canonical_json(
+            {
+                "schema": "arch151-synthetic-session-source/v1",
+                "symbol": first.symbol,
+                "session_date": first.session_date.isoformat(),
+                "minute_source_digest": minute_source_digest,
+                "aggregate_bars": [_bar_material(bar) for bar in validated],
+            }
+        )
+    ).hexdigest()
     digest = _verified_sparse_session_digest(
         first.symbol,
         first.resolution,
         first.session_date,
         validated,
         minute_source_digest,
+        synthetic_history_digest,
     )
-    return VerifiedSparseSession(
+    return _SyntheticSparseSessionEvidence(
         symbol=first.symbol,
         resolution=first.resolution,
         session_date=first.session_date,
         bars=validated,
+        history_source_digest=synthetic_history_digest,
         source_digest=digest,
         minute_source_digest=minute_source_digest,
-        _seal=_VERIFIED_SPARSE_SESSION_SEAL,
+        _seal=_SYNTHETIC_SPARSE_SESSION_SEAL,
     )
 
 
 def _require_verified_sparse_projection(
-    evidence: VerifiedSparseSession | None,
+    evidence: _SparseSessionEvidence | None,
     requested_bars: tuple[AggregateBar, ...],
     program: Arch151Program,
     *,
     allow_prefix: bool,
 ) -> tuple[AggregateBar, ...]:
-    if (
-        type(evidence) is not VerifiedSparseSession
-        or getattr(evidence, "_seal", None) is not _VERIFIED_SPARSE_SESSION_SEAL
-    ):
+    if not _sparse_session_evidence_is_valid(evidence):
         raise AuthorizationUnavailableError(
             "Family C/D require evaluator-owned verified sparse-session evidence"
         )
-    verified = _validated_sparse_session_aggregate_bars(
-        evidence.bars, program.resolution, require_open=False
-    )
     if (
-        evidence.symbol != verified[0].symbol
+        type(evidence.bars) is not tuple
+        or not evidence.bars
+        or evidence.symbol not in INITIAL_UNIVERSE
+        or evidence.symbol != evidence.bars[0].symbol
+        or evidence.session_date != evidence.bars[0].session_date
         or evidence.resolution is not program.resolution
-        or evidence.session_date != verified[0].session_date
         or evidence.minute_source_digest is None
-        or evidence.source_digest
-        != _verified_sparse_session_digest(
-            evidence.symbol,
-            evidence.resolution,
-            evidence.session_date,
-            verified,
-            evidence.minute_source_digest,
-        )
     ):
         raise AuthorizationUnavailableError("sparse-session evidence seal is invalid")
+    verified = evidence.bars
     if any(type(bar) is not AggregateBar for bar in requested_bars):
         raise TypeError("sparse-session projection requires AggregateBar values")
     if allow_prefix:
@@ -2213,7 +2982,7 @@ def family_c_entry_signal(
     preceding: Sequence[VwapObservation],
     signal: VwapObservation,
     *,
-    verified_session: VerifiedSparseSession | None = None,
+    verified_session: _SparseSessionEvidence | None = None,
 ) -> VwapMeanReversionSignal | None:
     """Evaluate the completed-bar downside sigma plus low-directionality gate."""
 
@@ -2287,7 +3056,7 @@ def family_c_reversion_exit(
     signal: VwapMeanReversionSignal,
     current: VwapObservation,
     *,
-    verified_session: VerifiedSparseSession | None = None,
+    verified_session: _SparseSessionEvidence | None = None,
 ) -> bool:
     """Check the VWAP exit against current VWAP and frozen entry sigma."""
 
@@ -2450,7 +3219,7 @@ def ema_series(
     bars: Sequence[AggregateBar],
     period: int,
     *,
-    verified_session: VerifiedSparseSession | None = None,
+    verified_session: _SparseSessionEvidence | None = None,
 ) -> tuple[Decimal | None, ...]:
     """Compute session-local EMA, reseeding after each sparse gap."""
 
@@ -2460,31 +3229,18 @@ def ema_series(
         bars, require_open=verified_session is None
     )
     if verified_session is not None:
-        if (
-            type(verified_session) is not VerifiedSparseSession
-            or getattr(verified_session, "_seal", None)
-            is not _VERIFIED_SPARSE_SESSION_SEAL
-        ):
+        if not _sparse_session_evidence_is_valid(verified_session):
             raise AuthorizationUnavailableError(
                 "EMA recovery after a missing open requires verified session evidence"
             )
-        verified = _validated_sparse_session_aggregate_bars(
-            verified_session.bars, materialized[0].resolution, require_open=False
-        )
         if (
-            verified_session.symbol != materialized[0].symbol
+            type(verified_session.bars) is not tuple
+            or not verified_session.bars
+            or verified_session.symbol != materialized[0].symbol
             or verified_session.session_date != materialized[0].session_date
             or verified_session.resolution is not materialized[0].resolution
             or verified_session.minute_source_digest is None
-            or verified_session.source_digest
-            != _verified_sparse_session_digest(
-                verified_session.symbol,
-                verified_session.resolution,
-                verified_session.session_date,
-                verified,
-                verified_session.minute_source_digest,
-            )
-            or verified[: len(materialized)] != materialized
+            or verified_session.bars[: len(materialized)] != materialized
         ):
             raise AuthorizationUnavailableError(
                 "EMA bars are not a source-bound sparse-session prefix"
@@ -2544,6 +3300,203 @@ def average_true_range(
     return result
 
 
+def prepare_session_features(
+    history: Arch150D1RSourceHistory | _SyntheticSourceHistory,
+    program: Arch151Program,
+    symbol: str,
+    session: date,
+    cutoff_completed_at: datetime,
+) -> PreparedSessionFeatures:
+    """Return an immutable feature prefix through one completed decision cutoff.
+
+    The accepted source reader computes the full history identity and each
+    source-session projection once. This function selects that projection and
+    never hashes or returns later session observations.
+    """
+
+    source_digest = _source_history_digest(history)
+    if not _is_canonical_program(program):
+        raise UnsupportedProgramError(
+            "feature preparation requires a canonical program"
+        )
+    if symbol not in INITIAL_UNIVERSE:
+        raise Arch151Error("feature preparation symbol is outside frozen SPY/QQQ")
+    if type(session) is not date or not DEVELOPMENT_START <= session < DEVELOPMENT_END:
+        raise Arch151Error("feature preparation session is outside 2016-2023")
+    if (
+        type(cutoff_completed_at) is not datetime
+        or cutoff_completed_at.tzinfo is None
+        or cutoff_completed_at.utcoffset() is None
+    ):
+        raise TypeError("feature cutoff must be timezone aware")
+    cutoff = cutoff_completed_at.astimezone(UTC)
+    schedule = _SESSION_AUTHORITY.schedule_for(session)
+    if schedule is None:
+        raise Arch151Error("feature session is not published by XNYS")
+    open_utc = schedule.opens_at.astimezone(UTC)
+    close_utc = schedule.closes_at.astimezone(UTC)
+    span_seconds = int(program.resolution) * 60
+    elapsed_seconds = (cutoff - open_utc).total_seconds()
+    if (
+        elapsed_seconds < span_seconds
+        or cutoff > close_utc
+        or elapsed_seconds % span_seconds != 0
+    ):
+        raise UnavailableIndicatorError(
+            "feature cutoff must be a scheduled completed aggregate boundary"
+        )
+    projection = history._projection_index.get((symbol, session, program.resolution))
+    if projection is None:
+        raise UnavailableIndicatorError("source session projection is unavailable")
+    stream = next(
+        item
+        for item in projection.aggregate_streams
+        if item.resolution is program.resolution
+    )
+    all_vwaps = dict(projection.vwap_by_resolution)[program.resolution]
+    evidence = next(
+        item
+        for item in projection.verified_sessions
+        if item.resolution is program.resolution
+    )
+    bars = tuple(bar for bar in stream.bars if bar.completed_at <= cutoff)
+    vwap_observations = tuple(
+        observation
+        for observation in all_vwaps
+        if observation.bar.completed_at <= cutoff
+    )
+    if tuple(item.bar for item in vwap_observations) != bars:
+        raise Arch151Error("prepared VWAP and aggregate prefixes do not match")
+
+    cache_key = SessionFeatureCacheKey(
+        source_digest,
+        symbol,
+        program.resolution,
+        session,
+        program_id(program),
+        program_fingerprint(program),
+        cutoff,
+    )
+    decision_bar = bars[-1] if bars and bars[-1].completed_at == cutoff else None
+    decision_vwap = (
+        vwap_observations[-1]
+        if decision_bar is not None
+        and vwap_observations
+        and vwap_observations[-1].bar == decision_bar
+        else None
+    )
+
+    fast_values: tuple[Decimal | None, ...] = ()
+    slow_values: tuple[Decimal | None, ...] = ()
+    if program.family is StrategyFamily.CROSS_ETF_TREND_PULLBACK and bars:
+        parameters = program.parameters
+        assert type(parameters) is CrossEtfPullbackParameters
+        fast_values = ema_series(bars, parameters.ema_fast, verified_session=evidence)
+        slow_values = ema_series(bars, parameters.ema_slow, verified_session=evidence)
+
+    points: list[CausalIndicatorPoint] = []
+    vwap_by_timestamp = {item.bar.timestamp: item for item in vwap_observations}
+    for index, bar in enumerate(bars):
+        observation = vwap_by_timestamp[bar.timestamp]
+        deviation = normalized_vwap_deviation(bar.close, observation.vwap)
+        sigma: Decimal | None = None
+        efficiency: Decimal | None = None
+        ema_fast = fast_values[index] if fast_values else None
+        ema_slow = slow_values[index] if slow_values else None
+        preceding_atr: Decimal | None = None
+
+        if program.family is StrategyFamily.VWAP_MEAN_REVERSION:
+            parameters = program.parameters
+            assert type(parameters) is VwapMeanReversionParameters
+            deviation_count = parameters.deviation_lookback_bars
+            if index >= deviation_count:
+                prior = vwap_observations[index - deviation_count : index]
+                try:
+                    contiguous_aggregate_bars(
+                        tuple(item.bar for item in (*prior, observation))
+                    )
+                    sigma, deviation = vwap_deviation_sigma(
+                        tuple((item.bar.close, item.vwap) for item in prior),
+                        bar.close,
+                        observation.vwap,
+                        lookback=deviation_count,
+                    )
+                except UnavailableIndicatorError:
+                    sigma = None
+            er_count = parameters.efficiency_ratio_lookback
+            if index >= er_count:
+                er_bars = bars[index - er_count : index + 1]
+                try:
+                    contiguous_aggregate_bars(er_bars)
+                    efficiency = efficiency_ratio(
+                        tuple(item.close for item in er_bars), er_count
+                    )
+                except UnavailableIndicatorError:
+                    efficiency = None
+
+        if program.family is StrategyFamily.CROSS_ETF_TREND_PULLBACK:
+            parameters = program.parameters
+            assert type(parameters) is CrossEtfPullbackParameters
+            prior_count = parameters.atr_lookback + 1
+            if index >= prior_count:
+                try:
+                    preceding_atr = average_true_range(
+                        bars[index - prior_count : index], parameters.atr_lookback
+                    )
+                except UnavailableIndicatorError:
+                    preceding_atr = None
+        points.append(
+            CausalIndicatorPoint(
+                bar,
+                observation.vwap,
+                deviation,
+                sigma,
+                efficiency,
+                ema_fast,
+                ema_slow,
+                preceding_atr,
+            )
+        )
+
+    opening_range_high: Decimal | None = None
+    if program.family is StrategyFamily.OPENING_RANGE_RETEST:
+        parameters = program.parameters
+        assert type(parameters) is OpeningRangeRetestParameters
+        opening_count = parameters.opening_range_minutes // int(program.resolution)
+        if len(bars) >= opening_count and bars[0].timestamp == open_utc:
+            expected = tuple(
+                open_utc + timedelta(minutes=index * int(program.resolution))
+                for index in range(opening_count)
+            )
+            if tuple(item.timestamp for item in bars[:opening_count]) == expected:
+                opening_range_high = max(item.high for item in bars[:opening_count])
+
+    family_a_measure: FamilyASessionMeasure | None = None
+    if (
+        program.family is StrategyFamily.NOISE_VWAP_BREAKOUT
+        and cutoff >= open_utc + timedelta(minutes=30)
+        and len(projection.minutes) >= 30
+    ):
+        try:
+            family_a_measure = _bind_family_a_measure_to_source(
+                family_a_session_measure(projection.minutes[:30]),
+                _source_calibration_provenance(history),
+            )
+        except UnavailableIndicatorError:
+            pass
+
+    return PreparedSessionFeatures(
+        cache_key,
+        bars,
+        vwap_observations,
+        tuple(points),
+        decision_bar,
+        decision_vwap,
+        opening_range_high,
+        family_a_measure,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class AlignedCrossEtfBars:
     timestamp: datetime
@@ -2581,6 +3534,61 @@ def exact_cross_etf_confirmation(
             )
         pairs.append(AlignedCrossEtfBars(left.timestamp, left, right))
     return tuple(pairs)
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedCrossEtfFeatures:
+    target: PreparedSessionFeatures
+    confirming: PreparedSessionFeatures
+    aligned_bars: tuple[AlignedCrossEtfBars, ...]
+    decision_aligned: bool
+
+
+def prepare_cross_etf_session_features(
+    history: Arch150D1RSourceHistory | _SyntheticSourceHistory,
+    program: Arch151Program,
+    target_symbol: str,
+    session: date,
+    cutoff_completed_at: datetime,
+) -> PreparedCrossEtfFeatures:
+    """Prepare both source-bound symbol prefixes at the same causal cutoff."""
+
+    if (
+        not _is_canonical_program(program)
+        or program.family is not StrategyFamily.CROSS_ETF_TREND_PULLBACK
+    ):
+        raise UnsupportedProgramError("cross-ETF preparation requires Family D")
+    if target_symbol not in INITIAL_UNIVERSE:
+        raise Arch151Error("target symbol is outside frozen SPY/QQQ")
+    confirming_symbol = next(item for item in INITIAL_UNIVERSE if item != target_symbol)
+    target = prepare_session_features(
+        history, program, target_symbol, session, cutoff_completed_at
+    )
+    confirming = prepare_session_features(
+        history, program, confirming_symbol, session, cutoff_completed_at
+    )
+    confirming_by_timestamp = {bar.timestamp: bar for bar in confirming.bars}
+    pairs = tuple(
+        AlignedCrossEtfBars(bar.timestamp, bar, confirming_by_timestamp[bar.timestamp])
+        for bar in target.bars
+        if bar.timestamp in confirming_by_timestamp
+    )
+    segment_start = len(pairs)
+    if pairs:
+        segment_start = len(pairs) - 1
+        while segment_start > 0 and pairs[segment_start].timestamp == pairs[
+            segment_start - 1
+        ].timestamp + timedelta(minutes=int(program.resolution)):
+            segment_start -= 1
+    aligned = pairs[segment_start:]
+    decision_aligned = (
+        target.decision_bar is not None
+        and confirming.decision_bar is not None
+        and target.decision_bar.completed_at == cutoff_completed_at.astimezone(UTC)
+        and confirming.decision_bar.completed_at == cutoff_completed_at.astimezone(UTC)
+        and target.decision_bar.timestamp == confirming.decision_bar.timestamp
+    )
+    return PreparedCrossEtfFeatures(target, confirming, aligned, decision_aligned)
 
 
 @dataclass(frozen=True, slots=True)
@@ -2756,8 +3764,8 @@ def family_d_entry_signal(
     confirming_bars: Sequence[AggregateBar],
     confirming_vwaps: Sequence[VwapObservation],
     *,
-    target_session: VerifiedSparseSession | None = None,
-    confirming_session: VerifiedSparseSession | None = None,
+    target_session: _SparseSessionEvidence | None = None,
+    confirming_session: _SparseSessionEvidence | None = None,
 ) -> TrendPullbackSignal | None:
     """Evaluate only a qualifying reclaim on the current completed decision bar.
 
@@ -3451,10 +4459,22 @@ class QualificationRejection(StrEnum):
         "MEDIAN_TRADES_PER_ACTIVE_SESSION_ABOVE_TWO"
     )
     SELECTION_BIAS_EVIDENCE_UNAVAILABLE = "SELECTION_BIAS_EVIDENCE_UNAVAILABLE"
+    SELECTION_BIAS_PROBABILITY_BELOW_THRESHOLD = (
+        "SELECTION_BIAS_PROBABILITY_BELOW_THRESHOLD"
+    )
 
 
 class SelectionBiasStatus(StrEnum):
-    DSR_COMPUTATION_DEFERRED = "DSR_COMPUTATION_DEFERRED"
+    DSR_COMPUTATION_REQUIRED = "DSR_COMPUTATION_REQUIRED"
+    DSR_VERIFIED = "DSR_VERIFIED"
+    STATISTICAL_EVIDENCE_UNAVAILABLE = "STATISTICAL_EVIDENCE_UNAVAILABLE"
+
+
+class DsrUnavailableReason(StrEnum):
+    UNDEFINED_TRIAL_SHARPE = "UNDEFINED_TRIAL_SHARPE"
+    ZERO_TRIAL_SHARPE_VARIANCE = "ZERO_TRIAL_SHARPE_VARIANCE"
+    INVALID_CANDIDATE_MOMENTS = "INVALID_CANDIDATE_MOMENTS"
+    DEGENERATE_DSR_VARIANCE = "DEGENERATE_DSR_VARIANCE"
 
 
 def _qualification_rejections(
@@ -3597,8 +4617,11 @@ def aggregate_development_economics(
     )
 
 
-def qualify_development(batch: DevelopmentEvaluationBatch) -> DevelopmentQualification:
-    """Qualify a complete valid batch; DSR absence always blocks selection.
+def qualify_development(
+    batch: DevelopmentEvaluationBatch,
+    selection_bias_evidence: VerifiedSelectionBiasEvidence | None = None,
+) -> DevelopmentQualification:
+    """Qualify one complete batch against its source-issued DSR evidence.
 
     Returned economic rejection reasons apply only to valid complete records.
     Malformed evidence fails at its typed construction boundary instead.
@@ -3606,16 +4629,42 @@ def qualify_development(batch: DevelopmentEvaluationBatch) -> DevelopmentQualifi
 
     aggregate = aggregate_development_economics(batch, FillCostCase.STRESS)
     economic_rejections = _qualification_rejections(aggregate)
-    reasons = (
-        *economic_rejections,
-        QualificationRejection.SELECTION_BIAS_EVIDENCE_UNAVAILABLE,
+    verified_evidence = (
+        type(selection_bias_evidence) is VerifiedSelectionBiasEvidence
+        and getattr(selection_bias_evidence, "_seal", None)
+        is _VERIFIED_SELECTION_BIAS_SEAL
+        and selection_bias_evidence.candidate_slot_id == batch.slot_id
+        and selection_bias_evidence.development_batch_digest == batch.batch_digest
+        and selection_bias_evidence.ledger_id == SELECTION_BIAS_INPUT.ledger_id
+        and selection_bias_evidence.effective_trial_count
+        == SELECTION_BIAS_INPUT.effective_trial_count
     )
+    selection_bias_status = (
+        SelectionBiasStatus.DSR_VERIFIED
+        if verified_evidence
+        else SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
+    )
+    reasons = list(economic_rejections)
+    if not verified_evidence:
+        reasons.append(QualificationRejection.SELECTION_BIAS_EVIDENCE_UNAVAILABLE)
+    elif not _selection_bias_probability_meets_threshold(
+        selection_bias_evidence.probability
+    ):
+        reasons.append(
+            QualificationRejection.SELECTION_BIAS_PROBABILITY_BELOW_THRESHOLD
+        )
     material = {
-        "schema": "arch151-development-qualification/v1",
+        "schema": "arch151-development-qualification/v2",
         "batch_digest": batch.batch_digest,
         "economics_case": FillCostCase.STRESS.value,
         "economic_rejections": [item.value for item in economic_rejections],
-        "selection_bias_status": SelectionBiasStatus.DSR_COMPUTATION_DEFERRED.value,
+        "selection_bias_status": selection_bias_status.value,
+        "selection_bias_evidence_digest": (
+            selection_bias_evidence.evidence_digest if verified_evidence else None
+        ),
+        "selection_bias_rejections": [
+            item.value for item in reasons[len(economic_rejections) :]
+        ],
     }
     qualification_id = uuid5(
         _QUALIFICATION_NAMESPACE, _canonical_json(material).decode("utf-8")
@@ -3625,8 +4674,8 @@ def qualify_development(batch: DevelopmentEvaluationBatch) -> DevelopmentQualifi
         batch.batch_digest,
         aggregate,
         economic_rejections,
-        reasons,
-        SelectionBiasStatus.DSR_COMPUTATION_DEFERRED,
+        tuple(reasons),
+        selection_bias_status,
         qualification_id,
     )
 
@@ -3847,7 +4896,7 @@ class SelectionBiasInputContract:
         prior = PRIOR_INTRADAY_TRIAL_LEDGER.documented_prior_intraday_trials
         effective = max(64, 32 + prior)
         values = (
-            ("schema", "arch151-selection-bias-input/v1"),
+            ("schema", "arch151-selection-bias-input/v2"),
             ("semantic_contract_version", SEMANTIC_CONTRACT_VERSION),
             ("ledger_id", PRIOR_INTRADAY_TRIAL_LEDGER.ledger_id),
             ("ledger_fingerprint", PRIOR_INTRADAY_TRIAL_LEDGER.fingerprint),
@@ -3856,7 +4905,7 @@ class SelectionBiasInputContract:
             ("minimum_effective_trial_count", 64),
             ("effective_trial_count", effective),
             ("required_probability", Decimal("0.95")),
-            ("status", SelectionBiasStatus.DSR_COMPUTATION_DEFERRED),
+            ("status", SelectionBiasStatus.DSR_COMPUTATION_REQUIRED),
             ("probability", None),
         )
         for name, value in values:
@@ -4021,7 +5070,11 @@ def rank_synthetic_candidate_population(
 
 
 class FinalFreezeStatus(StrEnum):
-    ZERO_CANDIDATES_DSR_AUTHORITY_DEFERRED = "ZERO_CANDIDATES_DSR_AUTHORITY_DEFERRED"
+    ZERO_CANDIDATES_STATISTICAL_EVIDENCE_UNAVAILABLE = (
+        "ZERO_CANDIDATES_STATISTICAL_EVIDENCE_UNAVAILABLE"
+    )
+    ZERO_CANDIDATES_NO_QUALIFIED_SURVIVOR = "ZERO_CANDIDATES_NO_QUALIFIED_SURVIVOR"
+    ONE_CANDIDATE_FROZEN = "ONE_CANDIDATE_FROZEN"
 
 
 class HoldoutConclusion(StrEnum):
@@ -4030,20 +5083,504 @@ class HoldoutConclusion(StrEnum):
 
 @dataclass(frozen=True, slots=True, init=False)
 class VerifiedSelectionBiasEvidence:
-    """Evaluator-owned DSR evidence type; no producer exists in this milestone."""
+    """Source-issued DSR result bound to one batch and the full population."""
 
     candidate_slot_id: UUID
     development_batch_digest: str
+    population_digest: str
     ledger_id: UUID
     effective_trial_count: int
+    observation_count: int
+    daily_sharpe: Decimal
+    expected_max_daily_sharpe: Decimal
+    skew: Decimal
+    non_excess_kurtosis: Decimal
     probability: Decimal
+    evidence_id: UUID
     evidence_digest: str
     _seal: object
 
-    def __init__(self, *_args: object, **_kwargs: object) -> None:
-        raise AuthorizationUnavailableError(
-            "verified DSR evidence is unavailable until the evaluator milestone"
+    def __init__(
+        self,
+        *,
+        _seal: object = None,
+        candidate_slot_id: UUID | None = None,
+        development_batch_digest: str | None = None,
+        population_digest: str | None = None,
+        daily_sharpe: Decimal | None = None,
+        expected_max_daily_sharpe: Decimal | None = None,
+        skew: Decimal | None = None,
+        non_excess_kurtosis: Decimal | None = None,
+        probability: Decimal | None = None,
+    ) -> None:
+        if _seal is not _VERIFIED_SELECTION_BIAS_SEAL:
+            raise AuthorizationUnavailableError(
+                "verified DSR evidence must come from the complete source population"
+            )
+        if type(candidate_slot_id) is not UUID:
+            raise TypeError("DSR evidence candidate identity must be a UUID")
+        for name, digest in (
+            ("development batch", development_batch_digest),
+            ("population", population_digest),
+        ):
+            if (
+                type(digest) is not str
+                or len(digest) != 64
+                or any(char not in "0123456789abcdef" for char in digest)
+            ):
+                raise ValueError(f"DSR {name} digest must be lowercase SHA-256")
+        decimal_fields = (
+            ("daily_sharpe", daily_sharpe),
+            ("expected_max_daily_sharpe", expected_max_daily_sharpe),
+            ("skew", skew),
+            ("non_excess_kurtosis", non_excess_kurtosis),
+            ("probability", probability),
         )
+        normalized: dict[str, Decimal] = {}
+        for name, value in decimal_fields:
+            if type(value) is not Decimal:
+                raise TypeError(f"DSR {name} must be Decimal")
+            normalized[name] = _decimal(value, f"DSR {name}")
+        probability_value = normalized["probability"]
+        if not Decimal(0) <= probability_value <= Decimal(1):
+            raise ValueError("DSR probability must be between zero and one")
+        if normalized[
+            "non_excess_kurtosis"
+        ] < 0 or SELECTION_BIAS_INPUT.effective_trial_count != max(
+            SELECTION_BIAS_INPUT.minimum_effective_trial_count,
+            SELECTION_BIAS_INPUT.current_search_slots
+            + SELECTION_BIAS_INPUT.documented_prior_intraday_trials,
+        ):
+            raise Arch151Error("DSR evidence statistical inputs are invalid")
+        material = {
+            "schema": "arch151-verified-selection-bias-evidence/v1",
+            "candidate_slot_id": str(candidate_slot_id),
+            "development_batch_digest": development_batch_digest,
+            "population_digest": population_digest,
+            "ledger_id": str(SELECTION_BIAS_INPUT.ledger_id),
+            "effective_trial_count": SELECTION_BIAS_INPUT.effective_trial_count,
+            "observation_count": DSR_OBSERVATION_COUNT,
+            **{name: _decimal_text(value) for name, value in normalized.items()},
+        }
+        canonical = _canonical_json(material)
+        values: tuple[tuple[str, object], ...] = (
+            ("candidate_slot_id", candidate_slot_id),
+            ("development_batch_digest", development_batch_digest),
+            ("population_digest", population_digest),
+            ("ledger_id", SELECTION_BIAS_INPUT.ledger_id),
+            ("effective_trial_count", SELECTION_BIAS_INPUT.effective_trial_count),
+            ("observation_count", DSR_OBSERVATION_COUNT),
+            *tuple(normalized.items()),
+            ("evidence_id", uuid5(_DSR_EVIDENCE_NAMESPACE, canonical.decode("utf-8"))),
+            ("evidence_digest", sha256(canonical).hexdigest()),
+            ("_seal", _seal),
+        )
+        for name, value in values:
+            object.__setattr__(self, name, value)
+
+
+@dataclass(frozen=True, slots=True)
+class SelectionBiasCalculation:
+    """One complete 32-slot DSR calculation or a typed fail-closed result."""
+
+    status: SelectionBiasStatus
+    population_digest: str
+    effective_trial_count: int
+    evidence: tuple[VerifiedSelectionBiasEvidence, ...]
+    unavailable_reason: DsrUnavailableReason | None
+    calculation_id: UUID
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not SelectionBiasStatus:
+            raise TypeError("selection-bias calculation status is invalid")
+        if (
+            type(self.population_digest) is not str
+            or len(self.population_digest) != 64
+            or any(char not in "0123456789abcdef" for char in self.population_digest)
+        ):
+            raise ValueError("selection-bias population digest is invalid")
+        if self.effective_trial_count != SELECTION_BIAS_INPUT.effective_trial_count:
+            raise Arch151Error("selection-bias effective count differs from ledger")
+        if type(self.calculation_id) is not UUID:
+            raise TypeError("selection-bias calculation identity must be a UUID")
+        if type(self.evidence) is not tuple:
+            raise TypeError("selection-bias evidence must be an immutable tuple")
+        if self.status is SelectionBiasStatus.DSR_VERIFIED:
+            if (
+                len(self.evidence) != len(CANONICAL_SLOTS)
+                or any(
+                    type(item) is not VerifiedSelectionBiasEvidence
+                    or getattr(item, "_seal", None) is not _VERIFIED_SELECTION_BIAS_SEAL
+                    or item.population_digest != self.population_digest
+                    or item.ledger_id != SELECTION_BIAS_INPUT.ledger_id
+                    or item.effective_trial_count
+                    != SELECTION_BIAS_INPUT.effective_trial_count
+                    or item.observation_count != DSR_OBSERVATION_COUNT
+                    for item in self.evidence
+                )
+                or tuple(item.candidate_slot_id for item in self.evidence)
+                != tuple(item.slot_id for item in CANONICAL_SLOTS)
+                or self.unavailable_reason is not None
+            ):
+                raise Arch151Error(
+                    "verified DSR requires the complete ordered population"
+                )
+        elif self.evidence or not isinstance(
+            self.unavailable_reason, DsrUnavailableReason
+        ):
+            raise Arch151Error("unavailable DSR cannot contain partial evidence")
+        if self.calculation_id != _selection_bias_calculation_id(
+            self.status,
+            self.population_digest,
+            self.evidence,
+            self.unavailable_reason,
+        ):
+            raise Arch151Error(
+                "selection-bias calculation identity does not match canonical inputs"
+            )
+
+
+def _selection_bias_calculation_id(
+    status: SelectionBiasStatus,
+    population_digest: str,
+    evidence: tuple[VerifiedSelectionBiasEvidence, ...],
+    unavailable_reason: DsrUnavailableReason | None,
+) -> UUID:
+    if status is SelectionBiasStatus.DSR_VERIFIED:
+        material = {
+            "schema": "arch151-dsr-population-calculation/v1",
+            "population_digest": population_digest,
+            "status": status.value,
+            "evidence_ids": [str(item.evidence_id) for item in evidence],
+        }
+    else:
+        if not isinstance(unavailable_reason, DsrUnavailableReason):
+            raise Arch151Error("unavailable DSR calculation requires a reason")
+        material = {
+            "schema": "arch151-dsr-population-calculation/v1",
+            "population_digest": population_digest,
+            "status": status.value,
+            "reason": unavailable_reason.value,
+        }
+    canonical = _canonical_json(material)
+    return uuid5(_DSR_CALCULATION_NAMESPACE, canonical.decode("utf-8"))
+
+
+_DSR_PI = Decimal(
+    "3.141592653589793238462643383279502884197169399375105820974944592307816406286"
+)
+_EULER_MASCHERONI = Decimal(
+    "0.577215664901532860606512090082402431042159335939923598805767234884867726"
+)
+
+
+def _normal_cdf(value: Decimal) -> Decimal:
+    """High-precision standard-normal CDF using a Decimal erf series."""
+
+    if type(value) is not Decimal or not value.is_finite():
+        raise TypeError("normal CDF input must be a finite Decimal")
+    if value == 0:
+        return Decimal("0.5")
+    if value >= Decimal(20):
+        return Decimal(1)
+    if value <= Decimal(-20):
+        return Decimal(0)
+    if value < 0:
+        with localcontext(_DECIMAL_CONTEXT):
+            return Decimal(1) - _normal_cdf(-value)
+    guard_context = _DECIMAL_CONTEXT.copy()
+    guard_context.prec = 140
+    with localcontext(guard_context):
+        scaled = value / Decimal(2).sqrt()
+        term = scaled
+        series = term
+        scaled_squared = scaled * scaled
+        for index in range(1, 1200):
+            term *= (
+                -scaled_squared
+                * Decimal(2 * index - 1)
+                / (Decimal(index) * Decimal(2 * index + 1))
+            )
+            series += term
+            if abs(term) < Decimal("1e-130"):
+                break
+        erf = Decimal(2) * series / _DSR_PI.sqrt()
+        result = (Decimal(1) + erf) / Decimal(2)
+    with localcontext(_DECIMAL_CONTEXT):
+        return +result
+
+
+def _normal_quantile(probability: Decimal) -> Decimal:
+    if type(probability) is not Decimal or not Decimal(0) < probability < Decimal(1):
+        raise ValueError(
+            "normal quantile requires a probability strictly between zero and one"
+        )
+    low = Decimal(0)
+    high = Decimal(5)
+    with localcontext(_DECIMAL_CONTEXT):
+        for _ in range(240):
+            midpoint = (low + high) / Decimal(2)
+            if midpoint == low or midpoint == high:
+                break
+            if _normal_cdf(midpoint) < probability:
+                low = midpoint
+            else:
+                high = midpoint
+        return +(low + high) / Decimal(2)
+
+
+def _expected_maximum_standard_normal_quantiles() -> Decimal:
+    with localcontext(_DECIMAL_CONTEXT):
+        effective = Decimal(SELECTION_BIAS_INPUT.effective_trial_count)
+        first_probability = Decimal(1) - Decimal(1) / effective
+        e_value = Decimal(1).exp()
+        second_probability = Decimal(1) - Decimal(1) / (effective * e_value)
+        first = _normal_quantile(first_probability)
+        second = _normal_quantile(second_probability)
+        gamma = _EULER_MASCHERONI
+        return +((Decimal(1) - gamma) * first + gamma * second)
+
+
+def _trial_return_statistics(
+    returns: tuple[Decimal, ...],
+) -> tuple[Decimal, Decimal, Decimal, Decimal] | DsrUnavailableReason | None:
+    if len(returns) != DSR_OBSERVATION_COUNT:
+        return None
+    if any(type(value) is not Decimal or not value.is_finite() for value in returns):
+        return DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+    try:
+        standard_deviation = _sample_standard_deviation_centered(returns)
+    except ArithmeticError:
+        return DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+    if standard_deviation <= 0:
+        return None
+    try:
+        with localcontext(_DECIMAL_CONTEXT):
+            count = Decimal(len(returns))
+            mean = sum(returns, Decimal(0)) / count
+            centered = tuple(value - mean for value in returns)
+            second = sum((value**2 for value in centered), Decimal(0)) / count
+            if second <= 0:
+                return DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+            third = sum((value**3 for value in centered), Decimal(0)) / count
+            fourth = sum((value**4 for value in centered), Decimal(0)) / count
+            skew = third / second.sqrt() ** 3
+            kurtosis = fourth / second**2
+            sharpe = mean / standard_deviation
+    except ArithmeticError:
+        return DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+    values = (sharpe, skew, kurtosis, standard_deviation)
+    if any(not value.is_finite() for value in values):
+        return DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+    return values
+
+
+def _sample_standard_deviation_centered(values: Sequence[Decimal]) -> Decimal:
+    """Stable ddof=1 deviation centered around the first value."""
+
+    points = tuple(values)
+    if len(points) < 2:
+        raise UnavailableIndicatorError("sample deviation requires two observations")
+    if any(type(value) is not Decimal or not value.is_finite() for value in points):
+        raise TypeError("sample deviation values must be finite Decimals")
+    with localcontext(_DECIMAL_CONTEXT):
+        origin = points[0]
+        offsets = tuple(value - origin for value in points)
+        mean_offset = sum(offsets, Decimal(0)) / Decimal(len(offsets))
+        variance = sum(
+            ((value - mean_offset) ** 2 for value in offsets), Decimal(0)
+        ) / Decimal(len(offsets) - 1)
+        if variance == 0:
+            return Decimal(0)
+        return variance.sqrt()
+
+
+def _selection_bias_population_digest(
+    batches: tuple[DevelopmentEvaluationBatch, ...],
+) -> str:
+    material = {
+        "schema": "arch151-selection-bias-population/v1",
+        "semantic_contract_version": SEMANTIC_CONTRACT_VERSION,
+        "manifest_id": str(CANONICAL_MANIFEST.manifest_id),
+        "ledger_id": str(SELECTION_BIAS_INPUT.ledger_id),
+        "effective_trial_count": SELECTION_BIAS_INPUT.effective_trial_count,
+        "batch_digests": [item.batch_digest for item in batches],
+    }
+    return sha256(_canonical_json(material)).hexdigest()
+
+
+def _unavailable_selection_bias_calculation(
+    population_digest: str, reason: DsrUnavailableReason
+) -> SelectionBiasCalculation:
+    return SelectionBiasCalculation(
+        SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE,
+        population_digest,
+        SELECTION_BIAS_INPUT.effective_trial_count,
+        (),
+        reason,
+        _selection_bias_calculation_id(
+            SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE,
+            population_digest,
+            (),
+            reason,
+        ),
+    )
+
+
+def compute_selection_bias_evidence(
+    batches: Sequence[DevelopmentEvaluationBatch],
+) -> SelectionBiasCalculation:
+    """Compute Bailey DSR for the complete canonical 32-slot STRESS population."""
+
+    population = tuple(batches)
+    expected_slots = tuple(item.slot_id for item in CANONICAL_SLOTS)
+    if len(population) != len(expected_slots) or any(
+        type(item) is not DevelopmentEvaluationBatch for item in population
+    ):
+        raise Arch151Error("DSR requires all 32 complete canonical slot batches")
+    if tuple(item.slot_id for item in population) != expected_slots:
+        raise Arch151Error("DSR population must preserve canonical manifest order")
+    population_digest = _selection_bias_population_digest(population)
+    trial_statistics: list[tuple[Decimal, Decimal, Decimal, Decimal]] = []
+    for batch in population:
+        stress_records = tuple(
+            record
+            for record in batch.records
+            if record.economics_case is FillCostCase.STRESS
+        )
+        if tuple(record.fold for record in stress_records) != WALK_FORWARD_FOLDS:
+            raise Arch151Error("DSR requires all five exact STRESS folds per slot")
+        returns = tuple(
+            value
+            for record in stress_records
+            for value in record.metrics.session_net_returns
+        )
+        statistics = _trial_return_statistics(returns)
+        if statistics is None or isinstance(statistics, DsrUnavailableReason):
+            reason = (
+                statistics
+                if isinstance(statistics, DsrUnavailableReason)
+                else DsrUnavailableReason.UNDEFINED_TRIAL_SHARPE
+            )
+            return _unavailable_selection_bias_calculation(population_digest, reason)
+        trial_statistics.append(statistics)
+    sharpes = tuple(item[0] for item in trial_statistics)
+    sharpe_dispersion = _sample_standard_deviation_centered(sharpes)
+    if sharpe_dispersion == 0:
+        return _unavailable_selection_bias_calculation(
+            population_digest, DsrUnavailableReason.ZERO_TRIAL_SHARPE_VARIANCE
+        )
+    try:
+        with localcontext(_DECIMAL_CONTEXT):
+            expected_maximum = (
+                sharpe_dispersion * _expected_maximum_standard_normal_quantiles()
+            )
+            time_scale = Decimal(DSR_OBSERVATION_COUNT - 1).sqrt()
+    except ArithmeticError:
+        return _unavailable_selection_bias_calculation(
+            population_digest, DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+        )
+    evidence_records: list[VerifiedSelectionBiasEvidence] = []
+    for batch, (sharpe, skew, kurtosis, _std) in zip(
+        population, trial_statistics, strict=True
+    ):
+        with localcontext(_DECIMAL_CONTEXT):
+            dsr_variance = (
+                Decimal(1)
+                - skew * sharpe
+                + ((kurtosis - Decimal(1)) / Decimal(4)) * sharpe**2
+            )
+        if not dsr_variance.is_finite() or dsr_variance <= 0:
+            return _unavailable_selection_bias_calculation(
+                population_digest, DsrUnavailableReason.DEGENERATE_DSR_VARIANCE
+            )
+        try:
+            with localcontext(_DECIMAL_CONTEXT):
+                probability = _normal_cdf(
+                    (sharpe - expected_maximum) * time_scale / dsr_variance.sqrt()
+                )
+        except ArithmeticError:
+            return _unavailable_selection_bias_calculation(
+                population_digest, DsrUnavailableReason.INVALID_CANDIDATE_MOMENTS
+            )
+        evidence_records.append(
+            VerifiedSelectionBiasEvidence(
+                _seal=_VERIFIED_SELECTION_BIAS_SEAL,
+                candidate_slot_id=batch.slot_id,
+                development_batch_digest=batch.batch_digest,
+                population_digest=population_digest,
+                daily_sharpe=sharpe,
+                expected_max_daily_sharpe=expected_maximum,
+                skew=skew,
+                non_excess_kurtosis=kurtosis,
+                probability=probability,
+            )
+        )
+    evidence = tuple(evidence_records)
+    return SelectionBiasCalculation(
+        SelectionBiasStatus.DSR_VERIFIED,
+        population_digest,
+        SELECTION_BIAS_INPUT.effective_trial_count,
+        evidence,
+        None,
+        _selection_bias_calculation_id(
+            SelectionBiasStatus.DSR_VERIFIED,
+            population_digest,
+            evidence,
+            None,
+        ),
+    )
+
+
+def rank_verified_candidate_population(
+    batches: Sequence[DevelopmentEvaluationBatch],
+    selection: SelectionBiasCalculation,
+) -> tuple[UUID, ...]:
+    """Rank the complete population using source-issued DSR evidence."""
+
+    population = tuple(batches)
+    expected = tuple(slot.slot_id for slot in CANONICAL_SLOTS)
+    if (
+        len(population) != len(expected)
+        or tuple(item.slot_id for item in population) != expected
+    ):
+        raise Arch151Error("verified ranking requires all 32 canonical slot batches")
+    if (
+        type(selection) is not SelectionBiasCalculation
+        or selection.status is not SelectionBiasStatus.DSR_VERIFIED
+        or selection.population_digest != _selection_bias_population_digest(population)
+        or len(selection.evidence) != len(expected)
+    ):
+        raise AuthorizationUnavailableError(
+            "complete source-issued DSR population evidence is required for ranking"
+        )
+    ordered_material: list[tuple[tuple[Decimal | int, ...], UUID]] = []
+    for batch, evidence in zip(population, selection.evidence, strict=True):
+        if (
+            getattr(evidence, "_seal", None) is not _VERIFIED_SELECTION_BIAS_SEAL
+            or evidence.candidate_slot_id != batch.slot_id
+            or evidence.development_batch_digest != batch.batch_digest
+            or evidence.population_digest != selection.population_digest
+        ):
+            raise AuthorizationUnavailableError(
+                "ranking DSR evidence does not bind the complete canonical population"
+            )
+        aggregate = aggregate_development_economics(batch, FillCostCase.STRESS)
+        if aggregate.sharpe is None:
+            raise AuthorizationUnavailableError(
+                "verified DSR candidate has no finite STRESS Sharpe"
+            )
+        key = _ranking_key(
+            evidence.probability,
+            aggregate.worst_scored_year_return,
+            aggregate.profit_factor,
+            aggregate.sharpe,
+            aggregate.max_drawdown,
+            aggregate.turnover,
+            batch.slot_id,
+        )
+        ordered_material.append((key, batch.slot_id))
+    return tuple(slot_id for _key, slot_id in sorted(ordered_material))
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -4143,11 +5680,14 @@ class ExtensionAuthorization:
 
 @dataclass(frozen=True, slots=True, init=False)
 class FinalCandidateFreeze:
-    """Source-issued zero-or-one freeze; this version can issue zero only."""
+    """Source-issued deterministic zero-or-one development candidate freeze."""
 
     source_manifest_id: UUID
     batch_digests: tuple[str, ...]
     economically_qualified_slot_ids: tuple[UUID, ...]
+    ranking_order: tuple[UUID, ...]
+    selection_bias_calculation_id: UUID | None
+    selection_bias_evidence_digests: tuple[str, ...]
     candidate_slot_id: UUID | None
     candidate_program_id: UUID | None
     selection_bias_status: SelectionBiasStatus
@@ -4162,29 +5702,101 @@ class FinalCandidateFreeze:
         _seal: object = None,
         batch_digests: tuple[str, ...],
         economically_qualified_slot_ids: tuple[UUID, ...],
+        ranking_order: tuple[UUID, ...],
+        selection_bias_status: SelectionBiasStatus,
+        selection_bias_calculation_id: UUID | None,
+        selection_bias_evidence_digests: tuple[str, ...],
+        candidate_slot_id: UUID | None,
+        status: FinalFreezeStatus,
     ) -> None:
         if _seal is not _FINAL_FREEZE_SEAL:
             raise Arch151Error("final candidate freeze must be source-owned")
+        expected_slot_ids = tuple(slot.slot_id for slot in CANONICAL_SLOTS)
+        if type(batch_digests) is not tuple or len(batch_digests) != len(
+            expected_slot_ids
+        ):
+            raise Arch151Error("final freeze must bind all 32 batch digests")
+        if type(economically_qualified_slot_ids) is not tuple or any(
+            item not in expected_slot_ids for item in economically_qualified_slot_ids
+        ):
+            raise Arch151Error("final freeze economic survivor identities are invalid")
+        if type(selection_bias_status) is not SelectionBiasStatus:
+            raise TypeError("final freeze DSR status is invalid")
+        if type(status) is not FinalFreezeStatus:
+            raise TypeError("final freeze status is invalid")
+        if type(selection_bias_evidence_digests) is not tuple:
+            raise TypeError("final freeze DSR evidence digests must be immutable")
+        if selection_bias_status is SelectionBiasStatus.DSR_VERIFIED:
+            if (
+                type(selection_bias_calculation_id) is not UUID
+                or len(selection_bias_evidence_digests) != len(expected_slot_ids)
+                or len(ranking_order) != len(expected_slot_ids)
+                or set(ranking_order) != set(expected_slot_ids)
+            ):
+                raise Arch151Error(
+                    "verified final freeze requires complete DSR ranking"
+                )
+        elif (
+            type(selection_bias_calculation_id) is not UUID
+            or selection_bias_evidence_digests
+            or ranking_order
+        ):
+            raise Arch151Error("unavailable DSR cannot authorize a candidate ranking")
+        if status is FinalFreezeStatus.ONE_CANDIDATE_FROZEN:
+            if candidate_slot_id not in expected_slot_ids:
+                raise Arch151Error("one-candidate freeze requires a canonical slot")
+        elif candidate_slot_id is not None:
+            raise Arch151Error("zero-candidate freeze cannot name a candidate")
+        if (
+            status is FinalFreezeStatus.ZERO_CANDIDATES_STATISTICAL_EVIDENCE_UNAVAILABLE
+        ) != (
+            selection_bias_status
+            is SelectionBiasStatus.STATISTICAL_EVIDENCE_UNAVAILABLE
+        ):
+            raise Arch151Error("final freeze status disagrees with DSR evidence status")
         material = {
-            "schema": "arch151-final-candidate-freeze/v1",
+            "schema": "arch151-final-candidate-freeze/v2",
             "semantic_contract_version": SEMANTIC_CONTRACT_VERSION,
             "source_manifest_id": str(CANONICAL_MANIFEST.manifest_id),
             "batch_digests": list(batch_digests),
             "economically_qualified_slot_ids": [
                 str(value) for value in economically_qualified_slot_ids
             ],
-            "candidate_slot_id": None,
-            "selection_bias_status": SelectionBiasStatus.DSR_COMPUTATION_DEFERRED.value,
+            "ranking_order": [str(value) for value in ranking_order],
+            "selection_bias_status": selection_bias_status.value,
+            "selection_bias_calculation_id": (
+                str(selection_bias_calculation_id)
+                if selection_bias_calculation_id is not None
+                else None
+            ),
+            "selection_bias_evidence_digests": list(selection_bias_evidence_digests),
+            "candidate_slot_id": (
+                str(candidate_slot_id) if candidate_slot_id is not None else None
+            ),
+            "status": status.value,
         }
         canonical = _canonical_json(material)
         values = (
             ("source_manifest_id", CANONICAL_MANIFEST.manifest_id),
             ("batch_digests", batch_digests),
             ("economically_qualified_slot_ids", economically_qualified_slot_ids),
-            ("candidate_slot_id", None),
-            ("candidate_program_id", None),
-            ("selection_bias_status", SelectionBiasStatus.DSR_COMPUTATION_DEFERRED),
-            ("status", FinalFreezeStatus.ZERO_CANDIDATES_DSR_AUTHORITY_DEFERRED),
+            ("ranking_order", ranking_order),
+            ("selection_bias_calculation_id", selection_bias_calculation_id),
+            ("selection_bias_evidence_digests", selection_bias_evidence_digests),
+            ("candidate_slot_id", candidate_slot_id),
+            (
+                "candidate_program_id",
+                next(
+                    (
+                        slot.program_id
+                        for slot in CANONICAL_SLOTS
+                        if slot.slot_id == candidate_slot_id
+                    ),
+                    None,
+                ),
+            ),
+            ("selection_bias_status", selection_bias_status),
+            ("status", status),
             ("freeze_id", uuid5(_FINAL_FREEZE_NAMESPACE, canonical.decode("utf-8"))),
             ("fingerprint", sha256(canonical).hexdigest()),
             ("_seal", _seal),
@@ -4195,8 +5807,10 @@ class FinalCandidateFreeze:
 
 def freeze_final_candidate_set(
     batches: Sequence[DevelopmentEvaluationBatch],
+    *,
+    _selection_bias_calculation: SelectionBiasCalculation | None = None,
 ) -> FinalCandidateFreeze:
-    """Freeze the complete population; DSR deferral always yields zero candidates."""
+    """Rank and freeze zero or one survivor from the complete verified population."""
 
     population = tuple(batches)
     expected_slot_ids = tuple(slot.slot_id for slot in CANONICAL_SLOTS)
@@ -4209,15 +5823,57 @@ def freeze_final_candidate_set(
         raise Arch151Error(
             "final freeze population must match canonical manifest order exactly"
         )
-    qualifications = tuple(qualify_development(batch) for batch in population)
+    selection = (
+        compute_selection_bias_evidence(population)
+        if _selection_bias_calculation is None
+        else _selection_bias_calculation
+    )
+    if (
+        type(selection) is not SelectionBiasCalculation
+        or selection.population_digest != _selection_bias_population_digest(population)
+    ):
+        raise AuthorizationUnavailableError(
+            "final freeze requires DSR evidence bound to the complete batch population"
+        )
+    evidence_by_slot = {item.candidate_slot_id: item for item in selection.evidence}
+    qualifications = tuple(
+        qualify_development(batch, evidence_by_slot.get(batch.slot_id))
+        for batch in population
+    )
     economically_qualified = tuple(
         result.slot_id for result in qualifications if result.economically_qualified
     )
+    ranking_order: tuple[UUID, ...] = ()
+    if selection.status is SelectionBiasStatus.DSR_VERIFIED:
+        ranking_order = rank_verified_candidate_population(population, selection)
+        qualified_slot_ids = {
+            result.slot_id for result in qualifications if result.qualified
+        }
+        candidate_slot_id = next(
+            (slot_id for slot_id in ranking_order if slot_id in qualified_slot_ids),
+            None,
+        )
+        status = (
+            FinalFreezeStatus.ONE_CANDIDATE_FROZEN
+            if candidate_slot_id is not None
+            else FinalFreezeStatus.ZERO_CANDIDATES_NO_QUALIFIED_SURVIVOR
+        )
+    else:
+        candidate_slot_id = None
+        status = FinalFreezeStatus.ZERO_CANDIDATES_STATISTICAL_EVIDENCE_UNAVAILABLE
     batch_digests = tuple(batch.batch_digest for batch in population)
     return FinalCandidateFreeze(
         _seal=_FINAL_FREEZE_SEAL,
         batch_digests=batch_digests,
         economically_qualified_slot_ids=economically_qualified,
+        ranking_order=ranking_order,
+        selection_bias_status=selection.status,
+        selection_bias_calculation_id=selection.calculation_id,
+        selection_bias_evidence_digests=tuple(
+            item.evidence_digest for item in selection.evidence
+        ),
+        candidate_slot_id=candidate_slot_id,
+        status=status,
     )
 
 
@@ -4456,9 +6112,23 @@ __all_canonical_check()
 
 
 __all__ = (
+    "ARCH150_D1R_AFFECTED_SESSION_COUNT",
+    "ARCH150_D1R_COMMON_MISSING_COUNT",
+    "ARCH150_D1R_CUSTODY_ID",
+    "ARCH150_D1R_CUSTODY_SHA256",
+    "ARCH150_D1R_DATASET_ID",
+    "ARCH150_D1R_DATASET_SHA256",
+    "ARCH150_D1R_EVIDENCE_ID",
+    "ARCH150_D1R_EVIDENCE_SHA256",
+    "ARCH150_D1R_FULLY_MISSING_SESSION_COUNTS",
+    "ARCH150_D1R_MISSING_COUNTS",
+    "ARCH150_D1R_OBSERVED_COUNTS",
+    "ARCH150_D1R_SCHEDULED_SLOTS_PER_SYMBOL",
+    "ARCH150_D1R_UNION_MISSING_COUNT",
     "AGGREGATION_SCHEMA",
     "AuthenticatedDevelopmentEvidence",
     "AuthenticatedHoldoutPass",
+    "Arch150D1RSourceHistory",
     "Arch151Error",
     "Arch151Program",
     "AlignedCrossEtfBars",
@@ -4468,6 +6138,7 @@ __all__ = (
     "AuthorizationUnavailableError",
     "BarResolution",
     "CAUSAL_EXECUTION_POLICY",
+    "CausalIndicatorPoint",
     "CANONICAL_MANIFEST",
     "CANONICAL_PROGRAMS",
     "CANONICAL_SLOTS",
@@ -4476,6 +6147,8 @@ __all__ = (
     "DevelopmentAggregate",
     "DevelopmentEvaluationBatch",
     "DevelopmentQualification",
+    "DSR_OBSERVATION_COUNT",
+    "DsrUnavailableReason",
     "DEVELOPMENT_END",
     "DEVELOPMENT_START",
     "EVALUATION_ECONOMICS_ORDER",
@@ -4490,6 +6163,9 @@ __all__ = (
     "FamilyASessionMeasure",
     "ProfitFactor",
     "ProfitFactorState",
+    "PreparedCrossEtfFeatures",
+    "PreparedSessionFeatures",
+    "SessionFeatureCacheKey",
     "VerifiedSparseSession",
     "VwapMeanReversionSignal",
     "TrendPullbackSignal",
@@ -4520,6 +6196,7 @@ __all__ = (
     "QualificationRejection",
     "SCORED_YEARS",
     "SELECTION_BIAS_INPUT",
+    "SelectionBiasCalculation",
     "SelectionBiasInputContract",
     "SelectionBiasStatus",
     "StrategyFamily",
@@ -4545,13 +6222,16 @@ __all__ = (
     "authorize_holdout",
     "average_true_range",
     "calibrate_family_a",
+    "calibrate_family_a_from_source_history",
     "canonical_manifest",
+    "compute_selection_bias_evidence",
     "contiguous_aggregate_bars",
     "efficiency_ratio",
     "ema_series",
     "exact_cross_etf_confirmation",
     "family_a_breakout_level",
     "family_a_entry_signal",
+    "family_a_current_measure_from_source_history",
     "family_a_historical_session_measure",
     "family_a_initial_risk",
     "family_a_regime_passes",
@@ -4561,12 +6241,16 @@ __all__ = (
     "family_c_reversion_exit",
     "family_d_entry_signal",
     "freeze_final_candidate_set",
+    "load_arch150_d1r_source_history",
     "normalized_vwap_deviation",
     "program_fingerprint",
     "program_from_bytes",
     "program_id",
     "program_to_bytes",
+    "prepare_cross_etf_session_features",
+    "prepare_session_features",
     "qualify_development",
+    "rank_verified_candidate_population",
     "rank_synthetic_candidate_population",
     "sample_standard_deviation",
     "structural_entry_opportunities",

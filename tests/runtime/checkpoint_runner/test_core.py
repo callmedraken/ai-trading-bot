@@ -434,6 +434,73 @@ def test_arch151_intraday_walkforward_checkpoint_is_source_only_and_mapped():
     assert runner._arch151_intraday_walkforward_authority_check(repo) == ()
 
 
+def test_arch151_evaluator_successor_is_source_only_and_diff_selected():
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    name = runner.ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME
+    spec = specs[name]
+
+    assert name == "arch151-intraday-walkforward-evaluator"
+    assert spec.remote_branch == runner.ARCH151_INTRADAY_WALKFORWARD_BRANCH
+    assert spec.tests == runner.ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_TESTS
+    assert spec.ruff_paths == runner.ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_RUFF
+    assert "scripts/source_authority.py" in spec.ruff_paths
+    assert "tests/experiments/test_arch151_intraday_walkforward.py" in spec.tests
+    assert (
+        "tests/experiments/test_arch151_intraday_walkforward_evaluator.py" in spec.tests
+    )
+    assert (
+        "src/trading_bot/experiments/arch151_intraday_walkforward_evaluator.py"
+        in spec.ruff_paths
+    )
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert name not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CERTIFICATION_PROFILES[name] == "full"
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "push",
+        )
+        == runner.ARCH151_INTRADAY_WALKFORWARD_NAME
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "push",
+            changed_paths=runner.ARCH151_INTRADAY_WALKFORWARD_PATHS,
+        )
+        == runner.ARCH151_INTRADAY_WALKFORWARD_NAME
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "push",
+            changed_paths=(
+                *runner.ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS[:2],
+                *runner.ARCH151_INTRADAY_WALKFORWARD_PATHS,
+                "scripts/checkpoint_runner.py",
+                ".github/workflows/checkpoint-source-gates.yml",
+                "docs/architecture/151-intraday-walk-forward-campaign.md",
+            ),
+        )
+        == name
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH151_INTRADAY_WALKFORWARD_BRANCH,
+            "pull_request",
+            changed_paths=runner.ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS,
+        )
+        is None
+    )
+    assert runner._arch151_intraday_walkforward_evaluator_authority_check(repo) == ()
+
+
 def test_arch150_d1_data_custody_route_is_source_only_and_diff_selected():
     repo = Path(runner.__file__).resolve().parents[1]
     specs = runner._checkpoint_specs()

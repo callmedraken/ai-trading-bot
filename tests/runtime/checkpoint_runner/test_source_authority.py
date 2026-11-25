@@ -66,7 +66,13 @@ def test_classification_has_one_current_owner_and_preserves_security_evidence():
         "ARCH151_INTRADAY_WALKFORWARD_BRANCH",
         "ARCH151_INTRADAY_WALKFORWARD_TESTS",
         "ARCH151_INTRADAY_WALKFORWARD_RUFF",
+        "ARCH151_INTRADAY_WALKFORWARD_PATHS",
+        "ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME",
+        "ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_PATHS",
+        "ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_TESTS",
+        "ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_RUFF",
         "_arch151_intraday_walkforward_authority_check",
+        "_arch151_intraday_walkforward_evaluator_authority_check",
         "_prepublication_admission_tests",
         "_prepublication_requires_infrastructure_coherence",
     ):

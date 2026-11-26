@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 evaluator integrated; real development evaluation next
+## Current milestone - Architecture 151 E2 integrated; successor development evaluation next
 
 Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
@@ -10,6 +10,17 @@ no duplicate FULL ran. The evaluator, durable one-shot operator, realized-net
 accounting, statistical qualification, diagnostic report, and source-bound
 candidate evidence are implemented and synthetic-tested. See the handoff and
 owning Architecture 151 documents for exact evidence and limitations.
+
+The first real Arch151 E1 observation is permanently CONSUMED / FAILED /
+SOURCE_LOAD_FAILED; no candidate was evaluated. E2 corrects the incompatible
+Arch150 discovery-stage versus full-development custody contract without
+changing Arch150 or the frozen strategy design. E2 is SOURCE/CERTIFICATION
+ACCEPTED and FAST-FORWARD INTEGRATED at
+`7c9c398cd82f917b51ce4ddba5488df937ea46ac` /
+`d2e3067a285cc309fea6989f145203b08e86eabd`. Feature FULL `45769306690` and
+develop exact reuse `45772034607`, both attempt 1, are terminal SUCCESS.
+Positive synthetic adapter-to-replay coverage passed; the real corrected
+custody load and successor evaluation remain unexecuted.
 
 Architecture 150 remains terminal: 24 evaluated, 0 qualified,
 `NO_HOLDOUT_CANDIDATES`; no rerun or mutation. Arch151 reuses its accepted
@@ -21,11 +32,12 @@ The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Immediate next milestone: ChatGPT-reviewed local source/evidence-root preflight,
-then a separately bounded one-shot development observation using only the
-accepted D1R custody. No new implementation is required for that observation.
-The fixed output root must not exist; preserve any existing attempt and never
-retry automatically. Review the terminal report, all candidate results and
+Immediate next milestone: source-owned read-only E2 successor preflight,
+then a separately reviewed one-shot successor observation using only accepted
+D1R custody. The E1 no-argument route is retired and its evidence preserved.
+Only the fixed E2 successor root
+`F:\AI\temp\arch151-intraday-development-evidence-e2-successor` must be absent.
+No automatic retry, recovery, relocation or alternative output root. Review the terminal report, all candidate results and
 zero-or-one freeze before any subsequent decision. 2024-2025 and Jan-Oct 2026
 remain sealed; real later-period readers/issuers are not implemented. No real
 custody access, provider/credential access, broker/order effect or 2024+ access

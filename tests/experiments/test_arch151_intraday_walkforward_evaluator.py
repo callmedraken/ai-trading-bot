@@ -321,18 +321,121 @@ def _synthetic_campaign_measures(
 
 
 def _synthetic_five_year_campaign_history():
-    """Generate a complete signal session and exact SPY endpoints per year."""
-    minutes = []
+    """Generate a complete campaign with representative 2023 family signals."""
+    minutes_by_key = {}
+
+    def retain(items) -> None:
+        for minute in items:
+            minutes_by_key[minute.symbol, minute.timestamp] = minute
+
+    def shift_fractional_price_level(items):
+        offset = Decimal("0.03125")
+        for minute in items:
+            with localcontext(arch151._DECIMAL_CONTEXT):
+                yield replace(
+                    minute,
+                    open=minute.open + offset,
+                    high=minute.high + offset,
+                    low=minute.low + offset,
+                    close=minute.close + offset,
+                )
+
     for year in arch151.SCORED_YEARS:
         signal_session = arch151._published_sessions_for_year(year)[1]
-        minutes.extend(_campaign_signal_session_minutes(signal_session))
+        retain(_campaign_signal_session_minutes(signal_session))
         benchmark = _synthetic_benchmark_history(year)
-        minutes.extend(
+        retain(
             minute
             for projection in benchmark._session_projections
             for minute in projection.minutes
         )
-    return arch151._test_only_synthetic_source_history(minutes)
+
+    for symbol in arch151.INITIAL_UNIVERSE:
+        retain(shift_fractional_price_level(_a_prior_minutes(symbol)))
+
+    selected_keys = (
+        arch151.ProgramKey.A5_01,
+        arch151.ProgramKey.A15_01,
+        arch151.ProgramKey.B5_01,
+        arch151.ProgramKey.B15_01,
+        arch151.ProgramKey.C5_01,
+        arch151.ProgramKey.C15_01,
+        arch151.ProgramKey.D5_01,
+        arch151.ProgramKey.D15_01,
+    )
+    target_dates = arch151._published_sessions_for_year(2023)[10:20]
+    assert len(target_dates) == 10
+    representative_sessions: dict[tuple[arch151.ProgramKey, str], date] = {}
+    flat_target_dates: set[date] = set()
+    target_index = 0
+    for key in selected_keys:
+        program = next(item for item in arch151.CANONICAL_PROGRAMS if item.key is key)
+        if program.family is arch151.StrategyFamily.CROSS_ETF_TREND_PULLBACK:
+            selected_targets = {
+                symbol: target_dates[target_index + offset]
+                for offset, symbol in enumerate(arch151.INITIAL_UNIVERSE)
+            }
+            target_index += len(arch151.INITIAL_UNIVERSE)
+        else:
+            target = target_dates[target_index]
+            target_index += 1
+            selected_targets = {symbol: target for symbol in arch151.INITIAL_UNIVERSE}
+        for symbol, target in selected_targets.items():
+            representative_sessions[key, symbol] = target
+            if target not in flat_target_dates:
+                schedule = arch151._SESSION_AUTHORITY.schedule_for(target)
+                assert schedule is not None
+                count = int(
+                    (schedule.closes_at - schedule.opens_at).total_seconds() // 60
+                )
+                retain(
+                    arch151.OneMinuteBar(
+                        item,
+                        schedule.opens_at + timedelta(minutes=offset),
+                        Decimal("100"),
+                        Decimal("100.01"),
+                        Decimal("99.99"),
+                        Decimal("100"),
+                        100,
+                    )
+                    for item in arch151.INITIAL_UNIVERSE
+                    for offset in range(count)
+                )
+                flat_target_dates.add(target)
+            source_history, source_session, *_ = _source_for_program(program, symbol)
+            assert source_session == SESSION
+            source_symbols = (
+                arch151.INITIAL_UNIVERSE
+                if program.family is arch151.StrategyFamily.CROSS_ETF_TREND_PULLBACK
+                else (symbol,)
+            )
+            shift = target - source_session
+            for source_symbol in source_symbols:
+                projection = source_history._projection_index[
+                    (source_symbol, source_session, program.resolution)
+                ]
+                pattern_minutes = projection.minutes
+                if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT:
+                    pattern_minutes = tuple(
+                        shift_fractional_price_level(pattern_minutes)
+                    )
+                retain(
+                    replace(
+                        minute,
+                        timestamp=minute.timestamp + timedelta(days=shift.days),
+                    )
+                    for minute in pattern_minutes
+                )
+
+    history = arch151._test_only_synthetic_source_history(
+        tuple(
+            sorted(
+                minutes_by_key.values(),
+                key=lambda minute: (minute.symbol, minute.timestamp),
+            )
+        )
+    )
+    return history, representative_sessions
 
 
 def _campaign_signal_session_minutes(session: date) -> tuple[arch151.OneMinuteBar, ...]:
@@ -1730,12 +1833,17 @@ def test_family_a_calibration_cache_matches_per_program_reference(
 def test_generated_five_year_simulation_composes_non_idle_480_records(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    source_measure_function = arch151._family_a_historical_measures_from_source_history
+
+    def campaign_measures(history, symbol: str, scored_year: int):
+        if scored_year == 2023:
+            return source_measure_function(history, symbol, scored_year)
+        return _synthetic_campaign_measures(history, symbol, scored_year)
+
     monkeypatch.setattr(
-        arch151,
-        "_family_a_historical_measures_from_source_history",
-        _synthetic_campaign_measures,
+        arch151, "_family_a_historical_measures_from_source_history", campaign_measures
     )
-    history = _synthetic_five_year_campaign_history()
+    history, representative_sessions = _synthetic_five_year_campaign_history()
     expected_binding = evaluator._synthetic_source_binding_for_test(
         history.source_digest
     )
@@ -1744,10 +1852,15 @@ def test_generated_five_year_simulation_composes_non_idle_480_records(
         for slot in arch151.CANONICAL_SLOTS
         for case in arch151.EVALUATION_ECONOMICS_ORDER
     )
-    year_batches = tuple(
-        evaluator.simulate_canonical_year(history, year)
-        for year in arch151.SCORED_YEARS
-    )
+    year_batches = []
+    for year in arch151.SCORED_YEARS:
+        if year == 2023:
+            with localcontext() as ambient:
+                ambient.prec = 8
+                year_batches.append(evaluator.simulate_canonical_year(history, year))
+        else:
+            year_batches.append(evaluator.simulate_canonical_year(history, year))
+    year_batches = tuple(year_batches)
     for batch in year_batches:
         assert batch.complete
         assert batch.source_binding == expected_binding
@@ -1765,6 +1878,130 @@ def test_generated_five_year_simulation_composes_non_idle_480_records(
         assert batch.passive_spy_benchmark.status is evaluator.BenchmarkStatus.AVAILABLE
 
     run = evaluator.compose_development_evaluation(year_batches)
+    report = evaluator.serialize_development_evaluation(run)
+    assert sha256(report.canonical_json_bytes).hexdigest() == report.sha256
+
+    revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        "b" * 40,
+        "c" * 40,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    representative_batch = next(
+        item for item in year_batches if item.scored_year == 2023
+    )
+    year_evidence = operator._year_batch_material(
+        representative_batch,
+        revision=revision,
+        attempt_id=UUID(int=9101),
+        invocation_id=UUID(int=9102),
+    )
+    year_evidence_bytes = operator._canonical_bytes(year_evidence)
+    serialized_year_evidence = json.loads(year_evidence_bytes)
+    assert serialized_year_evidence["expected_replay_count"] == 96
+    assert serialized_year_evidence["observed_replay_count"] == 96
+    assert serialized_year_evidence["complete"] is True
+
+    representative_programs = {
+        key: next(item for item in arch151.CANONICAL_PROGRAMS if item.key is key)
+        for key in (
+            arch151.ProgramKey.A5_01,
+            arch151.ProgramKey.A15_01,
+            arch151.ProgramKey.B5_01,
+            arch151.ProgramKey.B15_01,
+            arch151.ProgramKey.C5_01,
+            arch151.ProgramKey.C15_01,
+            arch151.ProgramKey.D5_01,
+            arch151.ProgramKey.D15_01,
+        )
+    }
+    preparation_cache = evaluator._PreparationCache(history)
+    calibration_cache = evaluator._FamilyACalibrationCache(history)
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        expected_fractional_noise = abs(
+            Decimal("100.13125") / Decimal("100.03125") - Decimal(1)
+        )
+    for symbol in arch151.INITIAL_UNIVERSE:
+        source_calibration = calibration_cache.calibration(
+            representative_programs[arch151.ProgramKey.A5_01], symbol, 2023
+        )
+        assert source_calibration.noise_return == expected_fractional_noise
+    cross_context_representatives = {
+        (arch151.ProgramKey.B5_01, "SPY"),
+        (arch151.ProgramKey.B15_01, "QQQ"),
+        (arch151.ProgramKey.C5_01, "SPY"),
+        (arch151.ProgramKey.D5_01, "SPY"),
+        (arch151.ProgramKey.D15_01, "QQQ"),
+    }
+    for (program_key, symbol), session_date in representative_sessions.items():
+        program = representative_programs[program_key]
+        slot = _slot_for(program, symbol)
+        reference_tape = None
+        if (
+            program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT
+            or (program_key, symbol) in cross_context_representatives
+        ):
+            calibration = (
+                calibration_cache.calibration(program, symbol, 2023)
+                if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT
+                else None
+            )
+            with localcontext(arch151._DECIMAL_CONTEXT):
+                reference_tape = evaluator._session_tape(
+                    history,
+                    preparation_cache,
+                    program,
+                    symbol,
+                    session_date,
+                    calibration,
+                )
+        for case in arch151.EVALUATION_ECONOMICS_ORDER:
+            annual_replay = next(
+                item
+                for item in representative_batch.evaluations
+                if item.slot == slot and item.cost_case is case
+            )
+            annual_session = next(
+                item
+                for item in annual_replay.sessions
+                if item.session_date == session_date
+            )
+            assert annual_session.trades, (program_key, symbol, case)
+            if (
+                program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT
+                or (program_key, symbol) in cross_context_representatives
+            ):
+                projection = history._projection_index.get(
+                    (symbol, session_date, program.resolution)
+                )
+                with localcontext(arch151._DECIMAL_CONTEXT):
+                    normal_context_session = evaluator._simulate_session_from_tape(
+                        history_digest=evaluator._history_digest(history),
+                        slot=slot,
+                        program=program,
+                        session=session_date,
+                        tape=reference_tape,
+                        minutes=projection.minutes if projection is not None else (),
+                        starting_equity=annual_session.starting_equity,
+                        case=case,
+                    )
+                assert normal_context_session == annual_session, (
+                    program_key,
+                    symbol,
+                    case,
+                )
+
+    assert len(representative_sessions) == 16
+    assert len(set(representative_sessions.values())) == 10
+    b5_spy = next(
+        item
+        for item in representative_batch.evaluations
+        if item.slot
+        == _slot_for(representative_programs[arch151.ProgramKey.B5_01], "SPY")
+        and item.cost_case is arch151.FillCostCase.BASE
+    )
+    assert len({trade.entry.timestamp.date() for trade in b5_spy.trades}) >= 2
 
     assert run.fold_evaluation_count == 480
     assert tuple(item.scored_year for item in run.year_batches) == arch151.SCORED_YEARS
@@ -2316,8 +2553,10 @@ def idle_report(
 
 def _one_trade_full_year_replay(
     case: arch151.FillCostCase,
+    *,
+    exit_mode: str = "target_open",
 ) -> evaluator.SlotYearReplay:
-    program, history, *_ = _b_history()
+    program, history, *_ = _b_history(exit_mode=exit_mode)
     slot = _slot_for(program)
     first_session = evaluator._simulate_session(history, slot, SESSION, case)
     assert first_session.closing_equity is not None
@@ -2419,6 +2658,49 @@ def test_economic_diagnostics_reconcile_costs_months_time_and_excursions() -> No
     with localcontext(arch151._DECIMAL_CONTEXT):
         expected_cost_delta = base.total_adverse_cost - zero.total_adverse_cost
     assert base_drag.adverse_cost_delta == expected_cost_delta
+
+
+def test_economic_diagnostic_negates_fractional_losses_exactly() -> None:
+    replay = _one_trade_full_year_replay(
+        arch151.FillCostCase.STRESS, exit_mode="stop_gap"
+    )
+    trade = replay.trades[0]
+    assert trade.net_pnl < 0
+    with localcontext() as ambient:
+        ambient.prec = 8
+        diagnostic = evaluator._economic_diagnostic(
+            (replay,), evaluator.DiagnosticScope.SCORED_YEAR
+        )
+        rounded_negation = -trade.net_pnl
+    assert diagnostic.average_net_loss == trade.net_pnl.copy_negate()
+    assert rounded_negation != diagnostic.average_net_loss
+
+
+def test_annual_replay_failure_has_slot_and_operation_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    program, history, *_ = _b_history()
+    slot = _slot_for(program)
+
+    def fail_tape(*_args, **_kwargs):
+        raise ValueError("private tape detail")
+
+    monkeypatch.setattr(evaluator, "_session_tape", fail_tape)
+    with pytest.raises(evaluator.AnnualReplayFailure) as error:
+        evaluator._simulate_slot_year_cases(history, slot, 2023)
+
+    context = error.value.context
+    assert context.scored_year == 2023
+    assert context.program_id == slot.program_id
+    assert context.slot_id == slot.slot_id
+    assert context.symbol == slot.symbol
+    assert context.cost_case is None
+    assert context.session_date == arch151._published_sessions_for_year(2023)[0]
+    assert (
+        context.operation_stage
+        is evaluator.AnnualReplayOperationStage.SESSION_TAPE_PREPARATION
+    )
+    assert isinstance(error.value.__cause__, ValueError)
 
 
 def test_diagnostic_quartiles_use_nearest_rank_without_interpolation() -> None:

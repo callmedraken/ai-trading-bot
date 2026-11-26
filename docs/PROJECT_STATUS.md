@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 E2 integrated; successor development evaluation next
+## Current milestone - Architecture 151 E2 observation consumed; E3 source correction
 
 Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
@@ -12,36 +12,46 @@ candidate evidence are implemented and synthetic-tested. See the handoff and
 owning Architecture 151 documents for exact evidence and limitations.
 
 The first real Arch151 E1 observation is permanently CONSUMED / FAILED /
-SOURCE_LOAD_FAILED; no candidate was evaluated. E2 corrects the incompatible
+SOURCE_LOAD_FAILED; no candidate was evaluated. E2 corrected the incompatible
 Arch150 discovery-stage versus full-development custody contract without
 changing Arch150 or the frozen strategy design. E2 is SOURCE/CERTIFICATION
 ACCEPTED and FAST-FORWARD INTEGRATED at
 `7c9c398cd82f917b51ce4ddba5488df937ea46ac` /
 `d2e3067a285cc309fea6989f145203b08e86eabd`. Feature FULL `45769306690` and
 develop exact reuse `45772034607`, both attempt 1, are terminal SUCCESS.
-Positive synthetic adapter-to-replay coverage passed; the real corrected
-custody load and successor evaluation remain unexecuted.
+E2's consumed one-shot observation loaded accepted source history and then
+failed before completing an annual artifact: `UNCLASSIFIED_FAILURE` / `ValueError`,
+source digest `69537a0b180bf995f1e645bda5e7b25fc32f66d2f5c6104a407d57e764a7b40b`,
+no annual artifacts, null report/source-binding IDs, `NOT_EVALUATED`, and no
+automatic retry. Its exact raising statement is unknown. E1 and E2 failures
+are not negative strategy results; both roots and their evidence are immutable.
+
+E3 corrects demonstrated finite-precision risk validation, adds representative
+annual replay coverage and sanitized failure attribution, and documents a
+separate offline-diagnostics proposal. It is a source-only correction; E3
+source acceptance, certification outcome, and integration are not established
+by this status page. No E3 custody-content read or real replay occurred.
 
 Architecture 150 remains terminal: 24 evaluated, 0 qualified,
 `NO_HOLDOUT_CANDIDATES`; no rerun or mutation. Arch151 reuses its accepted
 2016-2023 sparse SPY/QQQ custody without reacquisition. The frozen 16 programs /
 32 slots score five expanding years (2019-2023) under BASE 2 bps/fill,
 STRESS 5 bps/fill and ZERO diagnostic: 480 fold-cost records. Effective DSR
-trial count is 64. No real Arch151 replay or actual DSR result exists yet.
+trial count is 64. No completed real Arch151 development replay or actual DSR
+result exists yet.
 The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Immediate next milestone: source-owned read-only E2 successor preflight,
-then a separately reviewed one-shot successor observation using only accepted
-D1R custody. The E1 no-argument route is retired and its evidence preserved.
-Only the fixed E2 successor root
-`F:\AI\temp\arch151-intraday-development-evidence-e2-successor` must be absent.
-No automatic retry, recovery, relocation or alternative output root. Review the terminal report, all candidate results and
-zero-or-one freeze before any subsequent decision. 2024-2025 and Jan-Oct 2026
-remain sealed; real later-period readers/issuers are not implemented. No real
-custody access, provider/credential access, broker/order effect or 2024+ access
-is authorized by documentation publication itself.
+Immediate next milestone: exact-source review of the E3 candidate after its
+single admission, push, and mapped GitHub FULL result. The E1 and E2 public
+execution routes are retired and fail closed even if the E2 evidence root is
+missing. No third observation route is implemented. Review any future
+development result and its full trial accounting before a separately reviewed
+later-period decision. 2024–2025 and Jan–Oct 2026 remain sealed; real later-
+period readers/issuers are not implemented. Documentation or source publication
+does not authorize real replay, provider/credential access, broker/order
+effects, or 2024+ access.
 
 ### Product direction and conditional roadmap
 

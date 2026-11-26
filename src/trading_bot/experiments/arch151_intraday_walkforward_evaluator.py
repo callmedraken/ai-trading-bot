@@ -69,6 +69,33 @@ class ReplayFailureKind(StrEnum):
     CALIBRATION_UNAVAILABLE = "CALIBRATION_UNAVAILABLE"
 
 
+class AnnualReplayOperationStage(StrEnum):
+    FAMILY_A_CALIBRATION = "FAMILY_A_CALIBRATION"
+    PROGRAM_FEATURE_PREPARATION = "PROGRAM_FEATURE_PREPARATION"
+    SESSION_TAPE_PREPARATION = "SESSION_TAPE_PREPARATION"
+    SESSION_EXECUTION = "SESSION_EXECUTION"
+    SLOT_YEAR_AGGREGATION = "SLOT_YEAR_AGGREGATION"
+
+
+@dataclass(frozen=True, slots=True)
+class AnnualReplayFailureContext:
+    scored_year: int
+    program_id: UUID
+    slot_id: UUID
+    symbol: str
+    cost_case: arch151.FillCostCase | None
+    session_date: date | None
+    operation_stage: AnnualReplayOperationStage
+
+
+class AnnualReplayFailure(RuntimeError):
+    """Unexpected annual-simulation failure with sanitized frozen context."""
+
+    def __init__(self, context: AnnualReplayFailureContext) -> None:
+        self.context = context
+        super().__init__("annual replay failed")
+
+
 class RejectionReason(StrEnum):
     NONPOSITIVE_INITIAL_R = "NONPOSITIVE_INITIAL_R"
     POSITION_ALREADY_OPEN = "POSITION_ALREADY_OPEN"
@@ -2749,45 +2776,113 @@ def _simulate_slot_year_cases(
                 _slot_year_failure(history_digest, slot, year, case, failure)
                 for case in cases
             )
-    cache = preparation_cache or _PreparationCache(history)
+        except Exception as error:
+            raise AnnualReplayFailure(
+                AnnualReplayFailureContext(
+                    year,
+                    slot.program_id,
+                    slot.slot_id,
+                    slot.symbol,
+                    None,
+                    None,
+                    AnnualReplayOperationStage.FAMILY_A_CALIBRATION,
+                )
+            ) from error
+    try:
+        cache = preparation_cache or _PreparationCache(history)
+    except Exception as error:
+        raise AnnualReplayFailure(
+            AnnualReplayFailureContext(
+                year,
+                slot.program_id,
+                slot.slot_id,
+                slot.symbol,
+                None,
+                None,
+                AnnualReplayOperationStage.PROGRAM_FEATURE_PREPARATION,
+            )
+        ) from error
     sessions_by_case: dict[arch151.FillCostCase, list[SessionReplayRecord]] = {
         case: [] for case in cases
     }
     equity_by_case = {case: Decimal(1) for case in cases}
     stopped_cases: set[arch151.FillCostCase] = set()
     for session in arch151._published_sessions_for_year(year):
-        tape = _session_tape(history, cache, program, slot.symbol, session, calibration)
+        try:
+            tape = _session_tape(
+                history, cache, program, slot.symbol, session, calibration
+            )
+        except Exception as error:
+            raise AnnualReplayFailure(
+                AnnualReplayFailureContext(
+                    year,
+                    slot.program_id,
+                    slot.slot_id,
+                    slot.symbol,
+                    None,
+                    session,
+                    AnnualReplayOperationStage.SESSION_TAPE_PREPARATION,
+                )
+            ) from error
         projection = history._projection_index.get(
             (slot.symbol, session, program.resolution)
         )
         for case in cases:
             if case in stopped_cases:
                 continue
-            record = _simulate_session_from_tape(
-                history_digest=history_digest,
-                slot=slot,
-                program=program,
-                session=session,
-                tape=tape,
-                minutes=projection.minutes if projection is not None else (),
-                starting_equity=equity_by_case[case],
-                case=case,
-            )
+            try:
+                record = _simulate_session_from_tape(
+                    history_digest=history_digest,
+                    slot=slot,
+                    program=program,
+                    session=session,
+                    tape=tape,
+                    minutes=projection.minutes if projection is not None else (),
+                    starting_equity=equity_by_case[case],
+                    case=case,
+                )
+            except Exception as error:
+                raise AnnualReplayFailure(
+                    AnnualReplayFailureContext(
+                        year,
+                        slot.program_id,
+                        slot.slot_id,
+                        slot.symbol,
+                        case,
+                        session,
+                        AnnualReplayOperationStage.SESSION_EXECUTION,
+                    )
+                ) from error
             sessions_by_case[case].append(record)
             if record.closing_equity is None:
                 stopped_cases.add(case)
             else:
                 equity_by_case[case] = record.closing_equity
-    return tuple(
-        _finish_slot_year(
-            history_digest=history_digest,
-            slot=slot,
-            year=year,
-            case=case,
-            sessions=tuple(sessions_by_case[case]),
-        )
-        for case in cases
-    )
+    results = []
+    for case in cases:
+        try:
+            results.append(
+                _finish_slot_year(
+                    history_digest=history_digest,
+                    slot=slot,
+                    year=year,
+                    case=case,
+                    sessions=tuple(sessions_by_case[case]),
+                )
+            )
+        except Exception as error:
+            raise AnnualReplayFailure(
+                AnnualReplayFailureContext(
+                    year,
+                    slot.program_id,
+                    slot.slot_id,
+                    slot.symbol,
+                    case,
+                    None,
+                    AnnualReplayOperationStage.SLOT_YEAR_AGGREGATION,
+                )
+            ) from error
+    return tuple(results)
 
 
 def _simulate_slot_year(
@@ -2827,11 +2922,24 @@ def simulate_canonical_year(
         if slot.program_id != active_program_id:
             active_program_id = slot.program_id
             program = _slot_program(slot)
-            program_cache = (
-                _PreparationCache(history)
-                if program.family is arch151.StrategyFamily.CROSS_ETF_TREND_PULLBACK
-                else None
-            )
+            try:
+                program_cache = (
+                    _PreparationCache(history)
+                    if program.family is arch151.StrategyFamily.CROSS_ETF_TREND_PULLBACK
+                    else None
+                )
+            except Exception as error:
+                raise AnnualReplayFailure(
+                    AnnualReplayFailureContext(
+                        scored_year,
+                        slot.program_id,
+                        slot.slot_id,
+                        slot.symbol,
+                        None,
+                        None,
+                        AnnualReplayOperationStage.PROGRAM_FEATURE_PREPARATION,
+                    )
+                ) from error
         # Family D prepares both ETFs for either execution slot. The manifest
         # orders its two symbols adjacently, so one program-scoped cache reuses
         # those immutable prefixes without retaining features across programs.
@@ -3410,7 +3518,9 @@ def _economic_diagnostic(
         net_trade_pnl = sum((item.net_pnl for item in trades), Decimal(0))
         adverse_cost = sum((item.total_adverse_cost for item in trades), Decimal(0))
     net_wins = tuple(item.net_pnl for item in trades if item.net_pnl > 0)
-    net_losses = tuple(-item.net_pnl for item in trades if item.net_pnl < 0)
+    net_losses = tuple(
+        item.net_pnl.copy_negate() for item in trades if item.net_pnl < 0
+    )
     with localcontext(arch151._DECIMAL_CONTEXT):
         gross_expectancy = (
             sum((item.gross_pnl for item in trades), Decimal(0)) / Decimal(len(trades))

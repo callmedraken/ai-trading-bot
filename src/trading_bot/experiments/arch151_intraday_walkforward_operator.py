@@ -1,11 +1,8 @@
 """One-shot, offline Arch151 development evaluation evidence operator.
 
-Import is inert. The consumed E1 no-argument route is retired. Read-only
-successor preflight verifies a fixed predecessor and exact source revision;
-the separately authorized successor route reads only fixed accepted Arch150
-D1R development custody and writes once to the fixed external F: evidence
-root. Neither route has source, candidate, period, holdout, extension, or
-output-path selection arguments.
+Import is inert. The consumed E1 and E2 public execution routes are retired.
+Neither route can load accepted custody or create another attempt. The private
+execution engine remains available to synthetic tests only.
 """
 
 from __future__ import annotations
@@ -73,6 +70,7 @@ _REPLAY_FAILURE_SCHEMA = "arch151-replay-integrity-failure-evidence/v1"
 _INCOMPLETE_SCHEMA = "arch151-development-incomplete-evidence/v1"
 _OPERATOR_FAILURE_SCHEMA = "arch151-development-operator-failure/v1"
 _OPERATOR_FAILURE_SCHEMA_V2 = "arch151-development-operator-failure/v2"
+_OPERATOR_FAILURE_SCHEMA_V3 = "arch151-development-operator-failure/v3"
 _PREDECESSOR_BINDING_SCHEMA = "arch151-development-predecessor-binding/v1"
 _INVOCATION_SCHEMA = "arch151-development-invocation/v1"
 _INVOCATION_NAMESPACE = uuid5(
@@ -113,12 +111,38 @@ class OperatorFailureCode(StrEnum):
     EVIDENCE_WRITE_FAILED = "EVIDENCE_WRITE_FAILED"
     PREDECESSOR_EVIDENCE_INVALID = "PREDECESSOR_EVIDENCE_INVALID"
     PREDECESSOR_ATTEMPT_CONSUMED = "PREDECESSOR_ATTEMPT_CONSUMED"
+    SUCCESSOR_ATTEMPT_CONSUMED = "SUCCESSOR_ATTEMPT_CONSUMED"
     SUCCESSOR_SOURCE_HEAD_MISMATCH = "SUCCESSOR_SOURCE_HEAD_MISMATCH"
     YEAR_EVALUATION_FAILED = "YEAR_EVALUATION_FAILED"
     DEVELOPMENT_COMPOSITION_FAILED = "DEVELOPMENT_COMPOSITION_FAILED"
     REPORT_SERIALIZATION_FAILED = "REPORT_SERIALIZATION_FAILED"
     REPORT_INTEGRITY_FAILED = "REPORT_INTEGRITY_FAILED"
     UNCLASSIFIED_FAILURE = "UNCLASSIFIED_FAILURE"
+
+
+class OperatorFailureStage(StrEnum):
+    SOURCE_REVISION = "SOURCE_REVISION"
+    SOURCE_REVISION_EVIDENCE = "SOURCE_REVISION_EVIDENCE"
+    PREDECESSOR_EVIDENCE = "PREDECESSOR_EVIDENCE"
+    SOURCE_LOAD = "SOURCE_LOAD"
+    ANNUAL_SIMULATION = "ANNUAL_SIMULATION"
+    ANNUAL_EVIDENCE_CONSTRUCTION = "ANNUAL_EVIDENCE_CONSTRUCTION"
+    ANNUAL_EVIDENCE_SERIALIZATION = "ANNUAL_EVIDENCE_SERIALIZATION"
+    ANNUAL_EVIDENCE_PERSISTENCE = "ANNUAL_EVIDENCE_PERSISTENCE"
+    DEVELOPMENT_COMPOSITION = "DEVELOPMENT_COMPOSITION"
+    REPORT_SERIALIZATION = "REPORT_SERIALIZATION"
+    REPORT_PERSISTENCE = "REPORT_PERSISTENCE"
+    SOURCE_ATTESTATION = "SOURCE_ATTESTATION"
+    DEVELOPMENT_EVIDENCE_ISSUANCE = "DEVELOPMENT_EVIDENCE_ISSUANCE"
+
+
+class ClosedFailureReason(StrEnum):
+    AUTHORITY_UNAVAILABLE = "AUTHORITY_UNAVAILABLE"
+    ARITHMETIC_FAILURE = "ARITHMETIC_FAILURE"
+    REPOSITORY_VALIDATION_FAILURE = "REPOSITORY_VALIDATION_FAILURE"
+    IO_FAILURE = "IO_FAILURE"
+    OPERATOR_GATE_FAILURE = "OPERATOR_GATE_FAILURE"
+    UNEXPECTED_EXCEPTION = "UNEXPECTED_EXCEPTION"
 
 
 class OperatorError(RuntimeError):
@@ -463,11 +487,10 @@ class DevelopmentEvidenceHandoff:
 
 def operator_help() -> str:
     return (
-        "The consumed predecessor command is retired. Use --preflight-successor "
-        "to verify the fixed E2 successor plan, or --run-successor only after "
-        "independent source/certification review and with the reviewed exact "
-        "--expected-source-head. The successor uses fixed 2016-2023 data, a "
-        "fixed evidence root, and create-once evidence."
+        "The consumed Arch151 E1 and E2 execution routes are permanently "
+        "retired. Their CLI switches fail closed without reading custody or "
+        "creating another attempt. The private execution engine is reserved "
+        "for synthetic tests."
     )
 
 
@@ -996,38 +1019,11 @@ def _read_consumed_predecessor_binding() -> dict[str, object]:
     return {**material, "binding_id": str(binding_id)}
 
 
-def _verify_successor_preflight(
-    expected_source_head: str,
-) -> tuple[SourceRevision, dict[str, object], str]:
-    if not _is_git_object_id(expected_source_head):
-        raise OperatorError(OperatorFailureCode.SUCCESSOR_SOURCE_HEAD_MISMATCH)
-    _validate_evidence_root(SUCCESSOR_EVIDENCE_ROOT)
-    predecessor_binding = _read_consumed_predecessor_binding()
-    revision = _read_source_revision()
-    if revision.head != expected_source_head:
-        raise OperatorError(OperatorFailureCode.SUCCESSOR_SOURCE_HEAD_MISMATCH)
-    binding_digest = hashlib.sha256(_canonical_bytes(predecessor_binding)).hexdigest()
-    return revision, predecessor_binding, binding_digest
-
-
 def preflight_successor_observation(expected_source_head: str) -> dict[str, object]:
-    """Read-only successor check; it does not create evidence or load custody."""
+    """Retired E2 route; it never revalidates mutable evidence or source."""
 
-    revision, predecessor_binding, binding_digest = _verify_successor_preflight(
-        expected_source_head
-    )
-    return {
-        "status": "READY_FOR_INDEPENDENT_REVIEW",
-        "source_branch": revision.branch,
-        "source_origin": revision.origin,
-        "source_head": revision.head,
-        "source_tree": revision.tree,
-        "successor_evidence_root": str(SUCCESSOR_EVIDENCE_ROOT),
-        "predecessor_binding_id": predecessor_binding["binding_id"],
-        "predecessor_binding_sha256": binding_digest,
-        "accepted_source_loaded": False,
-        "evaluation_started": False,
-    }
+    del expected_source_head
+    raise OperatorError(OperatorFailureCode.SUCCESSOR_ATTEMPT_CONSUMED)
 
 
 def _predecessor_binding_for_root(root: Path) -> tuple[str, str] | None:
@@ -1211,23 +1207,106 @@ def _year_batch_material(
     }
 
 
+def _root_failure(error: Exception) -> Exception:
+    if isinstance(error, evaluator.AnnualReplayFailure) and isinstance(
+        error.__cause__, Exception
+    ):
+        return error.__cause__
+    return error
+
+
 def _operator_failure_code(error: Exception) -> OperatorFailureCode:
-    if isinstance(error, OperatorError):
-        return error.code
-    if isinstance(error, arch151.AuthorizationUnavailableError):
+    classified = _root_failure(error)
+    if isinstance(classified, OperatorError):
+        return classified.code
+    if isinstance(classified, arch151.AuthorizationUnavailableError):
         return OperatorFailureCode.SOURCE_LOAD_FAILED
-    if isinstance(error, evaluator.EvaluationIntegrityError):
+    if isinstance(classified, evaluator.EvaluationIntegrityError):
         return OperatorFailureCode.DEVELOPMENT_COMPOSITION_FAILED
-    if isinstance(error, OSError):
+    if isinstance(classified, OSError):
         return OperatorFailureCode.EVIDENCE_WRITE_FAILED
     return OperatorFailureCode.UNCLASSIFIED_FAILURE
 
 
 def _source_load_reason(error: Exception) -> str | None:
-    if not isinstance(error, arch151.AuthorizationUnavailableError):
+    classified = _root_failure(error)
+    if not isinstance(classified, arch151.AuthorizationUnavailableError):
         return None
-    reason = error.source_load_reason
+    reason = classified.source_load_reason
     return reason.value if type(reason) is arch151.SourceLoadFailureReason else None
+
+
+def _closed_failure_reason(error: Exception) -> ClosedFailureReason:
+    classified = _root_failure(error)
+    if isinstance(classified, arch151.AuthorizationUnavailableError):
+        return ClosedFailureReason.AUTHORITY_UNAVAILABLE
+    if isinstance(classified, ArithmeticError):
+        return ClosedFailureReason.ARITHMETIC_FAILURE
+    if isinstance(classified, evaluator.EvaluationIntegrityError):
+        return ClosedFailureReason.REPOSITORY_VALIDATION_FAILURE
+    if isinstance(classified, OSError):
+        return ClosedFailureReason.IO_FAILURE
+    if isinstance(classified, OperatorError):
+        return ClosedFailureReason.OPERATOR_GATE_FAILURE
+    return ClosedFailureReason.UNEXPECTED_EXCEPTION
+
+
+def _failure_attribution_material(
+    error: Exception,
+    stage: OperatorFailureStage,
+    *,
+    scored_year: int | None = None,
+) -> dict[str, object]:
+    root_error = _root_failure(error)
+    material: dict[str, object] = {
+        "failure_stage": stage.value,
+        "closed_failure_reason": _closed_failure_reason(root_error).value,
+        "failure_type": type(root_error).__name__,
+        "scored_year": scored_year,
+    }
+    replay_context = (
+        error.context if isinstance(error, evaluator.AnnualReplayFailure) else None
+    )
+    if replay_context is not None:
+        material.update(
+            {
+                "program_id": str(replay_context.program_id),
+                "slot_id": str(replay_context.slot_id),
+                "symbol": replay_context.symbol,
+                "cost_case": replay_context.cost_case.value
+                if replay_context.cost_case is not None
+                else None,
+                "session_date": replay_context.session_date.isoformat()
+                if replay_context.session_date is not None
+                else None,
+                "operation_stage": replay_context.operation_stage.value,
+            }
+        )
+        material["scored_year"] = replay_context.scored_year
+    repo_root = Path(__file__).resolve().parents[3]
+    frame = root_error.__traceback__
+    source_frame = None
+    while frame is not None:
+        try:
+            source_path = Path(frame.tb_frame.f_code.co_filename).relative_to(repo_root)
+        except ValueError:
+            frame = frame.tb_next
+            continue
+        if ".." in source_path.parts:
+            frame = frame.tb_next
+            continue
+        if source_path.parts[:2] == ("src", "trading_bot"):
+            source_frame = (
+                source_path.as_posix(),
+                frame.tb_lineno,
+                frame.tb_frame.f_code.co_name,
+            )
+        frame = frame.tb_next
+    if source_frame is not None:
+        path, line, function = source_frame
+        material["repository_function"] = function
+        material["source_location"] = f"{path}:{line}"
+    return material
 
 
 def _write_terminal(
@@ -1337,7 +1416,9 @@ def _persist_operator_failure(
     invocation_id: UUID | None,
     revision: SourceRevision | None,
     error: Exception,
+    stage: OperatorFailureStage,
     year_artifacts: tuple[dict[str, object], ...],
+    scored_year: int | None = None,
     source_digest: str | None = None,
     source_binding_id: UUID | None = None,
 ) -> OperatorOutcome:
@@ -1345,15 +1426,14 @@ def _persist_operator_failure(
     predecessor_binding = _predecessor_binding_for_root(root)
     source_load_reason = _source_load_reason(error)
     evidence = {
-        "schema": (
-            _OPERATOR_FAILURE_SCHEMA_V2
-            if source_load_reason is not None or predecessor_binding is not None
-            else _OPERATOR_FAILURE_SCHEMA
-        ),
+        "schema": _OPERATOR_FAILURE_SCHEMA_V3,
         "attempt_id": str(attempt_id),
         "invocation_id": str(invocation_id) if invocation_id is not None else None,
         "failure_code": code.value,
-        "failure_type": type(error).__name__,
+        "failure_type": type(_root_failure(error)).__name__,
+        "failure_attribution": _failure_attribution_material(
+            error, stage, scored_year=scored_year
+        ),
         "year_artifacts": list(year_artifacts),
     }
     if source_load_reason is not None:
@@ -1529,6 +1609,7 @@ def _execute_development_evaluation_once(
             invocation_id=None,
             revision=None,
             error=error,
+            stage=OperatorFailureStage.SOURCE_REVISION,
             year_artifacts=(),
         )
     invocation_id = _invocation_id(revision)
@@ -1571,6 +1652,7 @@ def _execute_development_evaluation_once(
             invocation_id=invocation_id,
             revision=revision,
             error=error,
+            stage=OperatorFailureStage.SOURCE_REVISION_EVIDENCE,
             year_artifacts=(),
         )
     year_artifacts: list[dict[str, object]] = []
@@ -1587,6 +1669,7 @@ def _execute_development_evaluation_once(
                 invocation_id=invocation_id,
                 revision=revision,
                 error=error,
+                stage=OperatorFailureStage.PREDECESSOR_EVIDENCE,
                 year_artifacts=(),
             )
     try:
@@ -1598,6 +1681,7 @@ def _execute_development_evaluation_once(
             invocation_id=invocation_id,
             revision=revision,
             error=error,
+            stage=OperatorFailureStage.SOURCE_LOAD,
             year_artifacts=(),
         )
     for scored_year in arch151.SCORED_YEARS:
@@ -1608,12 +1692,38 @@ def _execute_development_evaluation_once(
                 or batch.source_digest != history.source_digest
             ):
                 raise OperatorError(OperatorFailureCode.YEAR_EVALUATION_FAILED)
+        except Exception as error:
+            return _persist_operator_failure(
+                root=root,
+                attempt_id=attempt_id,
+                invocation_id=invocation_id,
+                revision=revision,
+                error=error,
+                stage=OperatorFailureStage.ANNUAL_SIMULATION,
+                year_artifacts=tuple(year_artifacts),
+                scored_year=scored_year,
+                source_digest=history.source_digest,
+            )
+        try:
             material = _year_batch_material(
                 batch,
                 revision=revision,
                 attempt_id=attempt_id,
                 invocation_id=invocation_id,
             )
+        except Exception as error:
+            return _persist_operator_failure(
+                root=root,
+                attempt_id=attempt_id,
+                invocation_id=invocation_id,
+                revision=revision,
+                error=error,
+                stage=OperatorFailureStage.ANNUAL_EVIDENCE_CONSTRUCTION,
+                year_artifacts=tuple(year_artifacts),
+                scored_year=scored_year,
+                source_digest=history.source_digest,
+            )
+        try:
             year_bytes = _canonical_bytes(material)
         except Exception as error:
             return _persist_operator_failure(
@@ -1622,11 +1732,26 @@ def _execute_development_evaluation_once(
                 invocation_id=invocation_id,
                 revision=revision,
                 error=error,
+                stage=OperatorFailureStage.ANNUAL_EVIDENCE_SERIALIZATION,
                 year_artifacts=tuple(year_artifacts),
+                scored_year=scored_year,
                 source_digest=history.source_digest,
             )
         year_name = f"year-{scored_year}.json"
-        year_digest = _write_once(root / year_name, year_bytes, attempt_root=root)
+        try:
+            year_digest = _write_once(root / year_name, year_bytes, attempt_root=root)
+        except Exception as error:
+            return _persist_operator_failure(
+                root=root,
+                attempt_id=attempt_id,
+                invocation_id=invocation_id,
+                revision=revision,
+                error=error,
+                stage=OperatorFailureStage.ANNUAL_EVIDENCE_PERSISTENCE,
+                year_artifacts=tuple(year_artifacts),
+                scored_year=scored_year,
+                source_digest=history.source_digest,
+            )
         batches.append(batch)
         artifact = {
             "scored_year": scored_year,
@@ -1669,6 +1794,7 @@ def _execute_development_evaluation_once(
             invocation_id=invocation_id,
             revision=revision,
             error=error,
+            stage=OperatorFailureStage.DEVELOPMENT_COMPOSITION,
             year_artifacts=tuple(year_artifacts),
             source_digest=history.source_digest,
         )
@@ -1689,13 +1815,27 @@ def _execute_development_evaluation_once(
             invocation_id=invocation_id,
             revision=revision,
             error=error,
+            stage=OperatorFailureStage.REPORT_SERIALIZATION,
             year_artifacts=tuple(year_artifacts),
             source_digest=history.source_digest,
             source_binding_id=run.source_binding.binding_id,
         )
-    report_digest = _write_once(
-        root / "development-report.json", report_bytes, attempt_root=root
-    )
+    try:
+        report_digest = _write_once(
+            root / "development-report.json", report_bytes, attempt_root=root
+        )
+    except Exception as error:
+        return _persist_operator_failure(
+            root=root,
+            attempt_id=attempt_id,
+            invocation_id=invocation_id,
+            revision=revision,
+            error=error,
+            stage=OperatorFailureStage.REPORT_PERSISTENCE,
+            year_artifacts=tuple(year_artifacts),
+            source_digest=history.source_digest,
+            source_binding_id=run.source_binding.binding_id,
+        )
     if report_digest != report.sha256:
         return _persist_operator_failure(
             root=root,
@@ -1703,6 +1843,7 @@ def _execute_development_evaluation_once(
             invocation_id=invocation_id,
             revision=revision,
             error=OperatorError(OperatorFailureCode.REPORT_INTEGRITY_FAILED),
+            stage=OperatorFailureStage.REPORT_PERSISTENCE,
             year_artifacts=tuple(year_artifacts),
             source_digest=history.source_digest,
             source_binding_id=run.source_binding.binding_id,
@@ -1727,6 +1868,7 @@ def _execute_development_evaluation_once(
             invocation_id=invocation_id,
             revision=revision,
             error=error,
+            stage=OperatorFailureStage.SOURCE_ATTESTATION,
             year_artifacts=tuple(year_artifacts),
             source_digest=history.source_digest,
             source_binding_id=run.source_binding.binding_id,
@@ -1764,6 +1906,7 @@ def _execute_development_evaluation_once(
                 invocation_id=invocation_id,
                 revision=revision,
                 error=classified_error,
+                stage=OperatorFailureStage.DEVELOPMENT_EVIDENCE_ISSUANCE,
                 year_artifacts=tuple(year_artifacts),
                 source_digest=history.source_digest,
                 source_binding_id=run.source_binding.binding_id,
@@ -1792,16 +1935,10 @@ def run_development_evaluation_once() -> OperatorOutcome:
 
 
 def run_successor_evaluation_once(expected_source_head: str) -> OperatorOutcome:
-    """Run the fixed E2 successor after an exact source-head authorization."""
+    """Retired E2 route; missing evidence roots never make it reusable."""
 
-    revision, predecessor_binding, _binding_digest = _verify_successor_preflight(
-        expected_source_head
-    )
-    return _execute_development_evaluation_once(
-        evidence_root=SUCCESSOR_EVIDENCE_ROOT,
-        source_revision_override=revision,
-        predecessor_binding=predecessor_binding,
-    )
+    del expected_source_head
+    raise OperatorError(OperatorFailureCode.SUCCESSOR_ATTEMPT_CONSUMED)
 
 
 def main(argv: Iterable[str] | None = None) -> int:
@@ -1811,61 +1948,18 @@ def main(argv: Iterable[str] | None = None) -> int:
     modes.add_argument("--run-successor", action="store_true")
     parser.add_argument("--expected-source-head")
     arguments = parser.parse_args(None if argv is None else list(argv))
-    if arguments.preflight_successor or arguments.run_successor:
-        if not _is_git_object_id(arguments.expected_source_head):
-            parser.error("successor mode requires an exact --expected-source-head")
-    elif arguments.expected_source_head is not None:
+    if not (arguments.preflight_successor or arguments.run_successor) and (
+        arguments.expected_source_head is not None
+    ):
         parser.error("--expected-source-head requires a successor mode")
+    if arguments.preflight_successor or arguments.run_successor:
+        print("STATUS=FAILED")
+        print("FAILURE_CODE=" + OperatorFailureCode.SUCCESSOR_ATTEMPT_CONSUMED.value)
+        return 2
     else:
         print("STATUS=FAILED")
         print("FAILURE_CODE=" + OperatorFailureCode.PREDECESSOR_ATTEMPT_CONSUMED.value)
         return 2
-    try:
-        if arguments.preflight_successor:
-            plan = preflight_successor_observation(arguments.expected_source_head)
-            for key, value in plan.items():
-                print(f"{key.upper()}={value}")
-            return 0
-        outcome = run_successor_evaluation_once(arguments.expected_source_head)
-    except OperatorError as error:
-        print("STATUS=FAILED")
-        print("FAILURE_CODE=" + error.code.value)
-        return 2
-    print("STATUS=" + outcome.status.value)
-    if outcome.attempt_id is not None:
-        print("ATTEMPT_ID=" + str(outcome.attempt_id))
-    if outcome.invocation_id is not None:
-        print("INVOCATION_ID=" + str(outcome.invocation_id))
-    if outcome.evidence_root is not None:
-        print("EVIDENCE_ROOT=" + str(outcome.evidence_root))
-    if outcome.report_sha256 is not None:
-        print("REPORT_SHA256=" + outcome.report_sha256)
-    if outcome.source_attestation is not None:
-        print("SOURCE_ATTESTATION_ID=" + str(outcome.source_attestation.attestation_id))
-        print(
-            "SOURCE_ATTESTATION_DIGEST=" + outcome.source_attestation.attestation_digest
-        )
-    if outcome.development_evidence_handoff is not None:
-        handoff = outcome.development_evidence_handoff
-        print(
-            "DEVELOPMENT_EVIDENCE_ID=" + str(handoff.authenticated_evidence.evidence_id)
-        )
-        print(
-            "DEVELOPMENT_EVIDENCE_DIGEST="
-            + handoff.authenticated_evidence.evidence_digest
-        )
-        print("CANDIDATE_SLOT_ID=" + str(handoff.final_freeze.candidate_slot_id))
-        print(
-            "SELECTION_BIAS_EVIDENCE_ID="
-            + str(handoff.selection_bias_evidence.evidence_id)
-        )
-        print(
-            "SELECTION_BIAS_EVIDENCE_DIGEST="
-            + handoff.selection_bias_evidence.evidence_digest
-        )
-    if outcome.failure_code is not None:
-        print("FAILURE_CODE=" + outcome.failure_code.value)
-    return 0 if outcome.status is OperatorStatus.COMPLETED else 2
 
 
 __all__ = (

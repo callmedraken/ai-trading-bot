@@ -1406,6 +1406,80 @@ def test_family_a_uses_price_times_dimensionless_noise_for_stop_risk() -> None:
     assert risk.risk_distance == Decimal("0.125000")
 
 
+def test_family_a_fractional_fill_risk_is_exact_under_ambient_contexts() -> None:
+    program = CANONICAL_PROGRAMS[0]
+    historical_sessions = tuple(
+        session
+        for session in _AUTHORITY.published.sessions
+        if date(2016, 1, 1) <= session < date(2023, 1, 1)
+    )[-60:]
+    historical = tuple(
+        family_a_historical_session_measure(
+            tuple(
+                _minute(
+                    "SPY",
+                    session,
+                    offset,
+                    open_price="3",
+                    close="4" if offset == 29 else "3",
+                )
+                for offset in range(
+                    int(
+                        (
+                            _AUTHORITY.schedule_for(session).closes_at
+                            - _AUTHORITY.schedule_for(session).opens_at
+                        ).total_seconds()
+                        // 60
+                    )
+                )
+            )
+        )
+        for session in historical_sessions
+    )
+    calibration = calibrate_family_a(program, historical, 2023)
+    current_session = family_a_session_measure(
+        tuple(
+            _minute(
+                "SPY",
+                _NORMAL_DAY,
+                offset,
+                open_price="3",
+                close="4" if offset == 29 else "3",
+            )
+            for offset in range(30)
+        )
+    )
+    entry = Decimal("100.123456789012345678901234567890123456789012345678901234592550")
+    risk = family_a_initial_risk(program, calibration, current_session, entry)
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        exact_stop = entry - risk.risk_distance
+        reverse_distance = entry - risk.stop_reference_price
+    assert risk.stop_reference_price == exact_stop
+    assert risk.stop_reference_price < entry
+    assert reverse_distance != risk.risk_distance
+
+    with localcontext() as ambient:
+        ambient.prec = 8
+        low_precision_risk = family_a_initial_risk(
+            program, calibration, current_session, entry
+        )
+    assert low_precision_risk == risk
+
+    with pytest.raises(ValueError, match="prices are inconsistent"):
+        replace(risk, risk_distance=risk.risk_distance + Decimal("0.01"))
+
+    with pytest.raises(ValueError, match="prices are inconsistent"):
+        arch151.FamilyAInitialRisk(
+            program.key,
+            "SPY",
+            current_session.session_date,
+            calibration.calibration_id,
+            Decimal("1E+100"),
+            Decimal("1E+100"),
+            Decimal("1E-100"),
+        )
+
+
 def test_family_c_deviation_is_normalized_and_stop_converts_to_price_distance() -> None:
     assert normalized_vwap_deviation(Decimal("99"), Decimal("100")) == Decimal("-0.01")
     assert vwap_sigma_stop_distance(

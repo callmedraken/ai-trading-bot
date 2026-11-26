@@ -2710,7 +2710,8 @@ def family_a_regime_passes(
         or current_session.session_date.year != calibration.scored_year
     ):
         raise Arch151Error("Family A calibration/current session binding is invalid")
-    limit = calibration.regime_median_return * program.parameters.regime_multiplier
+    with localcontext(_DECIMAL_CONTEXT):
+        limit = calibration.regime_median_return * program.parameters.regime_multiplier
     return current_session.absolute_return <= limit
 
 
@@ -2790,7 +2791,15 @@ class FamilyAInitialRisk:
         entry = _decimal(self.entry_reference_price, "entry_reference_price")
         stop = _decimal(self.stop_reference_price, "stop_reference_price")
         distance = _decimal(self.risk_distance, "risk_distance")
-        if entry <= 0 or stop <= 0 or distance <= 0 or entry - stop != distance:
+        with localcontext(_DECIMAL_CONTEXT):
+            expected_stop = entry - distance
+        if (
+            entry <= 0
+            or stop <= 0
+            or distance <= 0
+            or stop >= entry
+            or stop != expected_stop
+        ):
             raise ValueError("Family A initial risk prices are inconsistent")
         object.__setattr__(self, "entry_reference_price", entry)
         object.__setattr__(self, "stop_reference_price", stop)
@@ -2823,7 +2832,7 @@ def family_a_initial_risk(
     with localcontext(_DECIMAL_CONTEXT):
         distance = entry * program.parameters.stop_multiplier * calibration.noise_return
         stop = entry - distance
-    if distance <= 0 or stop <= 0 or not stop.is_finite():
+    if distance <= 0 or stop <= 0 or stop >= entry or not stop.is_finite():
         raise UnavailableIndicatorError("Family A initial risk distance is invalid")
     return FamilyAInitialRisk(
         program.key,
@@ -3185,12 +3194,12 @@ def family_b_entry_signal(
     opening_count = parameters.opening_range_minutes // resolution
     bars = _validated_family_b_session_bars(program, session_bars, opening_count)
     opening_range = bars[:opening_count]
-    level = max(bar.high for bar in opening_range) * (
-        Decimal(1) + parameters.breakout_buffer_bps / Decimal(10000)
-    )
-
-    lower = level * (Decimal(1) - parameters.retest_tolerance_bps / Decimal(10000))
-    upper = level * (Decimal(1) + parameters.retest_tolerance_bps / Decimal(10000))
+    with localcontext(_DECIMAL_CONTEXT):
+        level = max(bar.high for bar in opening_range) * (
+            Decimal(1) + parameters.breakout_buffer_bps / Decimal(10000)
+        )
+        lower = level * (Decimal(1) - parameters.retest_tolerance_bps / Decimal(10000))
+        upper = level * (Decimal(1) + parameters.retest_tolerance_bps / Decimal(10000))
     resolution_delta = timedelta(minutes=resolution)
     breakout_indexes: list[int] = []
     final_breakout_index: int | None = None
@@ -3252,7 +3261,10 @@ def family_b_entry_signal(
             continue
         assert retest_index is not None
         swing_low = min(bar.low for bar in bars[retest_index : index + 1])
-        stop = swing_low * (Decimal(1) - parameters.stop_buffer_bps / Decimal(10000))
+        with localcontext(_DECIMAL_CONTEXT):
+            stop = swing_low * (
+                Decimal(1) - parameters.stop_buffer_bps / Decimal(10000)
+            )
         return OpeningRangeRetestSignal(
             program.key,
             final_bar.symbol,
@@ -3968,8 +3980,8 @@ def _family_d_contiguous_segment_signal(
             frozen_atr = average_true_range(atr_history, parameters.atr_lookback)
         except UnavailableIndicatorError:
             continue
-        setup_depth = swing_peak - local[setup_index].low
         with localcontext(_DECIMAL_CONTEXT):
+            setup_depth = swing_peak - local[setup_index].low
             setup_depth_atr = setup_depth / frozen_atr
         if not (
             parameters.pullback_min_atr
@@ -4036,7 +4048,8 @@ def _family_d_contiguous_segment_signal(
                 signal_bar.completed_at
             ):
                 break
-            stop = pullback_low - parameters.stop_buffer_atr * frozen_atr
+            with localcontext(_DECIMAL_CONTEXT):
+                stop = pullback_low - parameters.stop_buffer_atr * frozen_atr
             if stop <= 0 or signal_bar.close <= stop:
                 break
             candidates.append(

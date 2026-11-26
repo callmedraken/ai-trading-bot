@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 E2 integrated; successor development evaluation next
+## Current milestone: Architecture 151 E2 observation consumed; E3 correction in progress
 
 Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
@@ -67,16 +67,26 @@ E2 replaces the stage-filtered Arch150 discovery opener with full accepted
 custody validation and Arch151-owned development authority. Source-history
 identity is v2; frozen program/manifest/ledger/economics/thresholds unchanged.
 Positive synthetic adaptation, projection and B5 replay passed; synthetic
-history cannot issue real authority. The real corrected loader was not run.
+history cannot issue real authority. The consumed E2 observation did execute
+the corrected loader and returned source digest
+`69537a0b180bf995f1e645bda5e7b25fc32f66d2f5c6104a407d57e764a7b40b`, then
+failed before producing an annual artifact. Its evidence does not distinguish
+an annual replay failure from annual-evidence construction failure, so it is
+not an annual result or a negative strategy result. The consumed attempt is
+`8721f462-ebeb-4f77-b5b7-4455e30cb599`, invocation
+`89f2b597-3032-5502-bfd4-33608c3f234b`, at
+`F:\AI\temp\arch151-intraday-development-evidence-e2-successor`; its exact
+artifact hashes and terminal binding are preserved in the validation plan.
 Typed sanitized source-load reasons and the exact published session population
-check improve failure attribution. See owning architecture and validation
-for the complete contract. The original invocation is retired.
+check improve failure attribution. See owning architecture and validation for
+the complete contract.
 
 Continuation checkout: `F:\AI\worktrees\ai-trading-bot-arch151-intraday-walkforward-current`,
 branch `feature/research-arch151-intraday-walkforward-current`; canonical develop
-checkout `F:\AI\ai-trading-bot`. Reprove live refs and exact clean expected
-source identities. A docs-only successor requires its own admission, terminal
-source gate, exact fast-forward and both local checkouts synchronized.
+checkout `F:\AI\ai-trading-bot`. The current E3 source-only correction remains
+pending exact-source review, admission, ordinary push, and its mapped terminal
+FULL result. E3 does not establish independent acceptance or integration.
+Reprove live refs and exact source identities before any later transition.
 
 [Architecture 151](architecture/151-intraday-walk-forward-campaign.md) and its
 [validation plan](validation/arch151-intraday-walk-forward-campaign.md) own the
@@ -92,12 +102,16 @@ fill-cash chain and frozen family entry caps. DSR unavailability remains
 fail-closed for the full population, with per-slot reasons and descriptive
 non-authorizing economic order. No actual DSR or candidate result exists.
 
-Exact next boundary: source-owned `--preflight-successor` with the exact
-reviewed synchronized `--expected-source-head`, followed by independent
-review and separately authorized `--run-successor` for that same source.
-The source-owned preflight authenticates all four consumed E1 operational
-artifacts, checks source identity and successor-root availability, but does
-not load historical custody or start evaluation.
+The E1 and E2 public execution routes are permanently retired. E2
+`--preflight-successor` and `--run-successor` now fail closed with
+`SUCCESSOR_ATTEMPT_CONSUMED`, whether the old evidence root exists or not; they
+do not check source identity, inspect either consumed observation, read
+custody, or create a new attempt. The private execution engine remains
+available only to synthetic tests. Do not retry, resume, relocate, or replace
+either consumed observation. The exact E1/E2 evidence inventory, hashes,
+terminal classifications, and preserved partial artifacts are in the owning
+validation plan.
+
 Accepted D1R source (do not reacquire):
 `F:\AI\temp\arch150-d1r-offline-requalification-a46c4ad1-4287-4e51-8741-0316f784f1de`.
 Dataset `ff5a3847-09c2-5902-b174-9e77eebf7d53` / SHA-256
@@ -106,16 +120,15 @@ custody `21e121dc-a9da-538f-bc88-c15fe7ea7f50` / SHA-256
 `5b6ac554eda73b588f2f6d664c14e5c7fca3c151966cb546c17621d0c7e6ad83`;
 evidence `c31bb29d-3d53-5e2f-a01f-55a42ec96295` / SHA-256
 `e58a6e5d95c44b33eb34311f705e6cc26982120689f98ddb207768dc304b4ecd`.
-The source-owned loader must authenticate the fixed artifacts during the
-reviewed observation; metadata-only preflight is not custody acceptance.
-Operator: `trading_bot.experiments.arch151_intraday_walkforward_operator`.
-The old E1 root is permanently consumed. Fixed E2 successor evidence root
-`F:\AI\temp\arch151-intraday-development-evidence-e2-successor` must not
-exist. The successor binds the exact predecessor artifacts and source,
-claims once and persists year evidence and terminal report/failure evidence;
-no overwrite, automatic retry, recovery or alternative root. Neither E2
-successor preflight nor invocation has been executed.
-No source-only step or docs closeout grants real replay permission.
+E2 accessed the accepted development source path and did not produce an annual
+artifact; E3 did not access custody content. No later-period or holdout source
+was read or replayed. The E3 work adds deterministic Decimal behavior and
+sanitized attribution to the annual evaluator/operator, with synthetic-only
+focused verification. It does not perform an offline diagnostic replay or
+issue qualification evidence. The separate offline diagnostics authority
+contract is design-only in the architecture document and requires its own
+reviewed implementation milestone. No source-only checkpoint grants real
+replay permission.
 2024-2025 remains sealed until a single authenticated qualifying development
 candidate and separate reviewed later-period authority; Jan-Oct 2026 remains
 sealed until that same candidate's authenticated holdout PASS. Actual later-

@@ -194,63 +194,71 @@ def test_source_revision_rejects_unavailable_git_identity(
     assert error.value.code is operator.OperatorFailureCode.SOURCE_IDENTITY_UNAVAILABLE
 
 
-def test_consumed_predecessor_preflight_is_read_only_and_source_bound(
+def test_consumed_e2_public_routes_fail_closed_when_root_is_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    predecessor_root = tmp_path / "consumed-predecessor"
-    original = _write_consumed_predecessor_fixture(predecessor_root)
     successor_root = tmp_path / "e2-successor"
-    monkeypatch.setattr(operator, "EVIDENCE_ROOT", predecessor_root)
     monkeypatch.setattr(operator, "SUCCESSOR_EVIDENCE_ROOT", successor_root)
-    monkeypatch.setattr(operator, "_read_source_revision", _revision)
+    monkeypatch.setattr(
+        operator,
+        "_read_consumed_predecessor_binding",
+        lambda: pytest.fail("retired E2 routes must not read consumed evidence"),
+    )
     monkeypatch.setattr(
         operator,
         "_load_accepted_source_history",
-        lambda: pytest.fail("successor preflight must not load accepted custody"),
+        lambda: pytest.fail("retired E2 routes must not load accepted custody"),
     )
 
-    plan = operator.preflight_successor_observation(_HEAD)
-
-    assert plan["status"] == "READY_FOR_INDEPENDENT_REVIEW"
-    assert plan["source_head"] == _HEAD
-    assert plan["source_tree"] == _TREE
-    assert plan["successor_evidence_root"] == str(successor_root)
-    assert plan["accepted_source_loaded"] is False
-    assert plan["evaluation_started"] is False
+    for route in (
+        operator.preflight_successor_observation,
+        operator.run_successor_evaluation_once,
+    ):
+        with pytest.raises(operator.OperatorError) as error:
+            route(_HEAD)
+        assert (
+            error.value.code is operator.OperatorFailureCode.SUCCESSOR_ATTEMPT_CONSUMED
+        )
+    assert (
+        operator.main(["--preflight-successor", "--expected-source-head", _HEAD]) == 2
+    )
+    assert operator.main(["--run-successor", "--expected-source-head", _HEAD]) == 2
+    assert capsys.readouterr().out.count("SUCCESSOR_ATTEMPT_CONSUMED") == 2
     assert not successor_root.exists()
+
+
+def test_consumed_e1_artifacts_keep_their_exact_historical_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    predecessor_root = tmp_path / "consumed-predecessor"
+    original = _write_consumed_predecessor_fixture(predecessor_root)
+    monkeypatch.setattr(operator, "EVIDENCE_ROOT", predecessor_root)
+
+    binding = operator._read_consumed_predecessor_binding()
+
+    assert binding["attempt_id"] == "0c0db97e-034c-4b59-97de-137d6e95359c"
+    assert binding["invocation_id"] == "7fa05c82-d0e5-508f-8e77-b508071236d0"
+    assert binding["binding_id"] == "5ce662be-6d80-5b6c-a626-769714cd3ca3"
     assert {
         path.name: path.read_bytes() for path in predecessor_root.iterdir()
     } == original
 
-    assert (
-        operator.main(["--preflight-successor", "--expected-source-head", _HEAD]) == 0
-    )
-    assert "READY_FOR_INDEPENDENT_REVIEW" in capsys.readouterr().out
-    assert not successor_root.exists()
 
-
-def test_successor_preflight_rejects_consumed_evidence_drift_or_root_collision(
+def test_consumed_e2_public_routes_fail_closed_when_root_already_exists(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    predecessor_root = tmp_path / "consumed-predecessor"
-    _write_consumed_predecessor_fixture(predecessor_root)
     successor_root = tmp_path / "e2-successor"
-    monkeypatch.setattr(operator, "EVIDENCE_ROOT", predecessor_root)
-    monkeypatch.setattr(operator, "SUCCESSOR_EVIDENCE_ROOT", successor_root)
-    monkeypatch.setattr(operator, "_read_source_revision", _revision)
-
-    source_path = predecessor_root / "source-revision.json"
-    original = source_path.read_bytes()
-    source_path.write_bytes(original + b" ")
-    with pytest.raises(operator.OperatorError) as error:
-        operator.preflight_successor_observation(_HEAD)
-    assert error.value.code is operator.OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID
-    source_path.write_bytes(original)
-
     successor_root.mkdir()
+    sentinel = successor_root / "sentinel.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    monkeypatch.setattr(operator, "SUCCESSOR_EVIDENCE_ROOT", successor_root)
     with pytest.raises(operator.OperatorError) as error:
         operator.preflight_successor_observation(_HEAD)
-    assert error.value.code is operator.OperatorFailureCode.EVIDENCE_ROOT_ALREADY_EXISTS
+    assert error.value.code is operator.OperatorFailureCode.SUCCESSOR_ATTEMPT_CONSUMED
+    with pytest.raises(operator.OperatorError) as error:
+        operator.run_successor_evaluation_once(_HEAD)
+    assert error.value.code is operator.OperatorFailureCode.SUCCESSOR_ATTEMPT_CONSUMED
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
 
 
 def test_consumed_predecessor_cli_route_is_retired(
@@ -723,11 +731,158 @@ def test_source_load_reason_is_typed_and_durable_without_exception_content(
     failure = json.loads((root / "operator-failure.json").read_text(encoding="utf-8"))
     terminal = json.loads((root / "attempt-result.json").read_text(encoding="utf-8"))
     assert result.failure_code is operator.OperatorFailureCode.SOURCE_LOAD_FAILED
-    assert failure["schema"] == operator._OPERATOR_FAILURE_SCHEMA_V2
+    assert failure["schema"] == operator._OPERATOR_FAILURE_SCHEMA_V3
     assert failure["source_load_reason"] == "ARTIFACT_AUTHENTICATION_FAILED"
     assert failure["failure_code"] == "SOURCE_LOAD_FAILED"
+    assert failure["failure_attribution"]["failure_stage"] == "SOURCE_LOAD"
+    assert (
+        failure["failure_attribution"]["closed_failure_reason"]
+        == "AUTHORITY_UNAVAILABLE"
+    )
     assert "private parser detail" not in json.dumps(failure)
     assert terminal["failure_code"] == "SOURCE_LOAD_FAILED"
+
+
+def test_annual_simulation_failure_attribution_is_structured_and_sanitized(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "arch151-annual-simulation-failure"
+    _install_synthetic_operator(monkeypatch, root)
+
+    def fail_simulation(_history, _year):
+        raise ValueError("secret private exception detail")
+
+    monkeypatch.setattr(evaluator, "simulate_canonical_year", fail_simulation)
+    result = operator._execute_development_evaluation_once(evidence_root=root)
+
+    failure = json.loads((root / "operator-failure.json").read_text(encoding="utf-8"))
+    attribution = failure["failure_attribution"]
+    assert result.failure_code is operator.OperatorFailureCode.UNCLASSIFIED_FAILURE
+    assert failure["failure_type"] == "ValueError"
+    assert attribution["failure_stage"] == "ANNUAL_SIMULATION"
+    assert attribution["scored_year"] == arch151.SCORED_YEARS[0]
+    assert attribution["closed_failure_reason"] == "UNEXPECTED_EXCEPTION"
+    assert attribution["repository_function"] == "_execute_development_evaluation_once"
+    assert attribution["source_location"].startswith(
+        "src/trading_bot/experiments/arch151_intraday_walkforward_operator.py:"
+    )
+    assert "secret private exception detail" not in json.dumps(failure)
+    assert "F:\\AI\\" not in json.dumps(failure)
+
+
+@pytest.mark.parametrize(
+    ("boundary", "expected_stage", "expected_year_count"),
+    [
+        ("annual-construction", "ANNUAL_EVIDENCE_CONSTRUCTION", 1),
+        ("annual-serialization", "ANNUAL_EVIDENCE_SERIALIZATION", 1),
+        ("composition", "DEVELOPMENT_COMPOSITION", len(arch151.SCORED_YEARS)),
+        ("report-serialization", "REPORT_SERIALIZATION", len(arch151.SCORED_YEARS)),
+        ("attestation", "SOURCE_ATTESTATION", len(arch151.SCORED_YEARS)),
+    ],
+)
+def test_operator_failure_boundaries_preserve_partial_year_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str,
+    expected_stage: str,
+    expected_year_count: int,
+) -> None:
+    root = tmp_path / f"arch151-{boundary}-failure"
+    _install_synthetic_operator(monkeypatch, root)
+    first_year, failed_year = arch151.SCORED_YEARS[:2]
+    if boundary == "annual-construction":
+        original = operator._year_batch_material
+
+        def fail_second_construction(batch, **kwargs):
+            if batch.scored_year == failed_year:
+                raise ValueError("private annual construction detail")
+            return original(batch, **kwargs)
+
+        monkeypatch.setattr(operator, "_year_batch_material", fail_second_construction)
+    elif boundary == "annual-serialization":
+        original = operator._canonical_bytes
+
+        def fail_second_year_serialization(value):
+            if (
+                isinstance(value, dict)
+                and value.get("schema") == operator._YEAR_EVIDENCE_SCHEMA
+                and value.get("scored_year") == failed_year
+            ):
+                raise ValueError("private annual serialization detail")
+            return original(value)
+
+        monkeypatch.setattr(
+            operator, "_canonical_bytes", fail_second_year_serialization
+        )
+    elif boundary == "composition":
+        monkeypatch.setattr(
+            evaluator,
+            "compose_development_evaluation",
+            lambda _batches: (_ for _ in ()).throw(
+                ValueError("private composition detail")
+            ),
+        )
+    elif boundary == "report-serialization":
+        monkeypatch.setattr(
+            evaluator,
+            "serialize_development_evaluation",
+            lambda _run: (_ for _ in ()).throw(
+                ValueError("private report serialization detail")
+            ),
+        )
+    elif boundary == "attestation":
+        monkeypatch.setattr(
+            operator,
+            "_issue_development_source_attestation",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                ValueError("private attestation detail")
+            ),
+        )
+    else:
+        pytest.fail(f"unsupported injected boundary {boundary}")
+
+    result = operator._execute_development_evaluation_once(evidence_root=root)
+
+    failure = json.loads((root / "operator-failure.json").read_text(encoding="utf-8"))
+    terminal = json.loads((root / "attempt-result.json").read_text(encoding="utf-8"))
+    attribution = failure["failure_attribution"]
+    assert result.failure_code is operator.OperatorFailureCode.UNCLASSIFIED_FAILURE
+    assert attribution["failure_stage"] == expected_stage
+    assert attribution["closed_failure_reason"] == "UNEXPECTED_EXCEPTION"
+    assert failure["failure_type"] == "ValueError"
+    assert len(failure["year_artifacts"]) == expected_year_count
+    assert len(terminal["year_artifacts"]) == expected_year_count
+    for artifact in failure["year_artifacts"]:
+        artifact_path = root / artifact["path"]
+        assert artifact_path.is_file()
+        assert (
+            hashlib.sha256(artifact_path.read_bytes()).hexdigest() == artifact["sha256"]
+        )
+    expected_failed_year = failed_year if expected_year_count == 1 else None
+    assert attribution["scored_year"] == expected_failed_year
+    assert "private " not in json.dumps(failure)
+    assert terminal["failure_code"] == "UNCLASSIFIED_FAILURE"
+    assert (root / "development-report.json").is_file() is (boundary == "attestation")
+    assert terminal["attempted_years"] == list(
+        arch151.SCORED_YEARS[:expected_year_count]
+    )
+    assert failure["year_artifacts"][0]["scored_year"] == first_year
+
+
+def test_annual_wrapper_does_not_change_existing_chained_failure_classification() -> (
+    None
+):
+    try:
+        try:
+            raise ValueError("cause detail")
+        except ValueError as cause:
+            raise evaluator.EvaluationIntegrityError("integrity detail") from cause
+    except evaluator.EvaluationIntegrityError as error:
+        assert operator._root_failure(error) is error
+        assert (
+            operator._operator_failure_code(error)
+            is operator.OperatorFailureCode.DEVELOPMENT_COMPOSITION_FAILED
+        )
 
 
 def test_create_only_writer_preserves_collision_and_cli_has_no_period_override(

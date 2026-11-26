@@ -1,31 +1,35 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 foundation integrated; offline evaluator next
+## Current milestone - Architecture 151 evaluator integrated; real development evaluation next
 
-Architecture 151 foundation/C3 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
-INTEGRATED. Feature FULL run `45492979313` and develop run `45495638481`, both
-attempt 1, are terminal SUCCESS; develop reused exact feature certification
-with stable identity and no duplicate FULL. Exact identities and continuation
-boundaries are in [the handoff](AI_TRADING_BOT_HANDOFF.md).
+Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
+FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
+`b18af8f7bef3bc2a97900544ae82e6e034926932`. Feature FULL `45739318873` and
+exact develop reuse `45753356448`, both attempt 1, are terminal SUCCESS;
+no duplicate FULL ran. The evaluator, durable one-shot operator, realized-net
+accounting, statistical qualification, diagnostic report, and source-bound
+candidate evidence are implemented and synthetic-tested. See the handoff and
+owning Architecture 151 documents for exact evidence and limitations.
 
-Architecture 150 is terminal: 24 evaluated, 0 qualified,
-`NO_HOLDOUT_CANDIDATES`; no rerun or mutation. Architecture 151 reuses its
-accepted 2016-2023 sparse SPY/QQQ custody without development reacquisition.
-The 16 frozen programs / 32 slots score five expanding years (2019-2023),
-with BASE 2 bps/fill, STRESS 5 bps/fill and ZERO diagnostic. The 29 prior
-trials plus 32 current slots yield effective trial count 64. DSR remains
-uncomputed; no real replay or qualifying candidate exists. 2024-2025 and
-Jan-Oct 2026 remain sealed under the frozen sequential gates.
+Architecture 150 remains terminal: 24 evaluated, 0 qualified,
+`NO_HOLDOUT_CANDIDATES`; no rerun or mutation. Arch151 reuses its accepted
+2016-2023 sparse SPY/QQQ custody without reacquisition. The frozen 16 programs /
+32 slots score five expanding years (2019-2023) under BASE 2 bps/fill,
+STRESS 5 bps/fill and ZERO diagnostic: 480 fold-cost records. Effective DSR
+trial count is 64. No real Arch151 replay or actual DSR result exists yet.
+The adjusted-price SPY comparator is not separately reconstructed dividend
+cash-flow total return. Statistical unavailability, incomplete/failed replay,
+and a valid zero-survivor result are distinct outcomes.
 
-Immediate next milestone: one coordinated synthetic-only offline evaluator
-checkpoint, covering custody authentication, deterministic causal execution,
-complete fold accounting, DSR/reviewed-equivalent statistics, immutable report
-provenance, gross/net and failure attribution, benchmark diagnostics and
-synthetic end-to-end/performance verification. Freeze statistical and execution
-semantics before real data access. Sol High coordinates/reviews; Luna Extra
-High implements, runs focused checks, admits and publishes to mapped CI.
-No real custody read/replay, provider/credential access, broker/order effect,
-or 2024+ access is authorized by this closeout.
+Immediate next milestone: ChatGPT-reviewed local source/evidence-root preflight,
+then a separately bounded one-shot development observation using only the
+accepted D1R custody. No new implementation is required for that observation.
+The fixed output root must not exist; preserve any existing attempt and never
+retry automatically. Review the terminal report, all candidate results and
+zero-or-one freeze before any subsequent decision. 2024-2025 and Jan-Oct 2026
+remain sealed; real later-period readers/issuers are not implemented. No real
+custody access, provider/credential access, broker/order effect or 2024+ access
+is authorized by documentation publication itself.
 
 ### Product direction and conditional roadmap
 

@@ -1,72 +1,93 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 foundation integrated; offline evaluator next
+## Current milestone: Architecture 151 evaluator integrated; real development evaluation next
 
-Architecture 150 is terminal and must not be rerun or mutated. Accepted
+Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
 `F:\AI\temp\arch150-g1-validation-cb197d11-9779-46e1-8179-81bab0c8806a\validation.json`;
 report `22f752aa-5dc1-5e42-af29-1c7e2f921175`, SHA-256
 `d3b637f410b9e8bf05d352e50efea95721151543ec6308fc270c804b5aa372c7`,
 24 evaluated / 0 qualified / `NO_HOLDOUT_CANDIDATES`.
 
-Arch151 foundation is independently SOURCE/CERTIFICATION ACCEPTED and
-FAST-FORWARD INTEGRATED at `39ce9cfe095acfef44e41ff4aa12ae371abd14ac` /
-`b8216809237ce2c0826644d9534f82fd77ac763c`, with preserved predecessor commits
-`b6b398014ade93b13a4abda90634247dca822ada`,
+Arch151 foundation was accepted and integrated at
+`39ce9cfe095acfef44e41ff4aa12ae371abd14ac` /
+`b8216809237ce2c0826644d9534f82fd77ac763c`; feature FULL `45492979313` and
+develop reuse `45495638481` are terminal SUCCESS, attempt 1. Foundation
+predecessors `b6b398014ade93b13a4abda90634247dca822ada`,
 `f442cf958dad07a740650a2d274894f0a0411633` and
-`0a5b978a2f2f2a493a85257fda048910eb7d229d`. C3 feature mapped FULL
-`45492979313`, attempt 1, is terminal SUCCESS with all seven lanes and
-source-static, active-tests and source-gates green. Develop `45495638481`,
-attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason
-`exact_feature_certification`, `IDENTITY_STABLE=True` and no duplicate FULL.
-The operator proved both local worktrees and live refs at the exact accepted
-source identity; preserved develop untracked files are permitted, but tracked
-and index drift is STOP. Integration evidence root:
-`F:\AI\temp\arch151-c3-integration-ac70162d6e8c4859a85e4474bf34ec8a`.
+`0a5b978a2f2f2a493a85257fda048910eb7d229d` remain immutable. Foundation
+integration evidence: `F:\AI\temp\arch151-c3-integration-ac70162d6e8c4859a85e4474bf34ec8a`.
+The prior coordination closeout was `5da3b755e4ce05e091c3dea2d9cae8f715fc8281` /
+`b0bb3671595095e82505a5590637ff255ba06d47`.
 
-C3 corrects Family D current-segment signal selection and rebuilds the sparse
-expired-entry regression; 82 focused tests passed as reported by the implementing
-owner. No real replay, accepted-custody access, provider/credential access,
-Robinhood/broker/order effect or 2024+ access occurred during foundation work.
+The complete E1 evaluator is independently SOURCE/CERTIFICATION ACCEPTED and
+FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
+`b18af8f7bef3bc2a97900544ae82e6e034926932`. The four-commit chain is:
+E1 `d3a42a4d763a3912e8601b19d6f240bae77cd952` (FULL `45557311951` SUCCESS),
+E1-C1 `ecbb9e37d58572f49192992ece0a0b609d181d73` (preserved FULL
+`45715017377` FAILURE: hosted fixture portability and hygiene), E1-C2
+`f4aa349efb18f33bfc2fe034b19262d2e9778a8f` (FULL `45721239698` SUCCESS),
+and E1-C3 (FULL `45739318873` SUCCESS, 18,526 passed / 10 skipped,
+slowest lane 274.462 s; all seven hygiene gates passed). Each run was attempt 1.
+Develop `45753356448`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`, `OVERALL=PASS`; duplicate FULL did not run.
+Integration evidence:
+`F:\AI\temp\arch151-e1-integration-accfe9527ef4433ba2ff585fd9363a23`.
+Both local worktrees were reported synchronized and develop's untracked
+inventory preserved. No accepted-custody read, real replay, trading credential,
+provider, broker/order, or 2024+ access was performed during E1 implementation.
 
 Continuation checkout: `F:\AI\worktrees\ai-trading-bot-arch151-intraday-walkforward-current`,
 branch `feature/research-arch151-intraday-walkforward-current`; canonical develop
-checkout `F:\AI\ai-trading-bot`. Reprove live remote develop and active feature
-HEAD/tree and clean expected state before implementation; documentation-only
-successors must be separately accepted and synchronized.
+checkout `F:\AI\ai-trading-bot`. Reprove live refs and exact clean expected
+source identities. A docs-only successor requires its own admission, terminal
+source gate, exact fast-forward and both local checkouts synchronized.
 
 [Architecture 151](architecture/151-intraday-walk-forward-campaign.md) and its
 [validation plan](validation/arch151-intraday-walk-forward-campaign.md) own the
 frozen manifest `4fdce706-4322-59e1-95d1-590a39e67978` / SHA-256
 `8a5c89c55388e8ec5d0c6384a8f69ab99587a538bd0d868cb29a108717084083`.
-The prior ledger is `f7ce28f9-56b2-570b-8c83-62fbac38edbf` / SHA-256
-`20dd765979f389504ccdf187589268a0d9d10a5d6479f1111738fc441a5a4269`.
-29 prior trials, 32 fixed slots, effective count 64. Fold evaluation schema v2
-retains explicit PF states; DSR producer and authenticated candidate issuance
-remain unavailable. Accepted sparse development custody is the D1R output
-identified below; verify its dataset and custody fingerprints before a later
-separately authorized read. No reacquisition.
+Prior ledger `f7ce28f9-56b2-570b-8c83-62fbac38edbf` / SHA-256
+`20dd765979f389504ccdf187589268a0d9d10a5d6479f1111738fc441a5a4269`:
+29 prior trials, 32 current slots, effective count 64. E1 implements DSR,
+realized-net PF, ZERO/BASE/STRESS diagnostics and adjusted-price benchmark,
+canonical 480-record report, durable one-shot operator and authenticated
+one-candidate development evidence. E1-C3 checks the exact chronological
+fill-cash chain and frozen family entry caps. DSR unavailability remains
+fail-closed for the full population, with per-slot reasons and descriptive
+non-authorizing economic order. No actual DSR or candidate result exists.
 
-Exact next boundary: a single coordinated source-only offline evaluator
-checkpoint using synthetic inputs. Sol High is planning/coordinator/reviewer
-only; Luna Extra High owns implementation, affected tests, prepublication
-admission, ordinary publication and terminal mapped FULL. Implement complete
-causal execution, verified sparse projections, complete fold accounting and
-failure evidence, frozen statistical calculation, source-owned qualification
-and candidate binding, reports and synthetic end-to-end/performance coverage.
-Retain ZERO/BASE/STRESS diagnostics and compare comparable benchmark returns
-without altering any threshold. Actual 2019-2023 replay requires subsequent
-exact-source/certification acceptance and explicit reviewed read-only authority.
-2024-2025 stays sealed until one authenticated qualifying candidate is frozen;
-Jan-Oct 2026 stays sealed until that candidate's authenticated holdout PASS.
-No source-only step authorizes real replay, provider calls or trading.
+Exact next boundary: local read-only source and output-root preflight, then
+separately reviewed no-argument Arch151 operator invocation, development only.
+Accepted D1R source (do not reacquire):
+`F:\AI\temp\arch150-d1r-offline-requalification-a46c4ad1-4287-4e51-8741-0316f784f1de`.
+Dataset `ff5a3847-09c2-5902-b174-9e77eebf7d53` / SHA-256
+`0070a5c0cfa5cd7878253d93bc0895b46da28d8b5e2a71395e66ce904b3f85dd`;
+custody `21e121dc-a9da-538f-bc88-c15fe7ea7f50` / SHA-256
+`5b6ac554eda73b588f2f6d664c14e5c7fca3c151966cb546c17621d0c7e6ad83`;
+evidence `c31bb29d-3d53-5e2f-a01f-55a42ec96295` / SHA-256
+`e58a6e5d95c44b33eb34311f705e6cc26982120689f98ddb207768dc304b4ecd`.
+The source-owned loader must authenticate the fixed artifacts during the
+reviewed observation; metadata-only preflight is not custody acceptance.
+Operator: `trading_bot.experiments.arch151_intraday_walkforward_operator`.
+Fixed evidence root `F:\AI\temp\arch151-intraday-development-evidence` must
+not exist. The operator claims once, persists year evidence and terminal
+report/failure evidence; no overwrite, automatic retry or alternative root.
+No source-only step or docs closeout grants real replay permission.
+2024-2025 remains sealed until a single authenticated qualifying development
+candidate and separate reviewed later-period authority; Jan-Oct 2026 remains
+sealed until that same candidate's authenticated holdout PASS. Actual later-
+period readers and result issuers are unavailable. A pure synthetic PASS is
+not an authorization. Distinguish valid no-survivor, statistical unavailable,
+incomplete and failed observation. No automatic trading authority follows.
 
 Product priority is defined in [Project Status](PROJECT_STATUS.md): complete
-Arch151; if qualification or later validation fails, prioritize the separate
-Arch149-based AI Portfolio Manager before further intraday strategy discovery.
-Preserve the Arch149 frozen confirmation boundary, account isolation and all
-broker/live readiness gates. Portfolio framework preparation is not authority
-to open partial 2026 confirmation or trade.
+Arch151; if valid qualification or later validation fails, prioritize the
+separate Arch149-based AI Portfolio Manager before further intraday strategy
+discovery. Preserve the Arch149 frozen confirmation boundary, account isolation
+and all broker/live readiness gates. Portfolio framework preparation is not
+authority to open partial 2026 confirmation or trade.
 
 Current implemented intraday runtime authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
 

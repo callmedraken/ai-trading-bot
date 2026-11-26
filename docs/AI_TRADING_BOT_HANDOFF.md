@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 E2 observation consumed; E3 correction in progress
+## Current milestone: Architecture 151 E3 timing failure preserved; E3-C1 test correction
 
 Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
@@ -83,10 +83,16 @@ the complete contract.
 
 Continuation checkout: `F:\AI\worktrees\ai-trading-bot-arch151-intraday-walkforward-current`,
 branch `feature/research-arch151-intraday-walkforward-current`; canonical develop
-checkout `F:\AI\ai-trading-bot`. The current E3 source-only correction remains
-pending exact-source review, admission, ordinary push, and its mapped terminal
-FULL result. E3 does not establish independent acceptance or integration.
-Reprove live refs and exact source identities before any later transition.
+checkout `F:\AI\ai-trading-bot`. E3 mapped FULL run `45797405811`, attempt 1,
+is terminal FAILURE only for broad-1 exceeding the 300-second budget (408.168
+seconds); all cases passed or skipped without failures/errors. Preserve this
+published red result. Failed job `139831883414` has timing artifact
+`15106217058`. E3-C1 makes test-fixture timing changes and records paired
+measurements and the projection in the validation plan. Review the exact
+E3-C1 commit and its mapped FULL result before any source acceptance or develop
+integration. Neither E3 nor E3-C1 establishes independent source acceptance or
+develop integration. Reprove live refs and exact source identities before any
+later transition.
 
 [Architecture 151](architecture/151-intraday-walk-forward-campaign.md) and its
 [validation plan](validation/arch151-intraday-walk-forward-campaign.md) own the

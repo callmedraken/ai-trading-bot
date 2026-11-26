@@ -66,6 +66,7 @@ def _b_history(
     second_setup: bool = False,
     second_open_observed: bool = False,
     entry_reference: Decimal = Decimal("100.2"),
+    _raw_minutes_only: bool = False,
 ):
     program = next(
         item
@@ -240,9 +241,14 @@ def _b_history(
                     100,
                 )
             )
+    history_or_minutes = (
+        tuple(minutes)
+        if _raw_minutes_only
+        else arch151._test_only_synthetic_source_history(minutes)
+    )
     return (
         program,
-        arch151._test_only_synthetic_source_history(minutes),
+        history_or_minutes,
         entry_time,
         target,
         stop,
@@ -250,9 +256,13 @@ def _b_history(
     )
 
 
-def _synthetic_benchmark_history(
-    year: int = 2019, *, missing_start: bool = False, missing_end: bool = False
-):
+def _synthetic_benchmark_minutes(
+    year: int = 2019,
+    *,
+    missing_start: bool = False,
+    missing_end: bool = False,
+    endpoints_only: bool = False,
+) -> tuple[arch151.OneMinuteBar, ...]:
     sessions = arch151._published_sessions_for_year(year)
     first_date, last_date = sessions[0], sessions[-1]
     minutes: list[arch151.OneMinuteBar] = []
@@ -262,7 +272,16 @@ def _synthetic_benchmark_history(
         scheduled_minutes = int(
             (schedule.closes_at - schedule.opens_at).total_seconds() // 60
         )
-        if role == "first":
+        if endpoints_only:
+            if role == "first":
+                offsets = () if missing_start else range(0, 15)
+            else:
+                offsets = (
+                    ()
+                    if missing_end
+                    else range(scheduled_minutes - 15, scheduled_minutes)
+                )
+        elif role == "first":
             offsets = range(15, 30) if missing_start else range(0, 15)
         else:
             offsets = (
@@ -290,7 +309,17 @@ def _synthetic_benchmark_history(
                     100,
                 )
             )
-    return arch151._test_only_synthetic_source_history(minutes)
+    return tuple(minutes)
+
+
+def _synthetic_benchmark_history(
+    year: int = 2019, *, missing_start: bool = False, missing_end: bool = False
+):
+    return arch151._test_only_synthetic_source_history(
+        _synthetic_benchmark_minutes(
+            year, missing_start=missing_start, missing_end=missing_end
+        )
+    )
 
 
 def _synthetic_campaign_measures(
@@ -320,6 +349,22 @@ def _synthetic_campaign_measures(
     )
 
 
+def _campaign_liquidation_boundary_minute(
+    session: date, symbol: str
+) -> arch151.OneMinuteBar:
+    schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
+    assert schedule is not None
+    return arch151.OneMinuteBar(
+        symbol,
+        schedule.closes_at - timedelta(minutes=5),
+        Decimal("100"),
+        Decimal("100.01"),
+        Decimal("99.99"),
+        Decimal("100"),
+        100,
+    )
+
+
 def _synthetic_five_year_campaign_history():
     """Generate a complete campaign with representative 2023 family signals."""
     minutes_by_key = {}
@@ -342,13 +387,10 @@ def _synthetic_five_year_campaign_history():
 
     for year in arch151.SCORED_YEARS:
         signal_session = arch151._published_sessions_for_year(year)[1]
-        retain(_campaign_signal_session_minutes(signal_session))
-        benchmark = _synthetic_benchmark_history(year)
         retain(
-            minute
-            for projection in benchmark._session_projections
-            for minute in projection.minutes
+            _campaign_signal_session_minutes(signal_session, include_flat_padding=False)
         )
+        retain(_synthetic_benchmark_minutes(year, endpoints_only=True))
 
     for symbol in arch151.INITIAL_UNIVERSE:
         retain(shift_fractional_price_level(_a_prior_minutes(symbol)))
@@ -366,7 +408,6 @@ def _synthetic_five_year_campaign_history():
     target_dates = arch151._published_sessions_for_year(2023)[10:20]
     assert len(target_dates) == 10
     representative_sessions: dict[tuple[arch151.ProgramKey, str], date] = {}
-    flat_target_dates: set[date] = set()
     target_index = 0
     for key in selected_keys:
         program = next(item for item in arch151.CANONICAL_PROGRAMS if item.key is key)
@@ -382,27 +423,9 @@ def _synthetic_five_year_campaign_history():
             selected_targets = {symbol: target for symbol in arch151.INITIAL_UNIVERSE}
         for symbol, target in selected_targets.items():
             representative_sessions[key, symbol] = target
-            if target not in flat_target_dates:
-                schedule = arch151._SESSION_AUTHORITY.schedule_for(target)
-                assert schedule is not None
-                count = int(
-                    (schedule.closes_at - schedule.opens_at).total_seconds() // 60
-                )
-                retain(
-                    arch151.OneMinuteBar(
-                        item,
-                        schedule.opens_at + timedelta(minutes=offset),
-                        Decimal("100"),
-                        Decimal("100.01"),
-                        Decimal("99.99"),
-                        Decimal("100"),
-                        100,
-                    )
-                    for item in arch151.INITIAL_UNIVERSE
-                    for offset in range(count)
-                )
-                flat_target_dates.add(target)
-            source_history, source_session, *_ = _source_for_program(program, symbol)
+            source_minutes, source_session, *_ = _source_for_program(
+                program, symbol, _raw_minutes_only=True
+            )
             assert source_session == SESSION
             source_symbols = (
                 arch151.INITIAL_UNIVERSE
@@ -411,10 +434,12 @@ def _synthetic_five_year_campaign_history():
             )
             shift = target - source_session
             for source_symbol in source_symbols:
-                projection = source_history._projection_index[
-                    (source_symbol, source_session, program.resolution)
-                ]
-                pattern_minutes = projection.minutes
+                pattern_minutes = tuple(
+                    minute
+                    for minute in source_minutes
+                    if minute.symbol == source_symbol
+                    and minute.session_date == source_session
+                )
                 if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT:
                     pattern_minutes = tuple(
                         shift_fractional_price_level(pattern_minutes)
@@ -425,6 +450,13 @@ def _synthetic_five_year_campaign_history():
                         timestamp=minute.timestamp + timedelta(days=shift.days),
                     )
                     for minute in pattern_minutes
+                )
+                boundary_minute = _campaign_liquidation_boundary_minute(
+                    target, source_symbol
+                )
+                minutes_by_key.setdefault(
+                    (boundary_minute.symbol, boundary_minute.timestamp),
+                    boundary_minute,
                 )
 
     history = arch151._test_only_synthetic_source_history(
@@ -438,21 +470,23 @@ def _synthetic_five_year_campaign_history():
     return history, representative_sessions
 
 
-def _campaign_signal_session_minutes(session: date) -> tuple[arch151.OneMinuteBar, ...]:
-    """Generate one complete SPY/QQQ session containing a B5 trade setup."""
-    program, b_history, *_ = _b_history(session=session)
+def _campaign_signal_session_minutes(
+    session: date, *, include_flat_padding: bool = True
+) -> tuple[arch151.OneMinuteBar, ...]:
+    """Generate a raw B5 setup with optional full-session flat padding."""
+    program, supplied_minutes, *_ = _b_history(session=session, _raw_minutes_only=True)
     assert program.key is arch151.ProgramKey.B5_01
-    projection = next(
-        item
-        for item in b_history._session_projections
-        if item.symbol == "SPY" and item.session_date == session
-    )
-    supplied_minutes = {item.timestamp: item for item in projection.minutes}
     schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
     assert schedule is not None
+    if not include_flat_padding:
+        return (
+            *supplied_minutes,
+            _campaign_liquidation_boundary_minute(session, "SPY"),
+        )
+    supplied_minutes_by_timestamp = {item.timestamp: item for item in supplied_minutes}
     count = int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
     minutes = tuple(
-        (supplied_minutes.get(timestamp) if symbol == "SPY" else None)
+        (supplied_minutes_by_timestamp.get(timestamp) if symbol == "SPY" else None)
         or arch151.OneMinuteBar(
             symbol,
             timestamp,
@@ -492,20 +526,15 @@ def _flat_arch150_session_bars(
     )
 
 
+@cache
 def _arch150_adapter_fixture():
     scored_sessions = arch151._published_sessions_for_year(2021)
-    prior_sessions = tuple(
-        session
-        for session in arch151._SESSION_AUTHORITY.published.sessions
-        if session < date(2021, 1, 1)
-    )[-60:]
     signal_session = scored_sessions[1]
     published_sessions = arch151._SESSION_AUTHORITY.published.sessions
     source_sessions = tuple(
         sorted(
             {
                 next(item for item in published_sessions if item.year == 2016),
-                *prior_sessions,
                 scored_sessions[0],
                 signal_session,
                 scored_sessions[-1],
@@ -621,7 +650,7 @@ def _a_prior_minutes(symbol: str) -> tuple[arch151.OneMinuteBar, ...]:
 
 
 @cache
-def _a_history(symbol: str):
+def _a_current_minutes(symbol: str) -> tuple[tuple[arch151.OneMinuteBar, ...], date]:
     session = SESSION
     schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
     assert schedule is not None
@@ -647,13 +676,24 @@ def _a_history(symbol: str):
                 100,
             )
         )
+    return tuple(current), session
+
+
+@cache
+def _a_history(symbol: str):
+    current, session = _a_current_minutes(symbol)
     history = arch151._test_only_synthetic_source_history(
         (*_a_prior_minutes(symbol), *current)
     )
     return history, session
 
 
-def _b_all_program_history(program: arch151.Arch151Program, symbol: str):
+def _b_all_program_history(
+    program: arch151.Arch151Program,
+    symbol: str,
+    *,
+    _raw_minutes_only: bool = False,
+):
     resolution = program.resolution
     bars = _flat_bars(symbol, SESSION, resolution)
     parameters = program.parameters
@@ -752,10 +792,20 @@ def _b_all_program_history(program: arch151.Arch151Program, symbol: str):
             100,
         )
     )
-    return arch151._test_only_synthetic_source_history(minutes), signal_time
+    history_or_minutes = (
+        tuple(minutes)
+        if _raw_minutes_only
+        else arch151._test_only_synthetic_source_history(minutes)
+    )
+    return history_or_minutes, signal_time
 
 
-def _c_history(program: arch151.Arch151Program, symbol: str):
+def _c_history(
+    program: arch151.Arch151Program,
+    symbol: str,
+    *,
+    _raw_minutes_only: bool = False,
+):
     resolution = program.resolution
     parameters = program.parameters
     bars = _flat_bars(symbol, SESSION, resolution)
@@ -840,7 +890,12 @@ def _c_history(program: arch151.Arch151Program, symbol: str):
             100,
         )
     )
-    return arch151._test_only_synthetic_source_history(minutes), signal_time, exit_time
+    history_or_minutes = (
+        tuple(minutes)
+        if _raw_minutes_only
+        else arch151._test_only_synthetic_source_history(minutes)
+    )
+    return history_or_minutes, signal_time, exit_time
 
 
 def _c_two_entry_history(program: arch151.Arch151Program, symbol: str):
@@ -975,7 +1030,12 @@ def _c_two_entry_history(program: arch151.Arch151Program, symbol: str):
     )
 
 
-def _d_history(program: arch151.Arch151Program, symbol: str):
+def _d_history(
+    program: arch151.Arch151Program,
+    symbol: str,
+    *,
+    _raw_minutes_only: bool = False,
+):
     resolution = program.resolution
     parameters = program.parameters
     other_symbol = next(item for item in arch151.INITIAL_UNIVERSE if item != symbol)
@@ -1085,25 +1145,44 @@ def _d_history(program: arch151.Arch151Program, symbol: str):
             100,
         )
     )
-    return arch151._test_only_synthetic_source_history(minutes), signal_time, boundary
+    history_or_minutes = (
+        tuple(minutes)
+        if _raw_minutes_only
+        else arch151._test_only_synthetic_source_history(minutes)
+    )
+    return history_or_minutes, signal_time, boundary
 
 
-def _source_for_program(program: arch151.Arch151Program, symbol: str):
+def _source_for_program(
+    program: arch151.Arch151Program,
+    symbol: str,
+    *,
+    _raw_minutes_only: bool = False,
+):
     if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT:
+        if _raw_minutes_only:
+            minutes, session = _a_current_minutes(symbol)
+            return minutes, session, None, evaluator.ExitReason.MAXIMUM_HOLD
         history, session = _a_history(symbol)
         return history, session, None, evaluator.ExitReason.MAXIMUM_HOLD
     if program.family is arch151.StrategyFamily.OPENING_RANGE_RETEST:
-        history, signal_time = _b_all_program_history(program, symbol)
+        history, signal_time = _b_all_program_history(
+            program, symbol, _raw_minutes_only=_raw_minutes_only
+        )
         return history, SESSION, signal_time, evaluator.ExitReason.TARGET_OPEN
     if program.family is arch151.StrategyFamily.VWAP_MEAN_REVERSION:
-        history, signal_time, exit_time = _c_history(program, symbol)
+        history, signal_time, exit_time = _c_history(
+            program, symbol, _raw_minutes_only=_raw_minutes_only
+        )
         return (
             history,
             SESSION,
             signal_time,
             (evaluator.ExitReason.VWAP_REVERSION, exit_time),
         )
-    history, signal_time, exit_time = _d_history(program, symbol)
+    history, signal_time, exit_time = _d_history(
+        program, symbol, _raw_minutes_only=_raw_minutes_only
+    )
     return (
         history,
         SESSION,
@@ -2345,19 +2424,35 @@ def family_a_replays() -> MappingProxyType[
     for symbol in arch151.INITIAL_UNIVERSE:
         history, _ = _a_history(symbol)
         calibration_cache = evaluator._FamilyACalibrationCache(history)
+        preparation_cache = evaluator._PreparationCache(history)
+        history_digest = evaluator._history_digest(history)
         for program in _programs_for_family(arch151.StrategyFamily.NOISE_VWAP_BREAKOUT):
-            replays = evaluator._simulate_slot_year_cases(
-                history,
-                _slot_for(program, symbol),
-                SESSION.year,
-                calibration_cache=calibration_cache,
-            )
-            base = next(
-                item for item in replays if item.cost_case is arch151.FillCostCase.BASE
-            )
-            results[program.key, symbol] = next(
-                item for item in base.sessions if item.session_date == SESSION
-            )
+            slot = _slot_for(program, symbol)
+            with localcontext(arch151._DECIMAL_CONTEXT):
+                calibration = calibration_cache.calibration(
+                    program, symbol, SESSION.year
+                )
+                tape = evaluator._session_tape(
+                    history,
+                    preparation_cache,
+                    program,
+                    symbol,
+                    SESSION,
+                    calibration,
+                )
+                projection = history._projection_index.get(
+                    (symbol, SESSION, program.resolution)
+                )
+                results[program.key, symbol] = evaluator._simulate_session_from_tape(
+                    history_digest=history_digest,
+                    slot=slot,
+                    program=program,
+                    session=SESSION,
+                    tape=tape,
+                    minutes=projection.minutes if projection is not None else (),
+                    starting_equity=Decimal(1),
+                    case=arch151.FillCostCase.BASE,
+                )
     return MappingProxyType(results)
 
 
@@ -3138,12 +3233,29 @@ def test_operator_attestation_binds_exact_run_report_and_captured_revision(
     )
     context.bind_run(run)
     context.bind_report(report)
+    real_serialize = evaluator.serialize_development_evaluation
+    serialization_requests: list[evaluator.DevelopmentEvaluationRun] = []
+
+    def serialize_using_fixture_cache(
+        candidate: evaluator.DevelopmentEvaluationRun,
+    ) -> evaluator.DevelopmentEvaluationReport:
+        serialization_requests.append(candidate)
+        if candidate is run:
+            # idle_report was produced by the real serializer for this exact run.
+            return report
+        return real_serialize(candidate)
+
+    monkeypatch.setattr(
+        evaluator, "serialize_development_evaluation", serialize_using_fixture_cache
+    )
     attestation = operator._issue_development_source_attestation(
         context,
         run,
         report,
         _synthetic_test_only=True,
     )
+    assert serialization_requests == [run]
+    assert report.sha256 == sha256(report.canonical_json_bytes).hexdigest()
 
     assert attestation.run_id == run.run_id
     assert attestation.report_id == report.report_id
@@ -3159,6 +3271,7 @@ def test_operator_attestation_binds_exact_run_report_and_captured_revision(
         )
         == attestation
     )
+    assert serialization_requests == [run, run]
 
     changed_revision = operator.SourceRevision(
         operator.EXPECTED_BRANCH,
@@ -3204,6 +3317,7 @@ def test_operator_attestation_binds_exact_run_report_and_captured_revision(
         operator._validate_development_source_attestation(
             run, forged_report, attestation
         )
+    assert serialization_requests == [run, run]
 
     outcome = operator.OperatorOutcome(
         operator.OperatorStatus.COMPLETED,

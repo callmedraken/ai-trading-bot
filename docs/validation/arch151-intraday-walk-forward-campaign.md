@@ -1,6 +1,6 @@
 # Architecture 151 — Validation plan and evidence boundary
 
-**Status:** this document records the accepted E2 source correction, both consumed observations, and the E3 source-only numerical-reliability correction. It does not assert E3 source acceptance, integration, or mapped CI status or outcome.
+**Status:** this document records the accepted E2 source correction, both consumed observations, E3's source-only numerical-reliability correction and terminal mapped FULL timing failure, and the E3-C1 test-fixture timing correction. Review the exact E3-C1 commit and mapped result before any source acceptance or integration.
 
 ## 1. Scope and safety boundary
 
@@ -111,6 +111,89 @@ different Windows hosts and do not establish actual hosted certification time.
 The lane algorithm, frozen C4 timing evidence and 300-second wall ceiling remain
 in force.
 
+### E3-C1 certification timing correction
+
+E3 mapped FULL run `45797405811`, attempt 1, is preserved as a terminal
+certification-budget failure. Broad-1 completed 2,443 cases (2,442 passed,
+one skipped, zero failures or errors) in 408.168 seconds against the unchanged
+300-second limit. Failed job `139831883414` contains timing artifact
+`15106217058`; the six other lanes passed. This is not a source-test failure
+or an accepted certification result. The prepublication timing audit did not
+account sufficiently for the expanded campaign fixture's actual hosted cost;
+the complete hosted overrun is not claimed to be reproduced locally.
+
+The E2-to-E3 broad-1 case sum rose from 233.901 to 393.199 seconds
+(+159.298); measured runner overhead rose from 12.070 to 14.969 seconds
+(+2.899), yielding the 162.197-second wall increase. The evaluator module rose
+from 161.542 to 288.809 seconds (+127.267). Its five-year campaign case rose
+from 13.341 to 92.025 seconds (+78.684); the evaluator's remaining cases
+accounted for another 48.583 seconds of increase. The other 49 broad-1 module
+groups rose from 72.359 to 104.390 seconds (+32.031). Their largest increases
+included the Arch134 successor soak (16.565 to 23.006), Arch149 rotation
+(7.475 to 11.469), certification results (4.358 to 7.886), and filtered trend
+bundle (8.418 to 11.763). The broad distribution is consistent with shared
+setup or host sensitivity; these records do not prove a particular cause.
+
+E3-C1 removes redundant generated-history construction while retaining the
+same canonical annual and campaign path. Raw minutes now feed one final
+synthetic history instead of repeatedly sealing intermediate histories and
+extracting their projections. It keeps complete prior Family A sessions for
+calibration, exact 15-minute benchmark endpoint buckets, all 16 representative
+program/symbol sessions across the four families, SPY and QQQ, both resolutions,
+all three economics cases, the complete 96-record annual result, and the
+canonical 480-record composition/report serialization. Sparse target sessions
+include only strategy observations plus the exact scheduled liquidation-minute
+observation for each symbol that can carry a position, preserving actual
+mandatory-liquidation checks. The Arch150 adapter fixture retains complete
+representative dates before and after 2021 and the real synthetic B5 replay;
+it no longer builds 60 unused complete sessions. Its positive authority checks
+and invalid/truncated/mismatched/sanitized rejection cases remain. The Family A
+canonical-signal fixture reuses source-owned calibration/preparation caches and
+replays the selected BASE session once, while the five-year campaign remains
+the separate annual/cost integration proof.
+
+The attestation test seeds a test-local identity cache from `idle_report`, which
+was produced by the real canonical serializer for that exact immutable run.
+Both issuer and valid validator paths still request serialization of the exact
+run; another run falls through to the real serializer. The byte hash check,
+issuer/validator binding, changed-revision rejection, forged-report rejection,
+annual serialization, and campaign serialization remain exercised. No
+successful issuer or validator result is mocked.
+
+Matched local fixture-only construction used the published E3 test blob and
+the E3-C1 test file in separate fresh Python processes with the same interpreter
+and working directory; the timer covered only `_synthetic_five_year_campaign_history()`
+and not imports or replay. It fell from 37.676 to 18.335 seconds, with 16
+representative sessions in each result. The campaign pytest case measured
+91.96 seconds in the selected E3 run and 65.46 seconds in the selected E3-C1
+run; these case timings include order-dependent cached fixture setup and are
+reported separately from the isolated constructor measurement. The four
+invalid-population adapter cases measured 13.17 seconds against the immutable
+E3 test blob and 0.72 seconds in E3-C1 (all four passed). A cold standalone
+SPY/A5 canonical-signal case measured 18.01 and 17.17 seconds respectively;
+the hosted E3 case was 2.041 seconds after earlier module setup, so no Family A
+savings are projected from the cold comparison.
+
+Other paired focused local cases were: full-input adapter 25.41 to 2.01
+seconds; truncated-population boundary 11.53 to 6.41 seconds; sanitized
+projection failure 4.19 to 0.10 seconds; and mismatched authority/projection
+source 3.77 to 0.06 seconds. The exact-run attestation call fell from 53.18 to
+0.42 seconds after seeding the test-local cache from the real `idle_report`;
+its real report-fixture setup remained about 32 seconds in both selections.
+These are separate focused-process measurements, not a claim that all setup
+cost is eliminated.
+
+Using the E3 hosted evaluator case sum and conservatively projecting measured
+local ratios for the campaign, adapter cases, invalid-population cases, and
+identity-seeded attestation gives a 150.394-second evaluator estimate. Keeping
+all other E3 broad-1 testcase durations fixed gives 254.784 seconds of testcase
+work; adding E3's unchanged 14.969-second maximum overhead gives a 269.753-second
+observed-shape projection, 30.247 seconds below the existing ceiling. This is
+a projection, not a certification result. The current C4 source model remains
+unchanged: broad-1 is 291.973 seconds and the seven-lane maximum is 291.980
+seconds. No timing weights, frozen C4 rows, lane membership, or budget were
+changed; mapped GitHub FULL remains the final timing gate.
+
 ## 3. Source-only checkpoint and mapped certification
 
 The established source-foundation checkpoint remains `arch151-intraday-walkforward-foundation` on branch `feature/research-arch151-intraday-walkforward-current`, preserving its prior route and certification evidence. The existing evaluator checkpoint `arch151-intraday-walkforward-evaluator` remains the source-only route for bounded Arch151 evaluator/operator corrections, including E3; this does not create another checkpoint registration. Changed-path routing selects the evaluator when its source/test or Arch151 design/validation docs are present, including mixed runner/workflow/docs changes; a no-diff route lookup keeps the foundation default. Both specs use `preflight=None`, `execute=None`, and `remote_head_env=None`, have no protected-effect dispatch, and map to GitHub-owned canonical `full`. Neither is registered in the historical `ACTIVE_CI_CHECKPOINTS` tuple.
@@ -127,18 +210,17 @@ Neither current route is registered as a historical ACTIVE_CI checkpoint. Curren
 
 ## 4. Focused local verification
 
-E3 changes the Arch151 numerical source/evaluator paths, operator failure attribution and consumed-route guards, their synthetic tests, and the owning architecture/validation/status/handoff documents. It does not change current runner or shared authority source, so focused verification covers the three Arch151 source/evaluator/operator test modules plus combined Ruff and diff checks. Do not rerun local canonical FULL; the registered mapping assigns FULL to GitHub.
+E3 changed the numerical evaluator and operator paths. E3-C1 changes only the evaluator's synthetic test fixtures and the owning coordination/validation documents; it does not change executable source, current runner, shared authority, or certification timing inputs. Focused verification selects the generated five-year campaign, canonical strategy signals, Arch150 adapter boundaries, exact-run attestation/report, and relevant numerical diagnostics. Do not rerun local canonical FULL; the registered mapping assigns FULL to GitHub.
 
 ```powershell
 $python = 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe'
 $projectRoot = 'F:\AI\worktrees\ai-trading-bot-arch151-intraday-walkforward-current'
-$pytestBase = Join-Path 'F:\AI\temp\pytest' ('arch151-e3-' + [guid]::NewGuid().ToString('N'))
+$pytestBase = Join-Path 'F:\AI\temp\pytest' ('arch151-e3c1-' + [guid]::NewGuid().ToString('N'))
 & $python -m pytest -q -p no:cacheprovider `
   -c (Join-Path $projectRoot 'pyproject.toml') `
   --rootdir $projectRoot "--basetemp=$pytestBase" `
-  (Join-Path $projectRoot 'tests/experiments/test_arch151_intraday_walkforward.py') `
   (Join-Path $projectRoot 'tests/experiments/test_arch151_intraday_walkforward_evaluator.py') `
-  (Join-Path $projectRoot 'tests/experiments/test_arch151_intraday_walkforward_operator.py')
+  -k 'generated_five_year_simulation_composes_non_idle_480_records or all_canonical_signals_enter_and_exit_through_unmocked_predicates or arch150_full_input_adapter_preserves_development_history_and_replays or arch150_adapter_rejects_invalid_population_before_custody_scan or arch150_adapter_rejects_truncated_population_at_custody_boundary or arch150_adapter_rejects_mismatched_authority_and_projection_source or arch150_adapter_sanitizes_projection_construction_failure or operator_attestation_binds_exact_run_report_and_captured_revision or source_owned_report_binds_all_records_provenance_dsr_and_freeze or economic_diagnostic_negates_fractional_losses_exactly or family_a_calibration_cache_matches_per_program_reference')
 if ($LASTEXITCODE -ne 0) { throw "Focused pytest failed with native exit $LASTEXITCODE" }
 
 & $python -m ruff check .
@@ -149,7 +231,7 @@ git diff --check
 if ($LASTEXITCODE -ne 0) { throw "git diff --check failed with native exit $LASTEXITCODE" }
 ```
 
-Use the repository-approved interpreter resolved to this checkout and a fresh GUID basetemp under `F:\AI\temp\pytest` for each pytest invocation. Earlier E1/E2 hosted counts and timing measurements in this document remain historical evidence; they do not replace focused E3 results. The mapped canonical FULL remains GitHub-owned, with the existing seven-lane topology and 300-second certification ceiling unchanged. Do not run local canonical FULL for this mapped checkpoint.
+Use the repository-approved interpreter resolved to this checkout and a fresh GUID basetemp under `F:\AI\temp\pytest` for each pytest invocation. Earlier E1/E2 hosted counts and timing measurements in this document remain historical evidence; E3's preserved terminal failure and the E3-C1 focused measurements above are separate evidence. The mapped canonical FULL remains GitHub-owned, with the existing seven-lane topology and 300-second certification ceiling unchanged. Do not run local canonical FULL for this mapped checkpoint.
 
 The route and GitHub-owned canonical FULL profile are specified in §3. Mapped certification is tied to the exact source revision; terminal CI evidence does not assert ChatGPT acceptance or develop integration.
 
@@ -162,4 +244,4 @@ The offline development evaluator, canonical report, and source-owned authentica
 - Authenticated holdout result issuance and a reader remain unavailable. The pure `qualify_later_period` function derives the exact 502-session/24-month 2024–2025 population from the published XNYS schedule and checks STRESS net return >0, each year >0, PF >1.10, drawdown <=15%, active-session fraction >=30%, average completed round trips/year >=80, and no month >40% of positive realized net trade P&L. Its synthetic PASS is not authenticated and cannot open data. No strategy mutation is allowed after holdout visibility.
 - Authenticated same-candidate Jan–Oct 2026 extension result issuance and a reader remain unavailable. The pure qualifier checks the exact 204-session/10-month XNYS population and STRESS net return >0, PF >1.05, drawdown <=15%, at least 6/10 complete calendar months positive, and active-session fraction >=30%. Extension authorization requires the same candidate and an authenticated holdout PASS; pure synthetic output cannot satisfy that boundary. A resulting `ARCH151_INTRADAY_RESEARCH_SURVIVOR` classification permits only a separately authorized paper/shadow translation study and grants no runtime, order, Robinhood, or live authority.
 
-Synthetic source and evaluator records test pure formulas, threshold boundaries, replay ordering, result serialization, and fail-closed rejection. They do not create accepted-custody evidence, a real-data qualifying candidate, holdout or extension permission, or authority to access later data. No mapped CI result is recorded by this validation document.
+Synthetic source and evaluator records test pure formulas, threshold boundaries, replay ordering, result serialization, and fail-closed rejection. They do not create accepted-custody evidence, a real-data qualifying candidate, holdout or extension permission, or authority to access later data. E3's mapped CI failure is recorded above. The E3-C1 mapped result is owned by its exact GitHub run and does not itself establish source acceptance or develop integration.

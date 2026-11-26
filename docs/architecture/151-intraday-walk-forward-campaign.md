@@ -1,6 +1,6 @@
 # Architecture 151 — Intraday walk-forward campaign
 
-**Status:** this document records the frozen design, accepted E2 source correction, consumed E1/E2 observations, and E3 numerical-reliability correction. E3 is a source-only implementation; it does not assert E3 exact-source acceptance, integration, or a mapped CI outcome. E2 source loading succeeded before the operator failed without a completed annual artifact; E3 did not reread custody or run a real replay. Architecture 150 remains immutable and unchanged.
+**Status:** this document records the frozen design, accepted E2 source correction, consumed E1/E2 observations, E3 numerical-reliability correction, and E3's preserved mapped FULL timing failure. E3's source is not independently accepted or integrated; E3-C1 is the bounded synthetic test-fixture timing correction. Review its exact commit and mapped result before any source acceptance or integration. E2 source loading succeeded before the operator failed without a completed annual artifact; neither E3 nor E3-C1 reread custody or ran a real replay. Architecture 150 remains immutable and unchanged.
 
 ## 1. Purpose and information boundary
 

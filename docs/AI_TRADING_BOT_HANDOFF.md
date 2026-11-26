@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 E3 timing failure preserved; E3-C1 test correction
+## Current milestone: Architecture 151 E3-C1 integrated; E4 offline runner next
 
 Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
@@ -87,12 +87,21 @@ checkout `F:\AI\ai-trading-bot`. E3 mapped FULL run `45797405811`, attempt 1,
 is terminal FAILURE only for broad-1 exceeding the 300-second budget (408.168
 seconds); all cases passed or skipped without failures/errors. Preserve this
 published red result. Failed job `139831883414` has timing artifact
-`15106217058`. E3-C1 makes test-fixture timing changes and records paired
-measurements and the projection in the validation plan. Review the exact
-E3-C1 commit and its mapped FULL result before any source acceptance or develop
-integration. Neither E3 nor E3-C1 establishes independent source acceptance or
-develop integration. Reprove live refs and exact source identities before any
-later transition.
+`15106217058`. E3-C1 removes redundant fixture work while retaining representative annual
+and campaign coverage; executable source is unchanged from E3. E3/E3-C1
+are independently SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`5525013ffcfe3b28276651e0f4a1719265db0369` /
+`a65232cbc1bcc341de1732a48066c24dbc98f8c6`. Direct parent E3 is
+`cd3188ad5752f8437573be126a6a8564ffce0116` /
+`3c95fc51f63302b898c90dd1756b3e07df1bde3e`. Feature FULL `45813360271`,
+attempt 1, terminal SUCCESS: 18,549 passed / 10 skipped, zero failures or
+errors, broad-1 248.642 s, slowest lane 262.682 s. Develop `45895966764`,
+attempt 1, terminal SUCCESS: `DEVELOP_CERTIFICATION_REUSE=True`,
+`REASON=exact_feature_certification`, `IDENTITY_STABLE=True`, `OVERALL=PASS`.
+No duplicate FULL. Integration evidence:
+`F:\AI\temp\arch151-e3-c1-integration-9e900aee67714f34ac1cbe44f7eab15b`.
+Both local checkouts reported synchronized; develop inventory preserved.
+Reprove live refs and exact source identities before any later transition.
 
 [Architecture 151](architecture/151-intraday-walk-forward-campaign.md) and its
 [validation plan](validation/arch151-intraday-walk-forward-campaign.md) own the
@@ -131,10 +140,20 @@ artifact; E3 did not access custody content. No later-period or holdout source
 was read or replayed. The E3 work adds deterministic Decimal behavior and
 sanitized attribution to the annual evaluator/operator, with synthetic-only
 focused verification. It does not perform an offline diagnostic replay or
-issue qualification evidence. The separate offline diagnostics authority
-contract is design-only in the architecture document and requires its own
-reviewed implementation milestone. No source-only checkpoint grants real
-replay permission.
+issue qualification evidence. The separate offline diagnostics proposal remains unimplemented. E4 is the
+next source-only milestone: one reusable development-only runner with fixed
+smoke-only and full-campaign modes, separate immutable attempts, source/custody
+provenance, progress and sanitized failure evidence. Full mode should load
+custody once, perform an operational smoke check, then evaluate and qualify
+the exact complete in-memory campaign using the existing frozen evaluator.
+Smoke results cannot select, tune, qualify or authorize candidates. Annual
+summary artifacts alone cannot reconstitute qualification authority; do not
+add a separate persisted replay reader or duplicate full diagnostic campaign
+without a separately reviewed need. E4 must retain both retired routes and
+all later-period and broker/provider prohibitions. No real custody-content
+read or replay during E4 implementation. Exact local invocation requires
+independent source/certification review and reviewed bounds. No source-only
+checkpoint grants real replay permission.
 2024-2025 remains sealed until a single authenticated qualifying development
 candidate and separate reviewed later-period authority; Jan-Oct 2026 remains
 sealed until that same candidate's authenticated holdout PASS. Actual later-

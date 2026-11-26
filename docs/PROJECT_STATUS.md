@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 E3-C1 timing correction
+## Current milestone - Architecture 151 E3-C1 integrated; E4 offline runner next
 
 Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
@@ -31,9 +31,10 @@ annual replay coverage and sanitized failure attribution, and documents a
 separate offline-diagnostics proposal. Its mapped FULL run `45797405811`,
 attempt 1, is preserved as a terminal timing failure: broad-1 took 408.168
 seconds against the unchanged 300-second ceiling, with 2,442 passes, one skip,
-and no test failures or errors. E3 source acceptance and integration are not
-established. E3-C1 trims redundant synthetic fixture construction; review its
-exact commit and mapped result before any acceptance or integration. No E3
+and no test failures or errors. E3-C1 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED.
+All seven mapped FULL lanes passed the unchanged 300-second ceiling; exact
+develop certification reuse succeeded. See the handoff for identities and
+the validation plan for the preserved red run and timing audit. No E3/E3-C1
 custody-content read or real replay occurred.
 
 Architecture 150 remains terminal: 24 evaluated, 0 qualified,
@@ -47,9 +48,13 @@ The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Immediate next milestone: independently review the exact E3-C1 commit and its
-terminal mapped FULL result before any acceptance or integration; preserve
-E3's red run and do not rerun it. The E1 and E2 public
+Immediate next milestone: E4 source-only reusable offline development runner.
+Reuse the accepted custody adapter, frozen simulator and qualification logic.
+Provide a fixed non-authorizing smoke mode and a complete campaign mode that
+authenticates custody once and qualifies the complete in-memory population
+without a duplicate full replay. Preserve immutable attempts, structured
+failure attribution and progress; no real execution during implementation.
+Preserve E3's red run and do not rerun it. The E1 and E2 public
 execution routes are retired and fail closed even if the E2 evidence root is
 missing. No third observation route is implemented. Review any future
 development result and its full trial accounting before a separately reviewed

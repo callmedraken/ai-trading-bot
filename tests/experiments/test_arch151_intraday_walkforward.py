@@ -4355,8 +4355,12 @@ def test_d1r_adapter_is_fixed_and_reuses_arch150_acceptance_without_reading_file
         return snapshot
 
     monkeypatch.setattr(arch151.arch150_d1r, "_read_pinned_input", fake_pinned_reader)
-    with pytest.raises(arch150.Arch150Error):
+    with pytest.raises(arch151.AuthorizationUnavailableError) as error:
         arch151.load_arch150_d1r_source_history()
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.INVALID_DEVELOPMENT_POPULATION
+    )
 
     assert roots == [arch150_d1r.ACCEPTED_INPUT_ROOT]
     bad_artifacts = tuple(
@@ -4368,17 +4372,42 @@ def test_d1r_adapter_is_fixed_and_reuses_arch150_acceptance_without_reading_file
         "_read_pinned_input",
         lambda root: arch150_d1r.InputSnapshot(incomplete_bars, bad_artifacts),
     )
-    with pytest.raises(arch151.AuthorizationUnavailableError, match="commitments"):
+    with pytest.raises(
+        arch151.AuthorizationUnavailableError, match="commitments"
+    ) as error:
         arch151.load_arch150_d1r_source_history()
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.ARTIFACT_AUTHENTICATION_FAILED
+    )
+    malformed_artifacts = (object(), *artifacts[1:])
+    monkeypatch.setattr(
+        arch151.arch150_d1r,
+        "_read_pinned_input",
+        lambda root: arch150_d1r.InputSnapshot(incomplete_bars, malformed_artifacts),
+    )
+    with pytest.raises(arch151.AuthorizationUnavailableError) as error:
+        arch151.load_arch150_d1r_source_history()
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.ARTIFACT_AUTHENTICATION_FAILED
+    )
     with pytest.raises(TypeError):
         arch151._adapt_arch150_d1r_snapshot(snapshot)
 
-    with pytest.raises(arch151.AuthorizationUnavailableError, match="accepted Arch150"):
+    with pytest.raises(
+        arch151.AuthorizationUnavailableError,
+        match="accepted full-development custody",
+    ) as error:
         arch151._source_session_projections(
             (("SPY", (_minute("SPY", _NORMAL_DAY, 0),)),),
             "0" * 64,
-            accepted_dataset=True,
+            accepted_custody=True,
         )
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH
+    )
     with pytest.raises(TypeError):
         arch151._source_session_projections((), "0" * 64, production=True)
 

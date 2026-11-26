@@ -1,15 +1,18 @@
 """One-shot, offline Arch151 development evaluation evidence operator.
 
-Import is inert. The no-argument command is a future separately authorized
-operation: it reads only the fixed accepted Arch150 D1R development source and
-writes once to the fixed external F: evidence root. It has no source, candidate,
-holdout, extension, or output-path selection arguments.
+Import is inert. The consumed E1 no-argument route is retired. Read-only
+successor preflight verifies a fixed predecessor and exact source revision;
+the separately authorized successor route reads only fixed accepted Arch150
+D1R development custody and writes once to the fixed external F: evidence
+root. Neither route has source, candidate, period, holdout, extension, or
+output-path selection arguments.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import stat
 import subprocess
@@ -29,14 +32,48 @@ EXPECTED_WORKTREE = Path(
     r"F:\AI\worktrees\ai-trading-bot-arch151-intraday-walkforward-current"
 )
 EVIDENCE_ROOT = Path(r"F:\AI\temp\arch151-intraday-development-evidence")
+SUCCESSOR_EVIDENCE_ROOT = Path(
+    r"F:\AI\temp\arch151-intraday-development-evidence-e2-successor"
+)
+_PREDECESSOR_ATTEMPT_ID = UUID("0c0db97e-034c-4b59-97de-137d6e95359c")
+_PREDECESSOR_INVOCATION_ID = UUID("7fa05c82-d0e5-508f-8e77-b508071236d0")
+_PREDECESSOR_HEAD = "3bb821aa77fbad7f3177e880d64234eb66b68ec4"
+_PREDECESSOR_TREE = "5e559e406d66f5a3bcbbab5155db0688b1c4c1d2"
+_PREDECESSOR_ARTIFACTS = (
+    (
+        "attempt.json",
+        381,
+        "181479c21ed663f38c6df563917e767dcc4d2b11caf195d300c39d9f44661465",
+    ),
+    (
+        "source-revision.json",
+        413,
+        "0c25ffa671bcfc72e9e9ac5b233b534d3e7d78847a996b76ae91ef28f7c6a68c",
+    ),
+    (
+        "operator-failure.json",
+        376,
+        "7c5a76452e8811cdf9a2bfe8e75e0bd2ff44f47e51a2c1d140bc3f6df4980ee8",
+    ),
+    (
+        "attempt-result.json",
+        931,
+        "0e0e5d5bfe3e8f0c6d04159c6615bccaa92a067f7e54dde42ce3b2d254a088e2",
+    ),
+)
 _ATTEMPT_SCHEMA = "arch151-development-operator-attempt/v1"
+_SUCCESSOR_ATTEMPT_SCHEMA = "arch151-development-operator-attempt/v2"
 _SOURCE_REVISION_SCHEMA = "arch151-development-source-revision/v1"
+_SUCCESSOR_SOURCE_REVISION_SCHEMA = "arch151-development-source-revision/v2"
 _RESULT_SCHEMA = "arch151-development-operator-result/v3"
+_SUCCESSOR_RESULT_SCHEMA = "arch151-development-operator-result/v4"
 _SOURCE_ATTESTATION_SCHEMA = "arch151-development-source-attestation/v1"
 _YEAR_EVIDENCE_SCHEMA = "arch151-development-year-evidence/v1"
 _REPLAY_FAILURE_SCHEMA = "arch151-replay-integrity-failure-evidence/v1"
 _INCOMPLETE_SCHEMA = "arch151-development-incomplete-evidence/v1"
 _OPERATOR_FAILURE_SCHEMA = "arch151-development-operator-failure/v1"
+_OPERATOR_FAILURE_SCHEMA_V2 = "arch151-development-operator-failure/v2"
+_PREDECESSOR_BINDING_SCHEMA = "arch151-development-predecessor-binding/v1"
 _INVOCATION_SCHEMA = "arch151-development-invocation/v1"
 _INVOCATION_NAMESPACE = uuid5(
     arch151.CANONICAL_MANIFEST.manifest_id, "arch151-development-invocation/v1"
@@ -49,6 +86,10 @@ _SOURCE_ATTESTATION_NAMESPACE = uuid5(
 _SOURCE_ATTESTATION_SEAL = object()
 _ACTIVE_INVOCATION_SEAL = object()
 _DEVELOPMENT_EVIDENCE_HANDOFF_SEAL = object()
+_PREDECESSOR_BINDING_NAMESPACE = uuid5(
+    arch151.CANONICAL_MANIFEST.manifest_id,
+    "arch151-e2-consumed-predecessor-binding/v1",
+)
 _REPARSE_ATTRIBUTE = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
 _WORKTREES_ROOT = Path(r"F:\AI\worktrees")
 
@@ -70,6 +111,9 @@ class OperatorFailureCode(StrEnum):
     EVIDENCE_ROOT_INVALID = "EVIDENCE_ROOT_INVALID"
     EVIDENCE_ROOT_ALREADY_EXISTS = "EVIDENCE_ROOT_ALREADY_EXISTS"
     EVIDENCE_WRITE_FAILED = "EVIDENCE_WRITE_FAILED"
+    PREDECESSOR_EVIDENCE_INVALID = "PREDECESSOR_EVIDENCE_INVALID"
+    PREDECESSOR_ATTEMPT_CONSUMED = "PREDECESSOR_ATTEMPT_CONSUMED"
+    SUCCESSOR_SOURCE_HEAD_MISMATCH = "SUCCESSOR_SOURCE_HEAD_MISMATCH"
     YEAR_EVALUATION_FAILED = "YEAR_EVALUATION_FAILED"
     DEVELOPMENT_COMPOSITION_FAILED = "DEVELOPMENT_COMPOSITION_FAILED"
     REPORT_SERIALIZATION_FAILED = "REPORT_SERIALIZATION_FAILED"
@@ -419,9 +463,11 @@ class DevelopmentEvidenceHandoff:
 
 def operator_help() -> str:
     return (
-        "Runs the fixed Arch151 2016-2023 development evaluation once. "
-        "The command has no source or period overrides; it refuses an existing "
-        "evidence root and never retries or overwrites an attempt."
+        "The consumed predecessor command is retired. Use --preflight-successor "
+        "to verify the fixed E2 successor plan, or --run-successor only after "
+        "independent source/certification review and with the reviewed exact "
+        "--expected-source-head. The successor uses fixed 2016-2023 data, a "
+        "fixed evidence root, and create-once evidence."
     )
 
 
@@ -830,17 +876,202 @@ def _create_attempt_root(path: Path) -> Path:
     return path
 
 
+def _read_consumed_predecessor_binding() -> dict[str, object]:
+    """Verify the immutable consumed E1 observation and derive its binding."""
+
+    root = EVIDENCE_ROOT
+    try:
+        if (
+            not root.is_dir()
+            or root.is_symlink()
+            or root.resolve(strict=True) != root
+            or _is_reparse_point(root)
+        ):
+            raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID)
+        paths = tuple(root.iterdir())
+        if tuple(sorted(path.name for path in paths)) != tuple(
+            sorted(name for name, _length, _digest in _PREDECESSOR_ARTIFACTS)
+        ):
+            raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID)
+        records: dict[str, dict[str, object]] = {}
+        for name, byte_length, expected_digest in _PREDECESSOR_ARTIFACTS:
+            path = root / name
+            if not path.is_file() or _is_reparse_point(path):
+                raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID)
+            raw = path.read_bytes()
+            if (
+                len(raw) != byte_length
+                or hashlib.sha256(raw).hexdigest() != expected_digest
+            ):
+                raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID)
+            value = json.loads(raw.decode("utf-8"))
+            if type(value) is not dict or arch151._canonical_json(value) != raw:
+                raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID)
+            records[name] = value
+    except OperatorError:
+        raise
+    except Exception:
+        raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID) from None
+
+    attempt = records["attempt.json"]
+    revision = records["source-revision.json"]
+    failure = records["operator-failure.json"]
+    result = records["attempt-result.json"]
+    expected_manifest_id = str(arch151.CANONICAL_MANIFEST.manifest_id)
+    expected_manifest_fingerprint = arch151.CANONICAL_MANIFEST.fingerprint
+    if not (
+        attempt.get("schema") == _ATTEMPT_SCHEMA
+        and attempt.get("status") == "STARTED"
+        and attempt.get("attempt_id") == str(_PREDECESSOR_ATTEMPT_ID)
+        and attempt.get("invocation_id") is None
+        and attempt.get("automatic_retry") == "FORBIDDEN"
+        and attempt.get("development_start") == "2016-01-01"
+        and attempt.get("development_end") == "2023-12-31"
+        and attempt.get("manifest_id") == expected_manifest_id
+        and attempt.get("manifest_fingerprint") == expected_manifest_fingerprint
+        and revision.get("schema") == _SOURCE_REVISION_SCHEMA
+        and revision.get("attempt_id") == str(_PREDECESSOR_ATTEMPT_ID)
+        and revision.get("invocation_id") == str(_PREDECESSOR_INVOCATION_ID)
+        and revision.get("source_branch") == EXPECTED_BRANCH
+        and revision.get("source_origin") == EXPECTED_ORIGIN
+        and revision.get("source_head") == _PREDECESSOR_HEAD
+        and revision.get("source_tree") == _PREDECESSOR_TREE
+        and failure.get("schema") == _OPERATOR_FAILURE_SCHEMA
+        and failure.get("attempt_id") == str(_PREDECESSOR_ATTEMPT_ID)
+        and failure.get("invocation_id") == str(_PREDECESSOR_INVOCATION_ID)
+        and failure.get("failure_code") == OperatorFailureCode.SOURCE_LOAD_FAILED.value
+        and failure.get("failure_type") == "AuthorizationUnavailableError"
+        and failure.get("source_head") == _PREDECESSOR_HEAD
+        and failure.get("source_tree") == _PREDECESSOR_TREE
+        and failure.get("year_artifacts") == []
+        and result.get("schema") == _RESULT_SCHEMA
+        and result.get("status") == OperatorStatus.FAILED.value
+        and result.get("attempt_id") == str(_PREDECESSOR_ATTEMPT_ID)
+        and result.get("invocation_id") == str(_PREDECESSOR_INVOCATION_ID)
+        and result.get("manifest_id") == expected_manifest_id
+        and result.get("manifest_fingerprint") == expected_manifest_fingerprint
+        and result.get("attempted_years") == []
+        and result.get("year_artifacts") == []
+        and result.get("candidate_evaluation") == "NOT_EVALUATED"
+        and result.get("report_id") is None
+        and result.get("report_sha256") is None
+        and result.get("source_binding_id") is None
+        and result.get("source_digest") is None
+        and result.get("failure_code") == OperatorFailureCode.SOURCE_LOAD_FAILED.value
+        and result.get("failure_evidence_sha256") == _PREDECESSOR_ARTIFACTS[2][2]
+        and result.get("automatic_retry") == "FORBIDDEN"
+        and result.get("source_branch") == EXPECTED_BRANCH
+        and result.get("source_origin") == EXPECTED_ORIGIN
+        and result.get("source_head") == _PREDECESSOR_HEAD
+        and result.get("source_tree") == _PREDECESSOR_TREE
+    ):
+        raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID)
+
+    material: dict[str, object] = {
+        "schema": _PREDECESSOR_BINDING_SCHEMA,
+        "attempt_id": str(_PREDECESSOR_ATTEMPT_ID),
+        "invocation_id": str(_PREDECESSOR_INVOCATION_ID),
+        "source": {
+            "branch": EXPECTED_BRANCH,
+            "origin": EXPECTED_ORIGIN,
+            "head": _PREDECESSOR_HEAD,
+            "tree": _PREDECESSOR_TREE,
+        },
+        "terminal": {
+            "status": OperatorStatus.FAILED.value,
+            "failure_code": OperatorFailureCode.SOURCE_LOAD_FAILED.value,
+            "artifact": "attempt-result.json",
+            "byte_length": _PREDECESSOR_ARTIFACTS[3][1],
+            "sha256": _PREDECESSOR_ARTIFACTS[3][2],
+        },
+        "artifacts": [
+            {"name": name, "byte_length": length, "sha256": digest}
+            for name, length, digest in _PREDECESSOR_ARTIFACTS
+        ],
+    }
+    binding_id = uuid5(
+        _PREDECESSOR_BINDING_NAMESPACE,
+        arch151._canonical_json(material).decode("utf-8"),
+    )
+    return {**material, "binding_id": str(binding_id)}
+
+
+def _verify_successor_preflight(
+    expected_source_head: str,
+) -> tuple[SourceRevision, dict[str, object], str]:
+    if not _is_git_object_id(expected_source_head):
+        raise OperatorError(OperatorFailureCode.SUCCESSOR_SOURCE_HEAD_MISMATCH)
+    _validate_evidence_root(SUCCESSOR_EVIDENCE_ROOT)
+    predecessor_binding = _read_consumed_predecessor_binding()
+    revision = _read_source_revision()
+    if revision.head != expected_source_head:
+        raise OperatorError(OperatorFailureCode.SUCCESSOR_SOURCE_HEAD_MISMATCH)
+    binding_digest = hashlib.sha256(_canonical_bytes(predecessor_binding)).hexdigest()
+    return revision, predecessor_binding, binding_digest
+
+
+def preflight_successor_observation(expected_source_head: str) -> dict[str, object]:
+    """Read-only successor check; it does not create evidence or load custody."""
+
+    revision, predecessor_binding, binding_digest = _verify_successor_preflight(
+        expected_source_head
+    )
+    return {
+        "status": "READY_FOR_INDEPENDENT_REVIEW",
+        "source_branch": revision.branch,
+        "source_origin": revision.origin,
+        "source_head": revision.head,
+        "source_tree": revision.tree,
+        "successor_evidence_root": str(SUCCESSOR_EVIDENCE_ROOT),
+        "predecessor_binding_id": predecessor_binding["binding_id"],
+        "predecessor_binding_sha256": binding_digest,
+        "accepted_source_loaded": False,
+        "evaluation_started": False,
+    }
+
+
+def _predecessor_binding_for_root(root: Path) -> tuple[str, str] | None:
+    path = root / "predecessor-binding.json"
+    if not path.exists():
+        return None
+    try:
+        raw = path.read_bytes()
+        value = json.loads(raw.decode("utf-8"))
+        if (
+            type(value) is not dict
+            or value.get("schema") != _PREDECESSOR_BINDING_SCHEMA
+            or arch151._canonical_json(value) != raw
+        ):
+            raise ValueError
+        return str(value["binding_id"]), hashlib.sha256(raw).hexdigest()
+    except Exception:
+        raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID) from None
+
+
 def _load_accepted_source_history() -> arch151.Arch150D1RSourceHistory:
     history = arch151.load_arch150_d1r_source_history()
     if type(history) is not arch151.Arch150D1RSourceHistory:
         raise OperatorError(OperatorFailureCode.SOURCE_HISTORY_INVALID)
     if (
         not arch151._is_sha256(history.source_digest)
+        or not arch151._is_sha256(history.validated_input_digest)
         or history.dataset_id != arch151.ARCH150_D1R_DATASET_ID
     ):
         raise OperatorError(OperatorFailureCode.SOURCE_HISTORY_INVALID)
-    sessions = tuple(item.session_date for item in history._session_projections)
-    if not sessions or any(not 2016 <= item.year <= 2023 for item in sessions):
+    sessions_by_symbol = {
+        symbol: tuple(
+            item.session_date
+            for item in history._session_projections
+            if item.symbol == symbol
+        )
+        for symbol in arch151.INITIAL_UNIVERSE
+    }
+    expected_sessions = tuple(
+        session
+        for session in arch151._SESSION_AUTHORITY.published.sessions
+        if arch151.DEVELOPMENT_START <= session < arch151.DEVELOPMENT_END
+    )
+    if any(sessions != expected_sessions for sessions in sessions_by_symbol.values()):
         raise OperatorError(OperatorFailureCode.SOURCE_HISTORY_INVALID)
     return history
 
@@ -992,6 +1223,13 @@ def _operator_failure_code(error: Exception) -> OperatorFailureCode:
     return OperatorFailureCode.UNCLASSIFIED_FAILURE
 
 
+def _source_load_reason(error: Exception) -> str | None:
+    if not isinstance(error, arch151.AuthorizationUnavailableError):
+        return None
+    reason = error.source_load_reason
+    return reason.value if type(reason) is arch151.SourceLoadFailureReason else None
+
+
 def _write_terminal(
     *,
     root: Path,
@@ -1010,8 +1248,13 @@ def _write_terminal(
     failure_evidence_sha256: str | None = None,
     incomplete_evidence_sha256: str | None = None,
 ) -> OperatorOutcome:
+    predecessor_binding = _predecessor_binding_for_root(root)
     terminal = {
-        "schema": _RESULT_SCHEMA,
+        "schema": (
+            _SUCCESSOR_RESULT_SCHEMA
+            if predecessor_binding is not None
+            else _RESULT_SCHEMA
+        ),
         "status": status.value,
         "attempt_id": str(attempt_id),
         "invocation_id": str(invocation_id) if invocation_id is not None else None,
@@ -1029,6 +1272,13 @@ def _write_terminal(
         "incomplete_evidence_sha256": incomplete_evidence_sha256,
         "automatic_retry": "FORBIDDEN",
     }
+    if predecessor_binding is not None:
+        terminal.update(
+            {
+                "predecessor_binding_id": predecessor_binding[0],
+                "predecessor_binding_sha256": predecessor_binding[1],
+            }
+        )
     if revision is not None:
         terminal.update(
             {
@@ -1092,14 +1342,29 @@ def _persist_operator_failure(
     source_binding_id: UUID | None = None,
 ) -> OperatorOutcome:
     code = _operator_failure_code(error)
+    predecessor_binding = _predecessor_binding_for_root(root)
+    source_load_reason = _source_load_reason(error)
     evidence = {
-        "schema": _OPERATOR_FAILURE_SCHEMA,
+        "schema": (
+            _OPERATOR_FAILURE_SCHEMA_V2
+            if source_load_reason is not None or predecessor_binding is not None
+            else _OPERATOR_FAILURE_SCHEMA
+        ),
         "attempt_id": str(attempt_id),
         "invocation_id": str(invocation_id) if invocation_id is not None else None,
         "failure_code": code.value,
         "failure_type": type(error).__name__,
         "year_artifacts": list(year_artifacts),
     }
+    if source_load_reason is not None:
+        evidence["source_load_reason"] = source_load_reason
+    if predecessor_binding is not None:
+        evidence.update(
+            {
+                "predecessor_binding_id": predecessor_binding[0],
+                "predecessor_binding_sha256": predecessor_binding[1],
+            }
+        )
     if revision is not None:
         evidence.update({"source_head": revision.head, "source_tree": revision.tree})
     evidence_bytes = _canonical_bytes(evidence)
@@ -1212,13 +1477,32 @@ def _persist_incomplete(
     )
 
 
-def run_development_evaluation_once() -> OperatorOutcome:
-    """Run the fixed development-only source operation once, with no overrides."""
+def _execute_development_evaluation_once(
+    *,
+    evidence_root: Path,
+    source_revision_override: SourceRevision | None = None,
+    predecessor_binding: dict[str, object] | None = None,
+) -> OperatorOutcome:
+    """Private fixed-contract execution engine; not a CLI override surface."""
 
-    root = _create_attempt_root(EVIDENCE_ROOT)
+    if predecessor_binding is not None and evidence_root != SUCCESSOR_EVIDENCE_ROOT:
+        raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID)
+    root = _create_attempt_root(evidence_root)
     attempt_id = uuid4()
+    predecessor_digest = None
+    if predecessor_binding is not None:
+        predecessor_bytes = _canonical_bytes(predecessor_binding)
+        predecessor_digest = _write_once(
+            root / "predecessor-binding.json",
+            predecessor_bytes,
+            attempt_root=root,
+        )
     claim = {
-        "schema": _ATTEMPT_SCHEMA,
+        "schema": (
+            _SUCCESSOR_ATTEMPT_SCHEMA
+            if predecessor_binding is not None
+            else _ATTEMPT_SCHEMA
+        ),
         "status": "STARTED",
         "attempt_id": str(attempt_id),
         "invocation_id": None,
@@ -1228,9 +1512,16 @@ def run_development_evaluation_once() -> OperatorOutcome:
         "manifest_fingerprint": arch151.CANONICAL_MANIFEST.fingerprint,
         "automatic_retry": "FORBIDDEN",
     }
+    if predecessor_binding is not None:
+        claim.update(
+            {
+                "predecessor_binding_id": predecessor_binding["binding_id"],
+                "predecessor_binding_sha256": predecessor_digest,
+            }
+        )
     _write_once(root / "attempt.json", _canonical_bytes(claim), attempt_root=root)
     try:
-        revision = _read_source_revision()
+        revision = source_revision_override or _read_source_revision()
     except Exception as error:
         return _persist_operator_failure(
             root=root,
@@ -1248,7 +1539,11 @@ def run_development_evaluation_once() -> OperatorOutcome:
         source_revision=revision,
     )
     source_revision = {
-        "schema": _SOURCE_REVISION_SCHEMA,
+        "schema": (
+            _SUCCESSOR_SOURCE_REVISION_SCHEMA
+            if predecessor_binding is not None
+            else _SOURCE_REVISION_SCHEMA
+        ),
         "attempt_id": str(attempt_id),
         "invocation_id": str(invocation_id),
         "source_branch": revision.branch,
@@ -1256,6 +1551,13 @@ def run_development_evaluation_once() -> OperatorOutcome:
         "source_head": revision.head,
         "source_tree": revision.tree,
     }
+    if predecessor_binding is not None:
+        source_revision.update(
+            {
+                "predecessor_binding_id": predecessor_binding["binding_id"],
+                "predecessor_binding_sha256": predecessor_digest,
+            }
+        )
     try:
         _write_once(
             root / "source-revision.json",
@@ -1274,6 +1576,19 @@ def run_development_evaluation_once() -> OperatorOutcome:
     year_artifacts: list[dict[str, object]] = []
     batches: list[evaluator.CanonicalYearBatch] = []
     history: arch151.Arch150D1RSourceHistory | None = None
+    if predecessor_binding is not None:
+        try:
+            if _read_consumed_predecessor_binding() != predecessor_binding:
+                raise OperatorError(OperatorFailureCode.PREDECESSOR_EVIDENCE_INVALID)
+        except Exception as error:
+            return _persist_operator_failure(
+                root=root,
+                attempt_id=attempt_id,
+                invocation_id=invocation_id,
+                revision=revision,
+                error=error,
+                year_artifacts=(),
+            )
     try:
         history = _load_accepted_source_history()
     except Exception as error:
@@ -1470,11 +1785,48 @@ def run_development_evaluation_once() -> OperatorOutcome:
     )
 
 
+def run_development_evaluation_once() -> OperatorOutcome:
+    """Retired E1 route; its consumed root is never a successor route."""
+
+    raise OperatorError(OperatorFailureCode.PREDECESSOR_ATTEMPT_CONSUMED)
+
+
+def run_successor_evaluation_once(expected_source_head: str) -> OperatorOutcome:
+    """Run the fixed E2 successor after an exact source-head authorization."""
+
+    revision, predecessor_binding, _binding_digest = _verify_successor_preflight(
+        expected_source_head
+    )
+    return _execute_development_evaluation_once(
+        evidence_root=SUCCESSOR_EVIDENCE_ROOT,
+        source_revision_override=revision,
+        predecessor_binding=predecessor_binding,
+    )
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=operator_help())
-    parser.parse_args(None if argv is None else list(argv))
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--preflight-successor", action="store_true")
+    modes.add_argument("--run-successor", action="store_true")
+    parser.add_argument("--expected-source-head")
+    arguments = parser.parse_args(None if argv is None else list(argv))
+    if arguments.preflight_successor or arguments.run_successor:
+        if not _is_git_object_id(arguments.expected_source_head):
+            parser.error("successor mode requires an exact --expected-source-head")
+    elif arguments.expected_source_head is not None:
+        parser.error("--expected-source-head requires a successor mode")
+    else:
+        print("STATUS=FAILED")
+        print("FAILURE_CODE=" + OperatorFailureCode.PREDECESSOR_ATTEMPT_CONSUMED.value)
+        return 2
     try:
-        outcome = run_development_evaluation_once()
+        if arguments.preflight_successor:
+            plan = preflight_successor_observation(arguments.expected_source_head)
+            for key, value in plan.items():
+                print(f"{key.upper()}={value}")
+            return 0
+        outcome = run_successor_evaluation_once(arguments.expected_source_head)
     except OperatorError as error:
         print("STATUS=FAILED")
         print("FAILURE_CODE=" + error.code.value)
@@ -1518,6 +1870,7 @@ def main(argv: Iterable[str] | None = None) -> int:
 
 __all__ = (
     "EVIDENCE_ROOT",
+    "SUCCESSOR_EVIDENCE_ROOT",
     "EXPECTED_BRANCH",
     "EXPECTED_ORIGIN",
     "EXPECTED_WORKTREE",
@@ -1530,7 +1883,9 @@ __all__ = (
     "SourceRevision",
     "main",
     "operator_help",
+    "preflight_successor_observation",
     "run_development_evaluation_once",
+    "run_successor_evaluation_once",
 )
 
 

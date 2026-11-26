@@ -13,6 +13,8 @@ from uuid import UUID, uuid5
 
 import pytest
 
+from trading_bot.experiments import arch150_g1_discovery as arch150_d1r
+from trading_bot.experiments import arch150_intraday_ai as arch150
 from trading_bot.experiments import arch151_intraday_walkforward as arch151
 from trading_bot.experiments import arch151_intraday_walkforward_evaluator as evaluator
 from trading_bot.experiments import arch151_intraday_walkforward_operator as operator
@@ -362,6 +364,105 @@ def _campaign_signal_session_minutes(session: date) -> tuple[arch151.OneMinuteBa
         for timestamp in (schedule.opens_at + timedelta(minutes=offset),)
     )
     return minutes
+
+
+def _flat_arch150_session_bars(
+    session: date, symbol: str
+) -> tuple[arch150.IntradayBar, ...]:
+    schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
+    assert schedule is not None
+    count = int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
+    base = Decimal("100") + Decimal(session.toordinal() % 31) / Decimal(100)
+    return tuple(
+        arch150.IntradayBar(
+            symbol,
+            schedule.opens_at + timedelta(minutes=offset),
+            opening,
+            opening + Decimal("0.02"),
+            opening - Decimal("0.02"),
+            opening + Decimal("0.001"),
+            100,
+            arch150.BarResolution.ONE_MINUTE,
+        )
+        for offset in range(count)
+        for opening in (base + Decimal(offset) / Decimal(10000),)
+    )
+
+
+def _arch150_adapter_fixture():
+    scored_sessions = arch151._published_sessions_for_year(2021)
+    prior_sessions = tuple(
+        session
+        for session in arch151._SESSION_AUTHORITY.published.sessions
+        if session < date(2021, 1, 1)
+    )[-60:]
+    signal_session = scored_sessions[1]
+    published_sessions = arch151._SESSION_AUTHORITY.published.sessions
+    source_sessions = tuple(
+        sorted(
+            {
+                next(item for item in published_sessions if item.year == 2016),
+                *prior_sessions,
+                scored_sessions[0],
+                signal_session,
+                scored_sessions[-1],
+                next(item for item in published_sessions if item.year == 2023),
+            }
+        )
+    )
+    signal_minutes = _campaign_signal_session_minutes(signal_session)
+    minutes_by_symbol: dict[str, list[arch151.OneMinuteBar]] = {
+        symbol: [] for symbol in arch151.INITIAL_UNIVERSE
+    }
+    for session in source_sessions:
+        session_minutes = (
+            tuple(item for item in signal_minutes if item.session_date == session)
+            if session == signal_session
+            else tuple(
+                arch151.OneMinuteBar(
+                    bar.symbol,
+                    bar.timestamp,
+                    bar.open,
+                    bar.high,
+                    bar.low,
+                    bar.close,
+                    bar.volume,
+                )
+                for symbol in arch151.INITIAL_UNIVERSE
+                for bar in _flat_arch150_session_bars(session, symbol)
+            )
+        )
+        for minute in session_minutes:
+            minutes_by_symbol[minute.symbol].append(minute)
+    source_bars = tuple(
+        arch150.IntradayBar(
+            minute.symbol,
+            minute.timestamp,
+            minute.open,
+            minute.high,
+            minute.low,
+            minute.close,
+            minute.volume,
+            arch150.BarResolution.ONE_MINUTE,
+        )
+        for symbol in arch151.INITIAL_UNIVERSE
+        for minute in minutes_by_symbol[symbol]
+    )
+    validated_bars = arch150.validate_universe_minute_bars(source_bars)
+    accepted_csv_hashes = dict(arch150._ACCEPTED_NORMALIZED_CSV_SHA256)
+    artifacts = tuple(
+        arch150_d1r.ArtifactCommitment(
+            name,
+            byte_length,
+            accepted_csv_hashes.get(
+                name.removeprefix("normalized/").removesuffix(".csv"),
+                "a" * 64,
+            ),
+        )
+        for name, byte_length in arch150_d1r._ARTIFACT_LENGTHS.items()
+    )
+    snapshot = arch150_d1r.InputSnapshot(source_bars, artifacts)
+    return snapshot, validated_bars, source_sessions, signal_session
 
 
 def _slot_for(program: arch151.Arch151Program, symbol: str = "SPY"):
@@ -1671,6 +1772,260 @@ def test_generated_five_year_simulation_composes_non_idle_480_records(
     assert run.year_batches == year_batches
     assert run.source_binding == expected_binding
     assert run.source_digest == history.source_digest
+
+
+def test_arch150_full_input_adapter_preserves_development_history_and_replays(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshot, validated_bars, source_sessions, signal_session = (
+        _arch150_adapter_fixture()
+    )
+    monkeypatch.setattr(
+        arch151.arch150_d1r,
+        "_read_pinned_input",
+        lambda _root: snapshot,
+    )
+    monkeypatch.setattr(
+        arch151.arch150,
+        "_validate_accepted_sparse_custody",
+        lambda _bars: validated_bars,
+    )
+
+    discovery = arch150.open_sparse_discovery_dataset(snapshot.bars)
+    assert discovery.end_exclusive == date(2021, 1, 1)
+    assert all(
+        bar.session_date < date(2021, 1, 1)
+        for symbol in arch150.INITIAL_UNIVERSE
+        for bar in discovery.bars.by_symbol[symbol].bars
+    )
+    assert arch151.DEVELOPMENT_END == date(2024, 1, 1)
+
+    synthetic_boundary = arch151._synthetic_arch150_d1r_custody_boundary_for_test(
+        validated_bars
+    )
+    monkeypatch.setattr(
+        arch151.arch150,
+        "_validate_accepted_sparse_custody",
+        lambda _bars: synthetic_boundary,
+    )
+    history = arch151._adapt_arch150_d1r_snapshot()
+
+    assert type(history) is arch151._SyntheticSourceHistory
+    assert not isinstance(history, arch151.Arch150D1RSourceHistory)
+    assert history.source_digest != validated_bars.input_digest
+    sessions_by_symbol = {
+        symbol: tuple(
+            item.session_date
+            for item in history._session_projections
+            if item.symbol == symbol
+        )
+        for symbol in arch151.INITIAL_UNIVERSE
+    }
+    for symbol in arch151.INITIAL_UNIVERSE:
+        assert sessions_by_symbol[symbol] == source_sessions
+        assert any(item < date(2021, 1, 1) for item in sessions_by_symbol[symbol])
+        assert any(item >= date(2021, 1, 1) for item in sessions_by_symbol[symbol])
+    assert all(
+        type(item) is arch151._SyntheticSparseSessionEvidence
+        for projection in history._session_projections
+        for item in projection.verified_sessions
+    )
+
+    program = next(
+        item
+        for item in arch151.CANONICAL_PROGRAMS
+        if item.key is arch151.ProgramKey.B5_01
+    )
+    schedule = arch151._SESSION_AUTHORITY.schedule_for(signal_session)
+    assert schedule is not None
+    prepared = arch151.prepare_session_features(
+        history,
+        program,
+        "SPY",
+        signal_session,
+        schedule.opens_at + timedelta(minutes=45),
+    )
+    assert prepared.decision_bar is not None
+    slot = next(
+        item
+        for item in arch151.CANONICAL_SLOTS
+        if item.program_key is arch151.ProgramKey.B5_01 and item.symbol == "SPY"
+    )
+    replay = evaluator._simulate_slot_year(
+        history,
+        slot,
+        2021,
+        arch151.EVALUATION_ECONOMICS_ORDER[0],
+    )
+    assert replay.complete
+    assert replay.trades
+    binding = evaluator._development_source_binding(history)
+    assert binding.kind is evaluator.DevelopmentSourceKind.SYNTHETIC_TEST_ONLY
+    with pytest.raises(arch151.AuthorizationUnavailableError, match="accepted"):
+        evaluator.evaluate_full_development_history(history)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "reordered_symbols",
+        "interleaved_symbols",
+        "reordered_observations",
+        "2024_input",
+    ),
+)
+def test_arch150_adapter_rejects_invalid_population_before_custody_scan(
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    snapshot, _validated_bars, _sessions, _signal_session = _arch150_adapter_fixture()
+    bars = snapshot.bars
+    if mutation == "reordered_symbols":
+        bars = tuple(
+            bar
+            for symbol in ("QQQ", "SPY")
+            for bar in snapshot.bars
+            if bar.symbol == symbol
+        )
+    elif mutation == "interleaved_symbols":
+        first_qqq = next(bar for bar in snapshot.bars if bar.symbol == "QQQ")
+        bars = (snapshot.bars[0], first_qqq, *snapshot.bars[1:])
+    elif mutation == "reordered_observations":
+        bars = (snapshot.bars[1], snapshot.bars[0], *snapshot.bars[2:])
+    else:
+        bars = (
+            replace(
+                snapshot.bars[0],
+                timestamp=datetime(2024, 1, 2, 14, 30, tzinfo=UTC),
+            ),
+            *snapshot.bars[1:],
+        )
+    invalid_snapshot = arch150_d1r.InputSnapshot(bars, snapshot.artifacts)
+    monkeypatch.setattr(
+        arch151.arch150_d1r, "_read_pinned_input", lambda _root: invalid_snapshot
+    )
+    monkeypatch.setattr(
+        arch151.arch150,
+        "_validate_accepted_sparse_custody",
+        lambda _bars: pytest.fail("invalid populations fail before custody scan"),
+    )
+
+    with pytest.raises(arch151.AuthorizationUnavailableError) as error:
+        arch151._adapt_arch150_d1r_snapshot()
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.INVALID_DEVELOPMENT_POPULATION
+    )
+
+
+def test_arch150_adapter_rejects_truncated_population_at_custody_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshot, _validated_bars, _sessions, _signal_session = _arch150_adapter_fixture()
+    truncated = arch150_d1r.InputSnapshot(snapshot.bars[:-1], snapshot.artifacts)
+    monkeypatch.setattr(
+        arch151.arch150_d1r, "_read_pinned_input", lambda _root: truncated
+    )
+
+    with pytest.raises(arch151.AuthorizationUnavailableError) as error:
+        arch151._adapt_arch150_d1r_snapshot()
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH
+    )
+
+
+def test_arch150_adapter_rejects_mismatched_authority_and_projection_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshot, validated_bars, _sessions, _signal_session = _arch150_adapter_fixture()
+    monkeypatch.setattr(
+        arch151.arch150_d1r, "_read_pinned_input", lambda _root: snapshot
+    )
+    monkeypatch.setattr(
+        arch151.arch150,
+        "_validate_accepted_sparse_custody",
+        lambda _bars: object(),
+    )
+    with pytest.raises(arch151.AuthorizationUnavailableError) as error:
+        arch151._adapt_arch150_d1r_snapshot()
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH
+    )
+
+    custody = arch151._Arch150D1RDevelopmentCustody(
+        validated_bars=validated_bars,
+        authority=arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY,
+        _seal=arch151._D1R_DEVELOPMENT_CUSTODY_SEAL,
+    )
+    spy_minutes = tuple(
+        arch151.OneMinuteBar(
+            bar.symbol,
+            bar.timestamp,
+            bar.open,
+            bar.high,
+            bar.low,
+            bar.close,
+            bar.volume,
+        )
+        for bar in validated_bars.by_symbol["SPY"].bars
+    )
+    qqq_minutes = tuple(
+        arch151.OneMinuteBar(
+            bar.symbol,
+            bar.timestamp,
+            bar.open,
+            bar.high,
+            bar.low,
+            bar.close,
+            bar.volume,
+        )
+        for bar in validated_bars.by_symbol["QQQ"].bars
+    )
+    changed_spy = (
+        replace(spy_minutes[0], close=spy_minutes[0].close + Decimal("0.01")),
+        *spy_minutes[1:],
+    )
+    with pytest.raises(arch151.AuthorizationUnavailableError) as error:
+        arch151._source_session_projections(
+            (("SPY", changed_spy), ("QQQ", qqq_minutes)),
+            "b" * 64,
+            accepted_custody=custody,
+        )
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH
+    )
+
+
+def test_arch150_adapter_sanitizes_projection_construction_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshot, validated_bars, _sessions, _signal_session = _arch150_adapter_fixture()
+    synthetic_boundary = arch151._synthetic_arch150_d1r_custody_boundary_for_test(
+        validated_bars
+    )
+    monkeypatch.setattr(
+        arch151.arch150_d1r, "_read_pinned_input", lambda _root: snapshot
+    )
+    monkeypatch.setattr(
+        arch151.arch150,
+        "_validate_accepted_sparse_custody",
+        lambda _bars: synthetic_boundary,
+    )
+
+    def fail_projection(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("unrestricted fixture detail")
+
+    monkeypatch.setattr(arch151, "_source_session_projections", fail_projection)
+    with pytest.raises(arch151.AuthorizationUnavailableError) as error:
+        arch151._adapt_arch150_d1r_snapshot()
+    assert (
+        error.value.source_load_reason
+        is arch151.SourceLoadFailureReason.SOURCE_PROJECTION_CONSTRUCTION_FAILED
+    )
+    assert "unrestricted fixture detail" not in str(error.value)
 
 
 def test_passive_spy_benchmark_binds_exact_adjusted_price_endpoints() -> None:

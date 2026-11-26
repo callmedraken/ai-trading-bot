@@ -77,7 +77,7 @@ _SLOT_NAMESPACE = uuid5(_ROOT_NAMESPACE, "trial-slot-identity/v1")
 _MANIFEST_NAMESPACE = uuid5(_ROOT_NAMESPACE, "population-identity/v1")
 _AGGREGATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "sparse-aggregation/v1")
 _CALIBRATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "family-a-calibration/v2")
-_D1R_HISTORY_NAMESPACE = uuid5(_ROOT_NAMESPACE, "arch150-d1r-source-history/v1")
+_D1R_HISTORY_NAMESPACE = uuid5(_ROOT_NAMESPACE, "arch150-d1r-source-history/v2")
 _FEATURE_CACHE_NAMESPACE = uuid5(_ROOT_NAMESPACE, "session-feature-cache-key/v1")
 _FOLD_NAMESPACE = uuid5(_ROOT_NAMESPACE, "walk-forward-fold/v1")
 _EVALUATION_NAMESPACE = uuid5(_ROOT_NAMESPACE, "fold-evaluation/v3")
@@ -105,6 +105,8 @@ _FAMILY_A_CALIBRATION_SEAL = object()
 _VERIFIED_SPARSE_SESSION_SEAL = object()
 _SYNTHETIC_SPARSE_SESSION_SEAL = object()
 _D1R_HISTORY_SEAL = object()
+_D1R_DEVELOPMENT_CUSTODY_SEAL = object()
+_SYNTHETIC_D1R_CUSTODY_BOUNDARY_SEAL = object()
 _SYNTHETIC_HISTORY_SEAL = object()
 _PRIOR_LEDGER_SEAL = object()
 _SELECTION_INPUT_SEAL = object()
@@ -135,8 +137,31 @@ class UnavailableIndicatorError(Arch151Error):
     """Raised when a causal feature lacks valid contiguous warmup data."""
 
 
+class SourceLoadFailureReason(StrEnum):
+    """Closed, sanitized reasons for a rejected accepted-source load."""
+
+    ARTIFACT_AUTHENTICATION_FAILED = "ARTIFACT_AUTHENTICATION_FAILED"
+    INVALID_DEVELOPMENT_POPULATION = "INVALID_DEVELOPMENT_POPULATION"
+    CUSTODY_AUTHORITY_MISMATCH = "CUSTODY_AUTHORITY_MISMATCH"
+    SOURCE_PROJECTION_CONSTRUCTION_FAILED = "SOURCE_PROJECTION_CONSTRUCTION_FAILED"
+
+
 class AuthorizationUnavailableError(Arch151Error):
     """Raised when a source-owned evidence boundary is not available."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        source_load_reason: SourceLoadFailureReason | None = None,
+    ) -> None:
+        if (
+            source_load_reason is not None
+            and type(source_load_reason) is not SourceLoadFailureReason
+        ):
+            raise TypeError("source-load reason must be a closed reason code")
+        self.source_load_reason = source_load_reason
+        super().__init__(message)
 
 
 class StrategyFamily(StrEnum):
@@ -1212,6 +1237,52 @@ class _SessionSourceProjection:
 
 
 @dataclass(frozen=True, slots=True, init=False)
+class _Arch150D1RDevelopmentCustody:
+    """Arch151-owned handle to Arch150's completely validated D1R input."""
+
+    validated_bars: arch150.ValidatedUniverseBars
+    authority: arch150.SparseCustodyAuthority
+    _seal: object = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        *,
+        validated_bars: arch150.ValidatedUniverseBars,
+        authority: arch150.SparseCustodyAuthority,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _D1R_DEVELOPMENT_CUSTODY_SEAL:
+            raise AuthorizationUnavailableError(
+                "Arch150 D1R development custody requires the fixed source adapter"
+            )
+        object.__setattr__(self, "validated_bars", validated_bars)
+        object.__setattr__(self, "authority", authority)
+        object.__setattr__(self, "_seal", _seal)
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class _SyntheticArch150D1RCustodyBoundary:
+    """Test-only substitute for Arch150's expensive complete custody scan."""
+
+    validated_bars: arch150.ValidatedUniverseBars
+    _seal: object = field(repr=False, compare=False)
+
+    def __init__(
+        self,
+        *,
+        validated_bars: arch150.ValidatedUniverseBars,
+        _seal: object = None,
+    ) -> None:
+        if _seal is not _SYNTHETIC_D1R_CUSTODY_BOUNDARY_SEAL:
+            raise AuthorizationUnavailableError(
+                "synthetic Arch150 custody boundaries are available only "
+                "to focused tests"
+            )
+        object.__setattr__(self, "validated_bars", validated_bars)
+        object.__setattr__(self, "_seal", _seal)
+
+
+@dataclass(frozen=True, slots=True, init=False)
 class Arch150D1RSourceHistory:
     """Source-owned projection of the accepted Arch150 D1R sparse custody."""
 
@@ -1222,6 +1293,7 @@ class Arch150D1RSourceHistory:
     custody_sha256: str
     evidence_id: UUID
     evidence_sha256: str
+    validated_input_digest: str
     artifact_commitments: tuple[tuple[str, int, str], ...]
     source_digest: str
     _session_projections: tuple[_SessionSourceProjection, ...] = field(
@@ -1242,6 +1314,7 @@ class Arch150D1RSourceHistory:
         custody_sha256: str,
         evidence_id: UUID,
         evidence_sha256: str,
+        validated_input_digest: str,
         artifact_commitments: tuple[tuple[str, int, str], ...],
         source_digest: str,
         session_projections: tuple[_SessionSourceProjection, ...],
@@ -1259,6 +1332,7 @@ class Arch150D1RSourceHistory:
             ("custody_sha256", custody_sha256),
             ("evidence_id", evidence_id),
             ("evidence_sha256", evidence_sha256),
+            ("validated_input_digest", validated_input_digest),
             ("artifact_commitments", artifact_commitments),
             ("source_digest", source_digest),
             ("_session_projections", session_projections),
@@ -1635,57 +1709,109 @@ def _d1r_semantic_pins_match() -> bool:
     )
 
 
-def _accepted_arch150_dataset_is_valid(dataset: object) -> bool:
+def _validated_development_bars_are_valid(
+    validated_bars: object,
+) -> bool:
     if (
-        type(dataset) is not arch150.ResearchDataset
-        or dataset._authority_seal is not arch150._DATASET_SEAL
-        or dataset.stage is not arch150.ResearchStage.DISCOVERY
-        or dataset.start != date(2016, 1, 1)
-        or dataset.end_exclusive != date(2024, 1, 1)
-        or dataset.candidate_freeze is not None
-        or dataset._sparse_custody_authority
-        is not arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY
-        or not arch150._sparse_custody_authority_is_valid(
-            dataset._sparse_custody_authority
-        )
+        type(validated_bars) is not arch150.ValidatedUniverseBars
+        or type(validated_bars.by_symbol) is not type(MappingProxyType({}))
+        or tuple(validated_bars.by_symbol) != INITIAL_UNIVERSE
+        or not _is_sha256(validated_bars.input_digest)
     ):
         return False
-    authority = dataset._sparse_custody_authority
-    return (
-        authority.dataset_id == ARCH150_D1R_DATASET_ID
-        and authority.dataset_semantic_sha256 == ARCH150_D1R_DATASET_SHA256
-        and authority.custody_id == ARCH150_D1R_CUSTODY_ID
-        and authority.custody_semantic_sha256 == ARCH150_D1R_CUSTODY_SHA256
-        and authority.scheduled_slots_per_symbol
-        == ARCH150_D1R_SCHEDULED_SLOTS_PER_SYMBOL
-        and authority.observed_counts_by_symbol == ARCH150_D1R_OBSERVED_COUNTS
-        and authority.missing_counts_by_symbol == ARCH150_D1R_MISSING_COUNTS
-        and authority.common_missing_count == ARCH150_D1R_COMMON_MISSING_COUNT
-        and authority.union_missing_count == ARCH150_D1R_UNION_MISSING_COUNT
-        and authority.fully_missing_session_counts_by_symbol
-        == ARCH150_D1R_FULLY_MISSING_SESSION_COUNTS
-    )
+    for symbol in INITIAL_UNIVERSE:
+        item = validated_bars.by_symbol[symbol]
+        if (
+            type(item) is not arch150.ValidatedMinuteBars
+            or item.symbol != symbol
+            or not item.bars
+            or any(
+                type(bar) is not arch150.IntradayBar
+                or bar.symbol != symbol
+                or not DEVELOPMENT_START <= bar.session_date < DEVELOPMENT_END
+                for bar in item.bars
+            )
+        ):
+            return False
+    expected_input_digest = sha256(
+        arch150._canonical_json(
+            {
+                symbol: [
+                    arch150._bar_material(bar)
+                    for bar in validated_bars.by_symbol[symbol].bars
+                ]
+                for symbol in INITIAL_UNIVERSE
+            }
+        )
+    ).hexdigest()
+    return validated_bars.input_digest == expected_input_digest
+
+
+def _validated_development_bars_match_input(
+    validated_bars: arch150.ValidatedUniverseBars,
+    source_bars: tuple[arch150.IntradayBar, ...],
+) -> bool:
+    for symbol in INITIAL_UNIVERSE:
+        expected = tuple(bar for bar in source_bars if bar.symbol == symbol)
+        observed = validated_bars.by_symbol[symbol].bars
+        if len(expected) != len(observed) or any(
+            actual.symbol != source.symbol
+            or actual.timestamp != source.timestamp
+            or actual.open != source.open
+            or actual.high != source.high
+            or actual.low != source.low
+            or actual.close != source.close
+            or actual.volume != source.volume
+            for actual, source in zip(observed, expected, strict=True)
+        ):
+            return False
+    return True
+
+
+def _accepted_arch150_development_custody_is_valid(custody: object) -> bool:
+    if (
+        type(custody) is not _Arch150D1RDevelopmentCustody
+        or custody._seal is not _D1R_DEVELOPMENT_CUSTODY_SEAL
+        or custody.authority is not arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY
+        or not arch150._sparse_custody_authority_is_valid(custody.authority)
+        or custody.authority.dataset_id != ARCH150_D1R_DATASET_ID
+        or custody.authority.dataset_semantic_sha256 != ARCH150_D1R_DATASET_SHA256
+        or custody.authority.custody_id != ARCH150_D1R_CUSTODY_ID
+        or custody.authority.custody_semantic_sha256 != ARCH150_D1R_CUSTODY_SHA256
+        or custody.authority.scheduled_slots_per_symbol
+        != ARCH150_D1R_SCHEDULED_SLOTS_PER_SYMBOL
+        or custody.authority.observed_counts_by_symbol != ARCH150_D1R_OBSERVED_COUNTS
+        or custody.authority.missing_counts_by_symbol != ARCH150_D1R_MISSING_COUNTS
+        or custody.authority.common_missing_count != ARCH150_D1R_COMMON_MISSING_COUNT
+        or custody.authority.union_missing_count != ARCH150_D1R_UNION_MISSING_COUNT
+        or custody.authority.fully_missing_session_counts_by_symbol
+        != ARCH150_D1R_FULLY_MISSING_SESSION_COUNTS
+    ):
+        return False
+    return _validated_development_bars_are_valid(custody.validated_bars)
 
 
 def _source_session_projections(
     minutes_by_symbol: tuple[tuple[str, tuple[OneMinuteBar, ...]], ...],
     source_digest: str,
     *,
-    accepted_dataset: arch150.ResearchDataset | None,
+    accepted_custody: _Arch150D1RDevelopmentCustody | None,
 ) -> tuple[_SessionSourceProjection, ...]:
-    if accepted_dataset is not None:
-        if not _accepted_arch150_dataset_is_valid(accepted_dataset):
+    if accepted_custody is not None:
+        if not _accepted_arch150_development_custody_is_valid(accepted_custody):
             raise AuthorizationUnavailableError(
-                "production projections require accepted Arch150 D1R authority"
+                "production projections require accepted full-development custody",
+                source_load_reason=SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH,
             )
         if len(minutes_by_symbol) != len(INITIAL_UNIVERSE):
             raise AuthorizationUnavailableError(
-                "production projection minutes differ from accepted Arch150 source"
+                "production projection minutes differ from accepted Arch150 source",
+                source_load_reason=SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH,
             )
         for symbol, (actual_symbol, actual_minutes) in zip(
             INITIAL_UNIVERSE, minutes_by_symbol, strict=True
         ):
-            source_bars = accepted_dataset.bars.by_symbol[symbol].bars
+            source_bars = accepted_custody.validated_bars.by_symbol[symbol].bars
             if (
                 actual_symbol != symbol
                 or len(actual_minutes) != len(source_bars)
@@ -1701,7 +1827,8 @@ def _source_session_projections(
                 )
             ):
                 raise AuthorizationUnavailableError(
-                    "production projection minutes differ from accepted Arch150 source"
+                    "production projection minutes differ from accepted Arch150 source",
+                    source_load_reason=SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH,
                 )
     projections: list[_SessionSourceProjection] = []
     for symbol, symbol_minutes in minutes_by_symbol:
@@ -1735,7 +1862,7 @@ def _source_session_projections(
                     minute_digest,
                     source_digest,
                 )
-                if accepted_dataset is not None:
+                if accepted_custody is not None:
                     session_evidence: _SparseSessionEvidence = VerifiedSparseSession(
                         symbol=symbol,
                         resolution=resolution,
@@ -1776,14 +1903,26 @@ def _source_session_projections(
     return tuple(projections)
 
 
-def _adapt_arch150_d1r_snapshot() -> Arch150D1RSourceHistory:
+def _adapt_arch150_d1r_snapshot() -> Arch150D1RSourceHistory | _SyntheticSourceHistory:
     """Read the fixed Arch150 source and bind it through accepted custody."""
 
     if not _d1r_semantic_pins_match():
-        raise AuthorizationUnavailableError("accepted Arch150 D1R pins drifted")
-    snapshot = arch150_d1r._read_pinned_input(arch150_d1r.ACCEPTED_INPUT_ROOT)
+        raise AuthorizationUnavailableError(
+            "accepted Arch150 D1R pins drifted",
+            source_load_reason=SourceLoadFailureReason.ARTIFACT_AUTHENTICATION_FAILED,
+        )
+    try:
+        snapshot = arch150_d1r._read_pinned_input(arch150_d1r.ACCEPTED_INPUT_ROOT)
+    except Exception:
+        raise AuthorizationUnavailableError(
+            "accepted Arch150 D1R artifacts could not be authenticated",
+            source_load_reason=SourceLoadFailureReason.ARTIFACT_AUTHENTICATION_FAILED,
+        ) from None
     if type(snapshot) is not arch150_d1r.InputSnapshot:
-        raise AuthorizationUnavailableError("Arch150 D1R input is not reader-owned")
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R input is not reader-owned",
+            source_load_reason=SourceLoadFailureReason.ARTIFACT_AUTHENTICATION_FAILED,
+        )
     expected_artifact_names = tuple(arch150_d1r._ARTIFACT_LENGTHS)
     artifacts = snapshot.artifacts
     expected_normalized_sha256 = {
@@ -1792,41 +1931,118 @@ def _adapt_arch150_d1r_snapshot() -> Arch150D1RSourceHistory:
     }
     if (
         type(artifacts) is not tuple
+        or any(type(item) is not arch150_d1r.ArtifactCommitment for item in artifacts)
         or tuple(item.name for item in artifacts) != expected_artifact_names
-        or any(
-            type(item) is not arch150_d1r.ArtifactCommitment
-            or type(item.byte_length) is not int
-            or item.byte_length != arch150_d1r._ARTIFACT_LENGTHS[item.name]
-            or not _is_sha256(item.sha256)
-            or (
-                item.name in expected_normalized_sha256
-                and item.sha256 != expected_normalized_sha256[item.name]
-            )
-            for item in artifacts
-        )
     ):
         raise AuthorizationUnavailableError(
-            "Arch150 D1R artifact commitments are incomplete or reordered"
+            "Arch150 D1R artifact commitments are incomplete or reordered",
+            source_load_reason=SourceLoadFailureReason.ARTIFACT_AUTHENTICATION_FAILED,
+        )
+    if any(
+        type(item.byte_length) is not int
+        or item.byte_length != arch150_d1r._ARTIFACT_LENGTHS[item.name]
+        or not _is_sha256(item.sha256)
+        or (
+            item.name in expected_normalized_sha256
+            and item.sha256 != expected_normalized_sha256[item.name]
+        )
+        for item in artifacts
+    ):
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R artifact commitments are incomplete or reordered",
+            source_load_reason=SourceLoadFailureReason.ARTIFACT_AUTHENTICATION_FAILED,
         )
     # The fixed reader validates each JSON artifact's inner semantic identity
     # against _SEMANTIC_PINS and returns its raw-byte commitment here. For the
     # normalized CSV artifacts, Arch150 also owns the accepted raw-file hashes.
-    if type(snapshot.bars) is not tuple or any(
-        type(bar) is not arch150.IntradayBar for bar in snapshot.bars
+    if (
+        type(snapshot.bars) is not tuple
+        or not snapshot.bars
+        or any(type(bar) is not arch150.IntradayBar for bar in snapshot.bars)
     ):
-        raise AuthorizationUnavailableError("Arch150 D1R bars are not normalized")
-
-    # This is Arch150's accepted identity/count/schedule validator. The adapter
-    # does not duplicate its custody scan or invoke the G1 strategy evaluator.
-    dataset = arch150.open_sparse_discovery_dataset(snapshot.bars)
-    if not _accepted_arch150_dataset_is_valid(dataset):
         raise AuthorizationUnavailableError(
-            "Arch150 D1R dataset lacks the accepted sparse-custody authority"
+            "Arch150 D1R bars are not normalized",
+            source_load_reason=SourceLoadFailureReason.INVALID_DEVELOPMENT_POPULATION,
+        )
+    ordered_symbols = tuple(dict.fromkeys(bar.symbol for bar in snapshot.bars))
+    symbol_sequence = tuple(bar.symbol for bar in snapshot.bars)
+    if (
+        ordered_symbols != INITIAL_UNIVERSE
+        or any(
+            previous == "QQQ" and current == "SPY"
+            for previous, current in zip(
+                symbol_sequence, symbol_sequence[1:], strict=False
+            )
+        )
+        or any(
+            not DEVELOPMENT_START <= bar.session_date < DEVELOPMENT_END
+            for bar in snapshot.bars
+        )
+        or any(
+            right.timestamp <= left.timestamp
+            for symbol in INITIAL_UNIVERSE
+            for stream in (tuple(bar for bar in snapshot.bars if bar.symbol == symbol),)
+            for left, right in zip(stream, stream[1:], strict=False)
+        )
+    ):
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R input is outside the complete ordered 2016-2023 population",
+            source_load_reason=SourceLoadFailureReason.INVALID_DEVELOPMENT_POPULATION,
+        )
+
+    # Arch150's complete accepted validator authenticates every 2016-2023
+    # scheduled slot, missing-slot commitment, normalized CSV digest, and bar.
+    try:
+        validation_output = arch150._validate_accepted_sparse_custody(snapshot.bars)
+    except arch150.Arch150Error:
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R input differs from accepted full-development custody",
+            source_load_reason=SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH,
+        ) from None
+    except Exception:
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R custody authentication failed",
+            source_load_reason=SourceLoadFailureReason.ARTIFACT_AUTHENTICATION_FAILED,
+        ) from None
+    synthetic_boundary = (
+        type(validation_output) is _SyntheticArch150D1RCustodyBoundary
+        and validation_output._seal is _SYNTHETIC_D1R_CUSTODY_BOUNDARY_SEAL
+    )
+    if synthetic_boundary:
+        validated_bars = validation_output.validated_bars
+        custody = None
+    elif type(validation_output) is arch150.ValidatedUniverseBars:
+        validated_bars = validation_output
+        custody = _Arch150D1RDevelopmentCustody(
+            validated_bars=validated_bars,
+            authority=arch150._ACCEPTED_SPARSE_CUSTODY_AUTHORITY,
+            _seal=_D1R_DEVELOPMENT_CUSTODY_SEAL,
+        )
+    else:
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R validation returned an unknown authority",
+            source_load_reason=SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH,
+        )
+    if (
+        not _validated_development_bars_are_valid(validated_bars)
+        or not _validated_development_bars_match_input(validated_bars, snapshot.bars)
+        or (
+            custody is not None
+            and not _accepted_arch150_development_custody_is_valid(custody)
+        )
+    ):
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R development custody authority is inconsistent",
+            source_load_reason=SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH,
         )
 
     authority = _SESSION_AUTHORITY.published
+    validated_input_digest = validated_bars.input_digest
     source_material = {
-        "schema": "arch151-arch150-d1r-source-history/v1",
+        "schema": "arch151-arch150-d1r-source-history/v2",
+        "source_kind": (
+            "SYNTHETIC_TEST_ONLY" if synthetic_boundary else "ARCH150_D1R_ACCEPTED"
+        ),
         "semantic_contract_version": SEMANTIC_CONTRACT_VERSION,
         "arch150_dataset_id": str(ARCH150_D1R_DATASET_ID),
         "arch150_dataset_sha256": ARCH150_D1R_DATASET_SHA256,
@@ -1849,13 +2065,12 @@ def _adapt_arch150_d1r_snapshot() -> Arch150D1RSourceHistory:
             {"name": item.name, "length": item.byte_length, "sha256": item.sha256}
             for item in artifacts
         ],
-        "validated_input_digest": dataset.bars.input_digest,
+        "validated_input_digest": validated_input_digest,
         "published_xnys_identity": str(authority.identity),
         "published_xnys_digest": authority.digest,
     }
     canonical = _canonical_json(source_material)
     source_digest = sha256(canonical).hexdigest()
-    source_id = uuid5(_D1R_HISTORY_NAMESPACE, canonical.decode("utf-8"))
     minutes_by_symbol = tuple(
         (
             symbol,
@@ -1869,14 +2084,34 @@ def _adapt_arch150_d1r_snapshot() -> Arch150D1RSourceHistory:
                     bar.close,
                     bar.volume,
                 )
-                for bar in dataset.bars.by_symbol[symbol].bars
+                for bar in validated_bars.by_symbol[symbol].bars
             ),
         )
         for symbol in INITIAL_UNIVERSE
     )
-    projections = _source_session_projections(
-        minutes_by_symbol, source_digest, accepted_dataset=dataset
-    )
+    try:
+        projections = _source_session_projections(
+            minutes_by_symbol, source_digest, accepted_custody=custody
+        )
+    except AuthorizationUnavailableError as error:
+        if error.source_load_reason is not None:
+            raise
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R projections could not be constructed",
+            source_load_reason=SourceLoadFailureReason.SOURCE_PROJECTION_CONSTRUCTION_FAILED,
+        ) from None
+    except Exception:
+        raise AuthorizationUnavailableError(
+            "Arch150 D1R projections could not be constructed",
+            source_load_reason=SourceLoadFailureReason.SOURCE_PROJECTION_CONSTRUCTION_FAILED,
+        ) from None
+    if synthetic_boundary:
+        return _SyntheticSourceHistory(
+            source_digest=source_digest,
+            session_projections=projections,
+            _seal=_SYNTHETIC_HISTORY_SEAL,
+        )
+    source_id = uuid5(_D1R_HISTORY_NAMESPACE, canonical.decode("utf-8"))
     return Arch150D1RSourceHistory(
         source_id=source_id,
         dataset_id=ARCH150_D1R_DATASET_ID,
@@ -1885,6 +2120,7 @@ def _adapt_arch150_d1r_snapshot() -> Arch150D1RSourceHistory:
         custody_sha256=ARCH150_D1R_CUSTODY_SHA256,
         evidence_id=ARCH150_D1R_EVIDENCE_ID,
         evidence_sha256=ARCH150_D1R_EVIDENCE_SHA256,
+        validated_input_digest=validated_input_digest,
         artifact_commitments=tuple(
             (item.name, item.byte_length, item.sha256) for item in artifacts
         ),
@@ -1902,7 +2138,29 @@ def load_arch150_d1r_source_history() -> Arch150D1RSourceHistory:
     data, invoke the Arch150 G1 evaluator, or open holdout/extension history.
     """
 
-    return _adapt_arch150_d1r_snapshot()
+    history = _adapt_arch150_d1r_snapshot()
+    if type(history) is not Arch150D1RSourceHistory:
+        raise AuthorizationUnavailableError(
+            "synthetic custody test input cannot be loaded as accepted history",
+            source_load_reason=SourceLoadFailureReason.CUSTODY_AUTHORITY_MISMATCH,
+        )
+    return history
+
+
+def _synthetic_arch150_d1r_custody_boundary_for_test(
+    validated_bars: arch150.ValidatedUniverseBars,
+) -> _SyntheticArch150D1RCustodyBoundary:
+    """Mark only the expensive custody scan as synthetic in focused tests."""
+
+    if not _validated_development_bars_are_valid(validated_bars):
+        raise AuthorizationUnavailableError(
+            "synthetic custody boundary input is invalid",
+            source_load_reason=SourceLoadFailureReason.INVALID_DEVELOPMENT_POPULATION,
+        )
+    return _SyntheticArch150D1RCustodyBoundary(
+        validated_bars=validated_bars,
+        _seal=_SYNTHETIC_D1R_CUSTODY_BOUNDARY_SEAL,
+    )
 
 
 def _test_only_synthetic_source_history(
@@ -1938,7 +2196,7 @@ def _test_only_synthetic_source_history(
     )
     source_digest = sha256(canonical).hexdigest()
     projections = _source_session_projections(
-        minutes_by_symbol, source_digest, accepted_dataset=None
+        minutes_by_symbol, source_digest, accepted_custody=None
     )
     return _SyntheticSourceHistory(
         source_digest=source_digest,
@@ -2259,6 +2517,7 @@ def _source_history_digest(history: object) -> str:
             or history.custody_sha256 != ARCH150_D1R_CUSTODY_SHA256
             or history.evidence_id != ARCH150_D1R_EVIDENCE_ID
             or history.evidence_sha256 != ARCH150_D1R_EVIDENCE_SHA256
+            or not _is_sha256(history.validated_input_digest)
             or not _is_sha256(history.source_digest)
         ):
             raise AuthorizationUnavailableError(
@@ -7676,6 +7935,7 @@ __all__ = (
     "AggregateStream",
     "AmbiguousIntraminuteRule",
     "AuthorizationUnavailableError",
+    "SourceLoadFailureReason",
     "BarResolution",
     "CAUSAL_EXECUTION_POLICY",
     "CausalIndicatorPoint",

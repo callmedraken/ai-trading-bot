@@ -2873,6 +2873,39 @@ def simulate_canonical_year(
     )
 
 
+def _validate_session_trade_cash(session: SessionReplayRecord) -> None:
+    # Cash balances telescope across fills and across sessions. Profit-factor
+    # gain and loss sums round separately and need not subtract to that result.
+    cash = session.starting_equity
+    if session.trades or session.fills:
+        if session.fills != tuple(
+            fill for trade in session.trades for fill in (trade.entry, trade.exit)
+        ):
+            raise EvaluationIntegrityError(
+                "session fills differ from its completed trades"
+            )
+        with localcontext(arch151._DECIMAL_CONTEXT):
+            for trade in session.trades:
+                if (
+                    trade.entry.cash_before != cash
+                    or trade.exit.cash_before != trade.entry.cash_after
+                    or trade.equity_before != cash
+                    or trade.equity_after != trade.exit.cash_after
+                ):
+                    raise EvaluationIntegrityError(
+                        "trade cash balances do not reconcile"
+                    )
+                if trade.net_pnl != trade.exit.cash_after - cash:
+                    raise EvaluationIntegrityError(
+                        "trade net P&L does not reconcile to fill cash"
+                    )
+                cash = trade.exit.cash_after
+    if cash != session.closing_equity:
+        raise EvaluationIntegrityError(
+            "session closing equity does not reconcile to fill cash"
+        )
+
+
 def _fold_metrics_from_slot_year(replay: SlotYearReplay) -> arch151.FoldMetrics:
     if type(replay) is not SlotYearReplay or not replay.complete or replay.failure:
         raise EvaluationIntegrityError(
@@ -2908,6 +2941,7 @@ def _fold_metrics_from_slot_year(replay: SlotYearReplay) -> arch151.FoldMetrics:
             raise EvaluationIntegrityError(
                 "session return does not reconcile to equity"
             )
+        _validate_session_trade_cash(session)
         returns.append(session.session_return)
         round_trips.append(session.completed_round_trips)
         expected_equity = session.closing_equity
@@ -2935,7 +2969,6 @@ def _fold_metrics_from_slot_year(replay: SlotYearReplay) -> arch151.FoldMetrics:
         net_negative = sum(
             (max(-trade.net_pnl, Decimal(0)) for trade in replay.trades), Decimal(0)
         )
-        realized_net_total = net_positive - net_negative
         total_gross = sum((trade.gross_pnl for trade in replay.trades), Decimal(0))
         total_adverse_cost = sum(
             (trade.total_adverse_cost for trade in replay.trades), Decimal(0)
@@ -2943,7 +2976,6 @@ def _fold_metrics_from_slot_year(replay: SlotYearReplay) -> arch151.FoldMetrics:
     if (
         replay.positive_net_pnl != net_positive
         or replay.negative_net_pnl != net_negative
-        or replay.net_return != realized_net_total
         or replay.gross_trade_pnl != total_gross
         or replay.total_adverse_cost != total_adverse_cost
     ):

@@ -7123,7 +7123,10 @@ def qualify_later_period(
         item for item in CANONICAL_SLOTS if item.slot_id == freeze.candidate_slot_id
     )
     program = next(item for item in CANONICAL_PROGRAMS if item.key is slot.program_key)
-    session_limit = 1 if program.family is StrategyFamily.OPENING_RANGE_RETEST else 2
+    session_limit = min(
+        CAUSAL_EXECUTION_POLICY.maximum_completed_round_trips_per_session,
+        program.parameters.entry_limit_per_session,
+    )
     if any(item.completed_round_trips > session_limit for item in evidence.sessions):
         raise Arch151Error("later-period session exceeds the frozen entry limit")
     if any(

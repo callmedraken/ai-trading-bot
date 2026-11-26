@@ -1387,6 +1387,86 @@ def test_stress_pf_uses_net_winning_and_losing_trade_outcomes() -> None:
         )
 
 
+@pytest.fixture(scope="module")
+def multi_trade_slot_year() -> evaluator.SlotYearReplay:
+    program, winning_history, *_ = _b_history()
+    _, losing_history, *_ = _b_history(exit_mode="stop_gap")
+    templates = []
+    for history, price in (
+        (winning_history, Decimal("102.2")),
+        (losing_history, Decimal("98.2")),
+    ):
+        bars = history._session_projections[0].minutes
+        exit_bar = replace(bars[-1], open=price, high=price, low=price, close=price)
+        templates.append((*bars[:-1], exit_bar))
+    template_schedule = arch151._SESSION_AUTHORITY.schedule_for(SESSION)
+    assert template_schedule is not None
+    template_open = template_schedule.opens_at.astimezone(UTC)
+    minutes = []
+    for index, session in enumerate(arch151._published_sessions_for_year(2023)[:210]):
+        schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
+        assert schedule is not None
+        offset = schedule.opens_at.astimezone(UTC) - template_open
+        minutes.extend(
+            replace(bar, timestamp=bar.timestamp + offset)
+            for bar in templates[index % len(templates)]
+        )
+    history = arch151._test_only_synthetic_source_history(minutes)
+    return next(
+        replay
+        for replay in evaluator._simulate_slot_year_cases(
+            history, _slot_for(program), 2023
+        )
+        if replay.cost_case is arch151.FillCostCase.BASE
+    )
+
+
+def test_fold_cash_reconciliation_accepts_finite_precision_trade_accumulation(
+    multi_trade_slot_year: evaluator.SlotYearReplay,
+) -> None:
+    replay = multi_trade_slot_year
+    assert replay.complete and len(replay.trades) == 210
+    assert replay.positive_net_pnl > 0 and replay.negative_net_pnl > 0
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        grouped_net = replay.positive_net_pnl - replay.negative_net_pnl
+        assert replay.net_return - grouped_net == Decimal("-5E-60")
+
+    with localcontext() as ambient:
+        ambient.prec = 8
+        metrics = evaluator._fold_metrics_from_slot_year(replay)
+
+    assert sum(metrics.round_trips_by_session) == 210
+    assert metrics.net_positive_trade_pnl == replay.positive_net_pnl
+    assert metrics.net_negative_trade_pnl == replay.negative_net_pnl
+    assert metrics.profit_factor == arch151.ProfitFactor.from_totals(
+        replay.positive_net_pnl, replay.negative_net_pnl
+    )
+
+
+def test_fold_cash_reconciliation_rejects_materially_incorrect_trade_pnl(
+    multi_trade_slot_year: evaluator.SlotYearReplay,
+) -> None:
+    replay = multi_trade_slot_year
+    first, *remaining = replay.sessions
+    (trade,) = first.trades
+    with localcontext(arch151._DECIMAL_CONTEXT):
+        changed_trade = replace(trade, net_pnl=trade.net_pnl + Decimal("0.01"))
+    changed_session = replace(first, trades=(changed_trade,))
+    tampered = evaluator._finish_slot_year(
+        history_digest=replay.source_digest,
+        slot=replay.slot,
+        year=replay.scored_year,
+        case=replay.cost_case,
+        sessions=(changed_session, *remaining),
+    )
+
+    with pytest.raises(
+        evaluator.EvaluationIntegrityError,
+        match="trade net P&L does not reconcile to fill cash",
+    ):
+        evaluator._fold_metrics_from_slot_year(tampered)
+
+
 def test_canonical_year_batch_keeps_all_slots_costs_and_full_session_denominators() -> (
     None
 ):
@@ -1770,6 +1850,7 @@ def test_family_c_cooldown_and_reversion_exit_survive_a_missing_next_open() -> N
     )
     assert second.exit_reason is evaluator.ExitReason.MAXIMUM_HOLD
     assert second.exit.timestamp == second_exit
+    evaluator._validate_session_trade_cash(record)
 
 
 @cache

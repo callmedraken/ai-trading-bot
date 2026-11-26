@@ -736,7 +736,10 @@ def _evaluation_batch_for_slot(slot, year_profiles=None):
     return arch151.DevelopmentEvaluationBatch(slot.slot_id, tuple(records))
 
 
-def _dsr_evaluation_population():
+def _dsr_evaluation_population(winning_program: ProgramKey = ProgramKey.A5_01):
+    winning_slot = next(
+        slot for slot in CANONICAL_SLOTS if slot.program_key is winning_program
+    )
     batches = []
     for slot_index, slot in enumerate(CANONICAL_SLOTS):
         records = []
@@ -746,7 +749,7 @@ def _dsr_evaluation_population():
             returns = []
             round_trips = []
             for session_index, _session in enumerate(session_dates):
-                if slot_index == 0:
+                if slot == winning_slot:
                     value = (
                         Decimal("0.0011")
                         if population_index % 2 == 0
@@ -793,14 +796,19 @@ def _dsr_evaluation_population():
 
 
 @cache
-def _one_candidate_final_freeze():
-    batches = _dsr_evaluation_population()
+def _one_candidate_final_freeze(
+    winning_program: ProgramKey = ProgramKey.A5_01,
+) -> arch151.FinalCandidateFreeze:
+    batches = _dsr_evaluation_population(winning_program)
     calculation = arch151.compute_selection_bias_evidence(batches)
     freeze = arch151.freeze_final_candidate_set(
         batches, _selection_bias_calculation=calculation
     )
     assert freeze.status is arch151.FinalFreezeStatus.ONE_CANDIDATE_FROZEN
-    assert freeze.candidate_slot_id == CANONICAL_SLOTS[0].slot_id
+    expected_slot = next(
+        slot for slot in CANONICAL_SLOTS if slot.program_key is winning_program
+    )
+    assert freeze.candidate_slot_id == expected_slot.slot_id
     return freeze
 
 
@@ -3905,8 +3913,57 @@ def test_later_period_calendar_population_and_non_authorizing() -> None:
         )
 
 
+@pytest.mark.parametrize("period", tuple(arch151.LaterPeriodKind))
+@pytest.mark.parametrize(
+    ("program_key", "limit"),
+    [
+        (ProgramKey.A5_01, 1),
+        (ProgramKey.B5_01, 1),
+        (ProgramKey.C5_01, 2),
+        (ProgramKey.D5_01, 1),
+    ],
+)
+def test_later_period_enforces_frozen_program_entry_limit(
+    period: arch151.LaterPeriodKind,
+    program_key: ProgramKey,
+    limit: int,
+) -> None:
+    freeze = (
+        _one_candidate_final_freeze()
+        if program_key is ProgramKey.A5_01
+        else _one_candidate_final_freeze(program_key)
+    )
+    sessions, _ = arch151._later_period_calendar(period)
+    first_session = sessions[0]
+    evidence = _later_period_evidence(
+        period,
+        freeze=freeze,
+        outcomes_by_session={first_session: (Decimal(1),) * limit},
+    )
+    assert arch151.qualify_later_period(freeze, evidence).passed
+
+    if limit == 2:
+        # Three round trips fail the global cap at the typed evidence boundary.
+        with pytest.raises(ValueError, match="zero through two round trips"):
+            _later_period_evidence(
+                period,
+                freeze=freeze,
+                outcomes_by_session={first_session: (Decimal(1),) * (limit + 1)},
+            )
+    else:
+        excessive = _later_period_evidence(
+            period,
+            freeze=freeze,
+            outcomes_by_session={first_session: (Decimal(1),) * (limit + 1)},
+        )
+        with pytest.raises(
+            arch151.Arch151Error, match="exceeds the frozen entry limit"
+        ):
+            arch151.qualify_later_period(freeze, excessive)
+
+
 def test_holdout_boundaries_accept_inclusive_limits() -> None:
-    freeze = _one_candidate_final_freeze()
+    freeze = _one_candidate_final_freeze(ProgramKey.C5_01)
     sessions, _months = arch151._later_period_calendar(
         arch151.LaterPeriodKind.HOLDOUT_2024_2025
     )
@@ -3933,6 +3990,7 @@ def test_holdout_boundaries_accept_inclusive_limits() -> None:
         freeze,
         _later_period_evidence(
             arch151.LaterPeriodKind.HOLDOUT_2024_2025,
+            freeze=freeze,
             returns_by_session=returns,
             outcomes_by_session=outcomes,
         ),
@@ -4056,7 +4114,11 @@ def _distributed_session_dates(
 def test_holdout_stress_thresholds_produce_typed_rejections(
     case: str, expected_rejection: arch151.LaterPeriodRejection
 ) -> None:
-    freeze = _one_candidate_final_freeze()
+    freeze = (
+        _one_candidate_final_freeze(ProgramKey.C5_01)
+        if case in {"profit_factor", "active_fraction"}
+        else _one_candidate_final_freeze()
+    )
     sessions, _months = arch151._later_period_calendar(
         arch151.LaterPeriodKind.HOLDOUT_2024_2025
     )
@@ -4100,6 +4162,7 @@ def test_holdout_stress_thresholds_produce_typed_rejections(
         freeze,
         _later_period_evidence(
             arch151.LaterPeriodKind.HOLDOUT_2024_2025,
+            freeze=freeze,
             returns_by_session=returns,
             outcomes_by_session=outcomes,
         ),
@@ -4136,7 +4199,11 @@ def test_holdout_stress_thresholds_produce_typed_rejections(
 def test_extension_stress_thresholds_produce_typed_rejections(
     case: str, expected_rejection: arch151.LaterPeriodRejection
 ) -> None:
-    freeze = _one_candidate_final_freeze()
+    freeze = (
+        _one_candidate_final_freeze(ProgramKey.C5_01)
+        if case == "profit_factor"
+        else _one_candidate_final_freeze()
+    )
     sessions, months = arch151._later_period_calendar(
         arch151.LaterPeriodKind.EXTENSION_2026_JAN_OCT
     )
@@ -4188,6 +4255,7 @@ def test_extension_stress_thresholds_produce_typed_rejections(
         freeze,
         _later_period_evidence(
             arch151.LaterPeriodKind.EXTENSION_2026_JAN_OCT,
+            freeze=freeze,
             returns_by_session=returns,
             outcomes_by_session=outcomes,
         ),

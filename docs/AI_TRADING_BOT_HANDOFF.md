@@ -1,6 +1,44 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM1 closed; PM2A integrated; PM2B next
+## Current milestone: PM1 closed; PM2A integrated; PM2B design checkpoint
+
+The active checkpoint is **Architecture 152-PM2B — Research Evidence and
+Signal Catalog**, design-only. The new architecture and validation records
+freeze the source-observation -> point-in-time fact -> validated/derived
+feature -> research snapshot -> later policy chain, V1 catalog formulas,
+provenance and availability contracts, Qlib/PyPortfolioOpt findings, and
+AI/optimizer firewalls. The prepared candidate is based on parent HEAD
+verified at checkpoint start. No Python, tests, dependencies, provider, real
+data, AI request, or execution path is introduced.
+
+PM1 remains synthetic, disarmed, and preview-only. PM2A C3 remains the accepted
+implementation identity. The PM2A documentation lineage terminates at the
+historical C6-C3 predecessor; later C4/C5/C6/C6-C1/C6-C2 entries below are
+historical documentation corrections, not a replacement implementation. Real
+PM2A read-only qualification remains **NOT YET AUTHORIZED**. The next bounded
+milestone is **PM2C — synthetic typed evidence/catalog/snapshot
+implementation**; real provider qualification, policy calibration, AI provider,
+optimization, and execution authority remain later separately reviewed work.
+Arch149 remains sealed.
+
+See [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md)
+and its [validation record](validation/arch152-pm2b-research-evidence-and-signal-catalog.md).
+At checkpoint start, the implementation checkout was
+`F:\AI\worktrees\ai-trading-bot-portfolio-manager-current` on
+`feature/robinhood-portfolio-manager-current`, at the exact PM2B parent
+`b43cf021b11b55db1a1b10e3f8f28def0e23e355` / tree
+`5231db460aad500f7c09771d3ff5744f57864b53`. The predecessor C6-C3 branch-gate
+runs `46064363946` (feature) and `46064367880` (develop) are terminal
+docs-only SUCCESS evidence; they are historical predecessor evidence, not PM2B
+publication identities. PM2B publication evidence (final SHA and mapped run)
+is reported after its one ordinary push. Exact-source acceptance and any
+integration remain ChatGPT-owned. Continuation is docs-only: exact
+review, four-path staging, one commit, docs-only admission, one ordinary push,
+remote verification, and terminal mapped CI. No merge, rebase, amend,
+force-push, PR mutation, provider read, real-data acquisition, or protected
+effect is in scope.
+
+### Historical PM1/PM2A checkpoint chronology
 
 Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
@@ -61,7 +99,7 @@ skipped. C6 and C6-C1 are historical docs-only corrections. C6 feature run
 `45994722624`, and C6-C1 develop run `45995025872` all passed their
 docs-only source gates with test/certification jobs skipped.
 
-Current develop integration is C6-C2 HEAD
+Historical PM2A documentation integration was C6-C2 HEAD
 `e7f485be4ce2032586a97bbd5d689a516a7271be` / tree
 `518c6de6cda4e85f1945a486ad43662e5e4bb9a8`. C6-C2 feature run
 `45997466949` and develop run `45997969288`, both attempt 1, are terminal
@@ -98,12 +136,9 @@ review, placement, cancellation, transfer, broker action, or production effect
 occurred. Real read-only qualification remains **NOT YET AUTHORIZED**; PM1
 remains disarmed, preview-only, and unable to dispatch.
 
-The next milestone is **Architecture 152-PM2B — Research Evidence and Signal
-Catalog**. Before implementation, PM2B must review Qlib and PyPortfolioOpt,
-then define evidence provenance and the valuation/fundamental, growth, quality,
-technical, volatility, relative-attractiveness, and portfolio-context catalog.
-PM2B is not implemented here. Arch149 confirmation remains frozen under its
-existing calendar-2026 contract.
+At that historical PM2A checkpoint, PM2B was the next design milestone; the
+current PM2B checkpoint is recorded above. Arch149 confirmation remains frozen
+under its existing calendar-2026 contract.
 
 ### Prior terminal Arch151 evidence
 

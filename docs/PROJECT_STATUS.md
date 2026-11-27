@@ -1,6 +1,30 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - PM1 closed; PM2A integrated; PM2B next
+## Current milestone - PM1 closed; PM2A integrated; PM2B design checkpoint
+
+The current checkpoint is **Architecture 152-PM2B — Research Evidence and
+Signal Catalog**, design-only. Its architecture and validation records define
+the source-observation -> point-in-time fact -> validated/derived feature ->
+research snapshot -> later policy chain, V1 family formulas, provenance,
+availability statuses, Qlib/PyPortfolioOpt review, and AI/optimizer firewalls.
+No Python, tests, dependencies, provider, real data, AI request, or execution
+path is introduced.
+PM1 remains synthetic, disarmed, and preview-only; PM2A C3 remains the accepted
+implementation identity. The PM2A documentation lineage terminates at the
+historical C6-C3 predecessor; C4/C5/C6/C6-C1/C6-C2 entries below are retained
+as historical documentation corrections and do not replace C3. Real PM2A read-only qualification
+is **NOT YET AUTHORIZED** and no provider, credential, account, order, broker,
+or production effect occurred.
+The next milestone is **PM2C — synthetic typed evidence/catalog/snapshot
+implementation**, limited to the frozen PM2B contracts and adversarial
+synthetic fixtures. Real provider qualification, signal-policy calibration,
+AI-provider qualification, optimization policy, and execution authority remain
+later separately reviewed milestones. Arch149 remains sealed.
+
+See [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md)
+and its [validation record](validation/arch152-pm2b-research-evidence-and-signal-catalog.md).
+
+### Historical PM1/PM2A checkpoint chronology
 
 Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
@@ -51,7 +75,7 @@ skipped. C6 and C6-C1 are historical docs-only corrections. C6 feature run
 `45994722624`, and C6-C1 develop run `45995025872` all passed their
 docs-only source gates with test/certification jobs skipped.
 
-Current develop integration is C6-C2 HEAD
+Historical PM2A documentation integration was C6-C2 HEAD
 `e7f485be4ce2032586a97bbd5d689a516a7271be` / tree
 `518c6de6cda4e85f1945a486ad43662e5e4bb9a8`. C6-C2 feature run
 `45997466949` and develop run `45997969288`, both attempt 1, are terminal
@@ -79,11 +103,9 @@ placement, cancellation, transfer, broker, or production effect occurred.
 Real read-only qualification remains **NOT YET AUTHORIZED** and PM1 remains
 closed and disarmed.
 
-The next milestone is **Architecture 152-PM2B — Research Evidence and Signal
-Catalog**. PM2B must first review Qlib and PyPortfolioOpt before defining
-evidence provenance and the valuation/fundamental, growth, quality, technical,
-volatility, relative-attractiveness, and portfolio-context features. PM2B is
-not implemented here. Arch149's frozen 2024-2026 confirmation remains sealed.
+At that historical PM2A checkpoint, PM2B was the next design milestone; the
+current PM2B checkpoint is recorded above. Arch149's frozen 2024-2026
+confirmation remains sealed.
 
 ### Terminal Architecture 151 background
 

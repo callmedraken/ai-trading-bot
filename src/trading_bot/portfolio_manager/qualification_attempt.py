@@ -660,12 +660,12 @@ def _schema_supports_current_read_surface(
         "get_portfolio": {"account_number": {"string"}},
         "get_equity_positions": {
             "account_number": {"string"},
-            "cursor": {"null", "string"},
+            "cursor": {"string"},
         },
         "get_equity_quotes": {"symbols": {"array"}},
         "get_equity_orders": {
             "account_number": {"string"},
-            "cursor": {"null", "string"},
+            "cursor": {"string"},
             "placed_agent": {"string"},
             "created_at_gte": {"string"},
         },

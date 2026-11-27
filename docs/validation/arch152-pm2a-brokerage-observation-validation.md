@@ -176,6 +176,21 @@ C2's attempt module passed 17 tests, and the final formatted-source focused set
 and source-owner/current-authority checks passed 90 and 60 tests respectively,
 as recorded above.
 
+C3 accepts the compatible cursor shape used by the static reader: position and
+order calls omit `cursor` on page one, then send a non-null string on later
+pages. Cursor schemas therefore need to admit `string`; they do not need to
+admit JSON `null`. The new synthetic regression supplies optional string-only
+cursor arguments for both tools and confirms that the schema gate accepts the
+static page-call shape. C2's required-cursor regressions remain in place and
+continue to block schemas that require a cursor on page one.
+
+C3's isolated cursor regression passed **1 test in 0.09s** using fresh
+basetemp `F:\AI\temp\pytest\db26de97f0aa4e298c83b6d98e328680`. The complete
+focused set passed **91 tests in 0.73s** using fresh basetemp
+`F:\AI\temp\pytest\3300cc13ad044d5cadda06189b411f84`. Source-owner/current-
+authority checks passed **60 tests in 71.06s** using fresh basetemp
+`F:\AI\temp\pytest\0804b65e9e2f4f12aa8f68721ad4db0a`.
+
 ## Prepared future real-read operation (NOT YET AUTHORIZED)
 
 After source publication, mapped CI completion, and independent exact-source

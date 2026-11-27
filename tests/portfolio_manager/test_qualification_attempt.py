@@ -498,6 +498,27 @@ def test_required_arguments_supplied_by_static_first_calls_are_supported() -> No
     )
 
 
+def test_optional_string_only_cursors_support_static_page_calls() -> None:
+    schema = _schema_result()
+    facts = list(schema.read_tools)
+    for index, tool in enumerate(facts):
+        if tool.name not in {"get_equity_positions", "get_equity_orders"}:
+            continue
+        facts[index] = replace(
+            tool,
+            arguments=tuple(
+                replace(argument, types=("string",), required=False)
+                if argument.name == "cursor"
+                else argument
+                for argument in tool.arguments
+            ),
+        )
+
+    assert attempt._schema_supports_current_read_surface(
+        replace(schema, read_tools=tuple(facts))
+    )
+
+
 def test_reviewed_source_head_and_tree_are_required_before_reservation(
     monkeypatch, tmp_path
 ) -> None:

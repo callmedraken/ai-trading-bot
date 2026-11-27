@@ -10,11 +10,25 @@
 - Scope: source-only account-aware Portfolio Manager domain, adapter, durable
   service, synthetic presentation, and tests.
 
-This validation record is prepared with the PM1 implementation. It makes no
-claim of source admission, commit, push, source acceptance, terminal CI,
-independent review, or integration. Those identities and results are added only
-after they exist. Existing Arch151 one-shot evidence and the two preserved
-timing failures remain immutable; PM1 does not resume either campaign.
+PM1 is now **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED**.
+The published source is HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` /
+tree `17426689d0eb381491654bb03caa28e0b29899ea`, direct parent
+`e578a7ff0e128a1f9895a9df82296f73f550e9c5`. Feature source-gate run
+`45954491120`, attempt 1, is terminal SUCCESS. Its seven canonical FULL lanes
+totaled 18,614 passed, 10 skipped and zero failures/errors; broad-1 was slowest
+at 292.368 seconds under the unchanged 300-second ceiling. No local FULL was
+run.
+
+Develop source-gate run `45956617137`, attempt 1, is terminal SUCCESS on the
+same exact source with
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`.
+Active-tests, full-tests, certification-tests and certification-full were
+skipped, proving no duplicate FULL ran. Exact-source independent review accepted
+PM1 before the fast-forward integration.
+
+These terminal source/certification/integration facts do not grant live trading
+authority. Existing Arch151 one-shot evidence and preserved timing failures
+remain immutable; PM1 does not resume either campaign.
 
 ## Current authority and inventory impact
 

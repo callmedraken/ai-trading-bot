@@ -1,34 +1,42 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 152-PM1 source foundation (prepublication)
+## Current milestone - Architecture 152-PM1 accepted/integrated; PM2A next
 
-Architecture 151 is terminal and the current product priority is now a separate
-longer-horizon AI Portfolio Manager. PM1 is the source-only account-aware
-portfolio observation, deterministic decision/risk/preview, durable service,
-and synthetic desktop foundation on branch
-`feature/robinhood-portfolio-manager-current`, based on develop
-`e578a7ff0e128a1f9895a9df82296f73f550e9c5` / tree
-`f6b3036c00afebfce93a1500731e504edba954d4`. Its current registration is
-`arch152-portfolio-manager-foundation`, mapped to the existing GitHub-owned
-FULL profile. See the owning [Architecture 152-PM1](architecture/152-pm1-account-aware-portfolio-manager.md)
-and [validation record](validation/arch152-pm1-portfolio-manager-foundation.md).
+Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
+INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
+`17426689d0eb381491654bb03caa28e0b29899ea`, direct parent
+`e578a7ff0e128a1f9895a9df82296f73f550e9c5`. Feature source-gate run
+`45954491120`, attempt 1, is terminal SUCCESS: source-static, active-tests and
+all seven mapped canonical FULL lanes passed, totaling 18,614 passed, 10
+skipped and zero failures/errors. Broad-1 was the slowest lane at 292.368
+seconds, below the unchanged 300-second ceiling. No local FULL was run.
 
-Focused domain, application, adapter, Arch149 firewall, directory-ownership,
-and checkpoint-route tests have passed; focused Ruff checks also pass. No local
-FULL was run. This is still an implementation candidate, not source admission,
-publication, canonical certification, source acceptance, integration, or
-trading authority. Next: complete the combined prepublication authority and
-diff gate, exact-source review, and one atomic feature publication; then follow
-the mapped GitHub run to terminal. The latest successful comparable FULL at
-the accepted base is run `45919230088` (18,566 passed, 10 skipped; slowest lane
-282.020 seconds; broad-1 258.979 seconds). Preserve the seven-lane topology
-and 300-second ceiling.
+Develop source-gate run `45956617137`, attempt 1, is terminal SUCCESS on the
+exact accepted source with
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`.
+Active-tests, full-tests, certification-tests and certification-full were
+skipped, so no duplicate FULL ran. PM1 therefore has closed source,
+certification and integration gates.
 
-PM1 uses fake/synthetic inputs only. It makes no real provider, credential,
-OAuth, broker, order, production, real AI-provider, or Arch149 confirmation
-request. Arch149 remains `EXPLORATORY_CANDIDATE_ONLY`; adapted signals are
-unadmitted research with no performance or order authority. Later-period
-2024+ evidence remains sealed.
+PM1 remains a synthetic/disarmed operational foundation only. It grants no real
+Robinhood/OAuth/credential access, broker/order effect, real AI-provider
+request, production mutation, Arch149 admission or sealed 2024+ confirmation
+access. Its account-adoption, recommendation, deterministic risk, preview-only
+planning, durable service and synthetic desktop contracts remain as documented
+in [Architecture 152-PM1](architecture/152-pm1-account-aware-portfolio-manager.md)
+and the [validation record](validation/arch152-pm1-portfolio-manager-foundation.md).
+
+The next substantive milestone is **Architecture 152-PM2A — read-only
+account-binding and reconciliation qualification**. Before adding new
+Robinhood-read implementation, compare the accepted transport against working
+public references including `arunitmaity/robinhood-portfolio-mcp`,
+`jmfernandes/robin_stocks`, and `nirholas/robinhood-mcp`; reuse proven
+patterns only after compatibility, account-scope, pagination, completeness and
+security review. PM2A must establish what authorized account, position, quote,
+cash/buying-power and order reads actually cover, and fail closed where
+account-wide exhaustiveness is unproven. The separate PM2B research milestone
+will define AI/fundamental/technical signal inputs and provenance. Arch149's
+frozen 2024-2026 confirmation remains sealed.
 
 ### Terminal Architecture 151 background
 
@@ -104,10 +112,10 @@ The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Architecture 151's research and execution are closed. PM1 is now the current
-source implementation checkpoint; its bounded source and evidence status are
-recorded above and in the owning Architecture 152 documents. No new Arch151
-execution or Arch149 confirmation is authorized by this source checkpoint.
+Architecture 151's research and execution are closed. PM1 source,
+certification and integration are also closed as recorded above. PM2A is the
+next separately reviewed read-only qualification; it does not reopen Arch151
+or authorize Arch149 confirmation.
 Preserve the E4 and E3 red runs. E1 and E2 public execution routes remain
 retired and fail closed even if the E2 evidence root is missing. E4 is a
 distinct current route; it does not resume, replace, or mutate either consumed

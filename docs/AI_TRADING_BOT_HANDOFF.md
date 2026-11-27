@@ -1,59 +1,59 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 152-PM1 source foundation (prepublication)
+## Current milestone: Architecture 152-PM1 accepted/integrated; PM2A next
 
-Architecture 151 is terminal; the current product priority is the
-longer-horizon AI Portfolio Manager. PM1 is the source-only account-aware
-observation, deterministic recommendation/risk/preview, durable service, and
-synthetic desktop foundation. It is being implemented on
-`feature/robinhood-portfolio-manager-current` from the reviewed develop base
-`e578a7ff0e128a1f9895a9df82296f73f550e9c5` / tree
-`f6b3036c00afebfce93a1500731e504edba954d4`. Its source checkpoint slug is
-`arch152-portfolio-manager-foundation`, explicitly mapped to the existing
-GitHub-owned FULL profile. The owning [Architecture 152-PM1](architecture/152-pm1-account-aware-portfolio-manager.md)
-and [validation record](validation/arch152-pm1-portfolio-manager-foundation.md)
-define the contracts and evidence boundary.
+Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
+INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
+`17426689d0eb381491654bb03caa28e0b29899ea`, direct parent
+`e578a7ff0e128a1f9895a9df82296f73f550e9c5`. Feature source-gate run
+`45954491120`, attempt 1, is terminal SUCCESS with source-static,
+active-tests and all seven canonical FULL lanes green: 18,614 passed, 10
+skipped, zero failures/errors, slowest lane broad-1 at 292.368 seconds under the
+unchanged 300-second ceiling. No local FULL was run.
 
-The implementation uses synthetic observations and fake injected providers.
-The account fingerprint and durable history are isolated from the intraday
-product; risk evaluation is independent of recommendations; plans are
-preview-only and cannot dispatch. A narrow Arch149 adapter exposes only
-identity-verified, unadmitted research signals and grants no performance or
-order authority. No real Robinhood transport, OAuth, credential, provider,
-broker/order, real AI-provider, production, or 2024+ confirmation effect is part
-of PM1.
+Develop source-gate run `45956617137`, attempt 1, is terminal SUCCESS at the
+same source and reports
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`.
+Active-tests, full-tests, certification-tests and certification-full were
+skipped, so no duplicate FULL ran. PM1's source, certification and integration
+gates are closed.
 
-The synthetic example adopts 3.25 SPY shares at a synthetic $520 quote and
-four TLT shares at $95 with unknown average cost, plus $4,000 cash. The vertical
-slice includes a GLD BUY preview and a TLT REDUCE preview; its sell leg precedes
-and is a dependency of the buy leg, while proposed proceeds remain unavailable.
-The injected fake Robinhood-read pipeline exercises the existing transport
-without opening a real provider session; bounded agentic-order visibility
-blocks order previews. Full example assertions are in
-`tests/portfolio_manager/test_vertical_slice.py`.
+The implementation remains synthetic/disarmed. Account fingerprint and durable
+history are isolated from the intraday product; deterministic risk evaluation
+is independent of recommendations; plans are preview-only and cannot dispatch.
+A narrow Arch149 adapter exposes only identity-verified, unadmitted research
+signals and grants no performance or order authority. No real Robinhood
+transport, OAuth, credential, broker/order effect, real AI-provider request,
+production mutation or sealed 2024+ confirmation access was used or authorized.
 
-After source review, the synthetic-only desktop launch command is:
+The synthetic desktop remains runnable with:
 
 ```powershell
 Set-Location 'F:\AI\worktrees\ai-trading-bot-portfolio-manager-current'
 & 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B 'src\trading_bot\portfolio_manager\application.py'
 ```
 
-It binds synthetic PM state under `F:\AI\portfolio-manager-state\pm1`, starts
-disarmed, and waits for the owner to click Start. It has no live placement
-method. The standalone local host command is not a CI/certification command and
-has not been run as part of source-only implementation.
+It binds synthetic PM state under `F:\AI\portfolio-manager-state\pm1`,
+starts disarmed, and waits for the owner to click Start. It has no live
+placement method.
 
-Focused domain, application, adapter, Arch149 firewall, directory-ownership,
-and checkpoint-route tests have passed, along with focused Ruff checks. No
-local FULL was run. The candidate is not represented here as admitted,
-published, source accepted, CI certified, reviewed, integrated, or
-operationally authorized. Next: complete the combined prepublication authority
-and diff gate and exact-source review, then create one atomic feature
-publication and follow its mapped GitHub source gate and canonical FULL run to
-terminal. GitHub-owned FULL should not be repeated locally after valid
-same-source green evidence. See the validation record for the conditional
-host-only fallback command shape and baseline timing.
+The next substantive milestone is **Architecture 152-PM2A — read-only
+account-binding and reconciliation qualification**. Before writing new
+Robinhood-read behavior, review and compare working public references,
+especially `arunitmaity/robinhood-portfolio-mcp`,
+`jmfernandes/robin_stocks`, and `nirholas/robinhood-mcp`. Reuse or adapt
+only behavior whose account scope, pagination, completeness, authentication
+boundary and failure semantics are compatible with this repository. PM2A must
+establish the actual coverage of authorized account, position, quote,
+cash/buying-power and order reads and preserve explicit UNKNOWN/incomplete
+states when exhaustive reconciliation cannot be proved. It remains read-only
+and grants no execution authority.
+
+The following research checkpoint, PM2B, should separately define provider
+inputs, evidence provenance, model identity, cost limits, output validation and
+the fundamental/technical signal catalog before any real AI-provider request.
+Arch149 confirmation remains frozen until its existing calendar-2026 contract
+permits it.
 
 ### Prior terminal Arch151 evidence
 

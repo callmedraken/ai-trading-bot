@@ -9,8 +9,12 @@ and displays preview-only plans. It is not a trading authorization or a
 validated profitable strategy. The feature branch is
 `feature/robinhood-portfolio-manager-current`; its reviewed base is develop
 `e578a7ff0e128a1f9895a9df82296f73f550e9c5` / tree
-`f6b3036c00afebfce93a1500731e504edba954d4`. Source admission, publication,
-canonical FULL, acceptance, and integration are separate later states.
+`f6b3036c00afebfce93a1500731e504edba954d4`. PM1 was subsequently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
+`17426689d0eb381491654bb03caa28e0b29899ea`; feature FULL run
+`45954491120` and develop exact-reuse run `45956617137` are terminal
+SUCCESS. This terminal source status does not grant trading authority.
 
 PM1 keeps the Portfolio Manager's account fingerprint, durable namespace,
 decision history, synthetic execution state, research provider, and risk policy
@@ -149,6 +153,8 @@ preserve the existing timing headroom.
 
 No source checkpoint grants Robinhood/OAuth access, live eligibility, paper or
 live execution, credential authority, Arch149 admission, real AI-provider
-access, protected data access, or access to sealed 2024+ evidence. PM1 remains a
-source-only operational foundation until each separate authority and
-acceptance gate is reviewed.
+access, protected data access, or access to sealed 2024+ evidence. PM1's source,
+certification and integration gates are closed, but it remains a
+synthetic/disarmed operational foundation. Read-only real-account coverage is a
+separate PM2A qualification, and execution authority remains a later separately
+reviewed boundary.

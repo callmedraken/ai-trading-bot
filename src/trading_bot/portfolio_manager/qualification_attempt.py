@@ -47,6 +47,15 @@ _EXPECTED_WORKTREE: Final = Path(
     r"F:\AI\worktrees\ai-trading-bot-portfolio-manager-current"
 )
 _ATTEMPT_ROOT: Final = Path(r"F:\AI\temp")
+_STATIC_FIRST_CALL_ARGUMENTS: Final[dict[str, frozenset[str]]] = {
+    "get_accounts": frozenset(),
+    "get_portfolio": frozenset({"account_number"}),
+    "get_equity_positions": frozenset({"account_number"}),
+    "get_equity_quotes": frozenset({"symbols"}),
+    "get_equity_orders": frozenset(
+        {"account_number", "placed_agent", "created_at_gte"}
+    ),
+}
 _EXPECTED_ORIGIN: Final = "https://github.com/callmedraken/ai-trading-bot.git"
 _FEATURE_REF: Final = "refs/heads/feature/robinhood-portfolio-manager-current"
 _DEVELOP_REF: Final = "refs/heads/develop"
@@ -638,13 +647,15 @@ def _evidence_material(
 def _schema_supports_current_read_surface(
     result: CurrentReadSchemaQualification,
 ) -> bool:
-    """Require the closed schema surface used by the static PM read path."""
+    """Require schemas to accept the exact static first-call argument sets."""
     if result.status is not SchemaQualificationStatus.COMPLETE:
         return False
     tools = {item.name: item for item in result.read_tools if item.advertised}
-    if set(tools) != set(READ_TOOLS):
+    if set(tools) != set(READ_TOOLS) or set(_STATIC_FIRST_CALL_ARGUMENTS) != set(
+        READ_TOOLS
+    ):
         return False
-    required_arguments = {
+    expected_argument_types = {
         "get_accounts": {},
         "get_portfolio": {"account_number": {"string"}},
         "get_equity_positions": {
@@ -659,14 +670,21 @@ def _schema_supports_current_read_surface(
             "created_at_gte": {"string"},
         },
     }
-    for name, expected in required_arguments.items():
+    for name, expected in expected_argument_types.items():
         fact = tools[name]
         if not fact.input_arguments_complete:
             return False
-        actual = {item.name: set(item.types or ()) for item in fact.arguments}
+        actual = {item.name: item for item in fact.arguments}
         if any(
-            argument not in actual or not types.issubset(actual[argument])
+            argument not in actual
+            or not types.issubset(set(actual[argument].types or ()))
             for argument, types in expected.items()
+        ):
+            return False
+        if any(
+            argument.required
+            and argument.name not in _STATIC_FIRST_CALL_ARGUMENTS[name]
+            for argument in fact.arguments
         ):
             return False
     for name in ("get_accounts", "get_portfolio"):

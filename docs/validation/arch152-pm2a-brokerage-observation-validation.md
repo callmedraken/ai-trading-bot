@@ -63,6 +63,7 @@ that an account argument is honored or that rows are exhaustive.
 | Attempt IDs are create-once; repeat, collision, crash-reserved, and concurrent IDs do not retry; evidence is sanitized | `tests/portfolio_manager/test_qualification_attempt.py::test_attempt_id_collision_and_crash_reserved_slot_are_never_reused`; `test_concurrent_attempt_id_has_one_provider_winner`; `test_complete_fake_observation_records_only_sanitized_facts` |
 | Explicit fingerprint with multiple eligible accounts still blocks before any position/order read | `tests/portfolio_manager/test_qualification_attempt.py::test_explicit_account_fingerprint_does_not_override_multiple_account_block`; existing PM1 ambiguity behavior is unchanged. |
 | Incomplete/malformed schema or missing static argument/account echo/pagination shape stops before reads | `tests/portfolio_manager/test_qualification_attempt.py::test_schema_incomplete_reserves_before_provider_and_stops_before_reads`; `test_schema_missing_static_account_or_order_filter_arguments_blocks_reads`; schema fixture coverage in `tests/robinhood_mcp/test_current_read_schema_qualification.py` |
+| Advertised required arguments absent from a tool's static first-call arguments block transport construction and all reads | `tests/portfolio_manager/test_qualification_attempt.py::test_required_argument_missing_from_static_first_call_blocks_all_reads` covers accounts, portfolio, quotes, and first-page position/order cursors; `test_required_arguments_supplied_by_static_first_calls_are_supported` covers required arguments that the fixed call does send. |
 
 The current provider does not expose cash-reservation semantics in source. Cash
 held for orders, unsettled cash, and withdrawal availability therefore remain
@@ -104,16 +105,16 @@ New-Item -ItemType Directory -Path $testBaseTemp
   tests/portfolio_manager/test_vertical_slice.py -q
 ```
 
-Latest complete focused result after C1: **84 passed in 0.61s** using external
-basetemp `F:\AI\temp\pytest\759b515e64c2426c8cd278ff2a7a44e2`. The isolated
-attempt module also passed **11 tests in 0.20s** using fresh basetemp
-`F:\AI\temp\pytest\ffe71fd18fa24fa39592e00e236ecbab`. An earlier
+Latest complete focused result after C2: **90 passed in 2.60s** using external
+basetemp `F:\AI\temp\pytest\8955343ba1514e4c85696bb2b421fcc5`. The isolated
+attempt module passed **17 tests in 0.28s** using fresh basetemp
+`F:\AI\temp\pytest\36075fe63b404517bda82ec5ec617270`. An earlier
 directory-creation attempt was denied and is not counted as a compliant test
 run.
 
-The source-owner/current-authority command passed **60 tests in 69.57s** using
+The source-owner/current-authority command passed **60 tests in 71.10s** using
 fresh external basetemp
-`F:\AI\temp\pytest\46be85ea320948abafc2ea5ad91e41a5`:
+`F:\AI\temp\pytest\3fd404c2e7004955a5987336e4539434`:
 
 ```powershell
 $ownerGuid = [guid]::NewGuid().ToString('N')
@@ -153,6 +154,27 @@ public attempt API and production `F:\AI\temp` default are unchanged. The new
 resolver continues to reject `C:\Windows`. C1's attempt module passed 11 tests,
 and the full focused PM2A/PM1 set passed 84 tests, as recorded above. This
 correction changes no provider schema, order-scope, or broker-effect claim.
+
+C1 source `0840fce67d896be43eed6494ee74458b06d26a85` / tree
+`aa5170acd36729233f76bf337777a92fd56039ad` passed mapped run `45977590119`,
+attempt 1. Source-static, active-tests, all seven canonical FULL lanes, and the
+final `source-gates` job passed. Lane durations were broad-1 4m40s, broad-2
+2m54s, broad-3 3m1s, broad-4 3m33s, broad-5 3m50s, broad-6 4m19s, and broad-7
+5m51s. The prior red run and its artifact remain preserved.
+
+C2 checks every advertised `required` argument against the existing static
+first-call argument set for its tool before constructing the read transport.
+The sets are empty for `get_accounts`, `account_number` for the selected
+portfolio and first position page, `symbols` for quotes, and
+`account_number`/`placed_agent`/`created_at_gte` for the first order page.
+Position and order `cursor` values are added only after a page supplies a next
+cursor, so a schema requiring `cursor` on page one blocks before any read tool.
+The synthetic tests cover each first-call gap and confirm required arguments
+already supplied by the fixed calls remain supported. No provider fields,
+actual schemas, account-wide order semantics, or broker effects are inferred.
+C2's attempt module passed 17 tests, and the final formatted-source focused set
+and source-owner/current-authority checks passed 90 and 60 tests respectively,
+as recorded above.
 
 ## Prepared future real-read operation (NOT YET AUTHORIZED)
 

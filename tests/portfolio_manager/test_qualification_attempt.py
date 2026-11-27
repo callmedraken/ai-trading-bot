@@ -407,6 +407,97 @@ def test_schema_missing_static_account_or_order_filter_arguments_blocks_reads(
     assert evidence["read_tools_invoked"] == []
 
 
+@pytest.mark.parametrize(
+    ("tool_name", "argument_name", "argument_types"),
+    [
+        ("get_accounts", "synthetic_required_argument", ("string",)),
+        ("get_portfolio", "synthetic_required_argument", ("boolean",)),
+        ("get_equity_positions", "cursor", ("null", "string")),
+        ("get_equity_quotes", "synthetic_required_argument", ("string",)),
+        ("get_equity_orders", "cursor", ("null", "string")),
+    ],
+)
+def test_required_argument_missing_from_static_first_call_blocks_all_reads(
+    monkeypatch,
+    tmp_path,
+    tool_name: str,
+    argument_name: str,
+    argument_types: tuple[str, ...],
+) -> None:
+    schema = _schema_result()
+    facts = list(schema.read_tools)
+    index = READ_TOOLS.index(tool_name)
+    tool = facts[index]
+    arguments = list(tool.arguments)
+    existing = next(
+        (
+            position
+            for position, item in enumerate(arguments)
+            if item.name == argument_name
+        ),
+        None,
+    )
+    required_fact = ArgumentSchemaFact(argument_name, True, argument_types)
+    if existing is None:
+        arguments.append(required_fact)
+    else:
+        arguments[existing] = required_fact
+    facts[index] = replace(tool, arguments=tuple(arguments))
+    schema = replace(schema, read_tools=tuple(facts))
+
+    reader_constructions: list[bool] = []
+
+    def fail_if_transport_constructed(_oauth_factory):
+        reader_constructions.append(True)
+        raise AssertionError("incompatible first-call schema must stop before reads")
+
+    events = _prepare(
+        monkeypatch,
+        tmp_path,
+        schema=schema,
+        reader_factory=fail_if_transport_constructed,
+    )
+
+    result = _run_attempt(oauth_factory=lambda: None)
+
+    evidence = json.loads(result.evidence_file.read_text(encoding="ascii"))
+    assert result.status is attempt.QualificationAttemptStatus.SCHEMA_INCOMPLETE
+    assert evidence["reason"] == "CURRENT_READ_SCHEMA_INSUFFICIENT"
+    assert evidence["read_tools_invoked"] == []
+    assert set(evidence["read_tool_invocation_counts"].values()) == {0}
+    assert reader_constructions == []
+    assert events == ["schema"]
+
+
+def test_required_arguments_supplied_by_static_first_calls_are_supported() -> None:
+    schema = _schema_result()
+    facts = list(schema.read_tools)
+    required_by_tool = {
+        "get_accounts": (),
+        "get_portfolio": ("account_number",),
+        "get_equity_positions": ("account_number",),
+        "get_equity_quotes": ("symbols",),
+        "get_equity_orders": (
+            "account_number",
+            "placed_agent",
+            "created_at_gte",
+        ),
+    }
+    for index, tool in enumerate(facts):
+        required = set(required_by_tool[tool.name])
+        facts[index] = replace(
+            tool,
+            arguments=tuple(
+                replace(argument, required=argument.name in required)
+                for argument in tool.arguments
+            ),
+        )
+
+    assert attempt._schema_supports_current_read_surface(
+        replace(schema, read_tools=tuple(facts))
+    )
+
+
 def test_reviewed_source_head_and_tree_are_required_before_reservation(
     monkeypatch, tmp_path
 ) -> None:

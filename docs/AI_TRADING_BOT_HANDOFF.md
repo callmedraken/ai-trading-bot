@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 E4-C1 integrated; offline evaluation next
+## Current milestone: Architecture 151 terminal; AI Portfolio Manager priority
 
 Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
@@ -115,7 +115,8 @@ canonical 480-record report, durable one-shot operator and authenticated
 one-candidate development evidence. E1-C3 checks the exact chronological
 fill-cash chain and frozen family entry caps. DSR unavailability remains
 fail-closed for the full population, with per-slot reasons and descriptive
-non-authorizing economic order. No actual DSR or candidate result exists.
+non-authorizing economic order. The completed E4 campaign verified DSR for
+all 32 slots but froze no candidate.
 
 The E1 and E2 public execution routes are permanently retired. E2
 `--preflight-successor` and `--run-successor` now fail closed with
@@ -191,18 +192,11 @@ issuer's synthetic-source rejection; none dispatched current-source preflight,
 loaded accepted history, or evaluated a real candidate.
 The E1 and E2 routes remain permanently retired, and E4 does not resume or alter
 either consumed root. Annual summary artifacts still cannot reconstitute
-qualification authority; no separate persisted replay reader is added. After
-this closeout is integrated and certified, the next operation is the reviewed
-`--preflight-offline --expected-source-head` invocation on the exact integrated
-checkout. It must report READY, both exact live/tracking refs,
-`CUSTODY_CONTENT_AUTHENTICATED=false` and `ATTEMPT_CREATED=false`.
-Independent preflight review precedes one explicitly reviewed fresh UUID
-`--run-offline-campaign` invocation, with 1,056 fixed smoke records followed
-only on smoke success by the complete 480-record campaign. A failure or
-interruption preserves the consumed attempt; no automatic retry or resume.
-All later-period, provider/credential, broker, paper/live and production
-boundaries remain unchanged. No source-only checkpoint grants real replay
-permission.
+qualification authority; no separate persisted replay reader is added. The
+reviewed real preflight and combined campaign are now completed. The
+terminal result is recorded in the owning validation plan; no further
+Arch151 execution is authorized. All later-period, provider/credential,
+broker, paper/live and production boundaries remain unchanged.
 2024-2025 remains sealed until a single authenticated qualifying development
 candidate and separate reviewed later-period authority; Jan-Oct 2026 remains
 sealed until that same candidate's authenticated holdout PASS. Actual later-
@@ -210,12 +204,44 @@ period readers and result issuers are unavailable. A pure synthetic PASS is
 not an authorization. Distinguish valid no-survivor, statistical unavailable,
 incomplete and failed observation. No automatic trading authority follows.
 
-Product priority is defined in [Project Status](PROJECT_STATUS.md): complete
-Arch151; if valid qualification or later validation fails, prioritize the
-separate Arch149-based AI Portfolio Manager before further intraday strategy
-discovery. Preserve the Arch149 frozen confirmation boundary, account isolation
+Product priority is defined in [Project Status](PROJECT_STATUS.md): Arch151
+valid qualification failure has triggered the separate Arch149-based AI
+Portfolio Manager priority before further intraday strategy discovery. Preserve the Arch149 frozen confirmation boundary, account isolation
 and all broker/live readiness gates. Portfolio framework preparation is not
 authority to open partial 2026 confirmation or trade.
+
+### Accepted real E4 development observation — terminal economic rejection
+
+The exact integrated execution source was `6d420d20b7eab6689d84432ecfe38a68e5dbb367` / tree
+`1cd21a0cb26b5f7781e84be2f7a2ea8b07eb8df2`. Coordination feature `45929687618` and develop
+`45931754827` both passed DOCS_ONLY on attempt 1. The read-only preflight was
+READY with no custody-content read or attempt creation; its SHA-256 was
+`29d090873195d9648b602181aaa31da739e797672071ae70e3cde17cac4d1c68`.
+The separately reviewed combined campaign consumed attempt
+`9ac36178-906b-416b-ba5a-9df687595a3f`, invocation `7aa001a7-5a11-5cf6-9834-a5803b6e7f58`,
+at `F:\AI\temp\arch151-offline-development\attempts\9ac36178-906b-416b-ba5a-9df687595a3f`. Terminal COMPLETED, no failure, exit 0,
+elapsed 1597.9507193 seconds. Preserve the attempt; no retry or resume.
+
+The source digest `69537a0b180bf995f1e645bda5e7b25fc32f66d2f5c6104a407d57e764a7b40b`
+matches the earlier E2 loaded history. Validated-input digest
+`01c4af0cfa114d4dd6cbe96a08c7e3832d23f25ed2def696b87f6bd4bc89dfed`;
+source binding `bccf6de5-3721-5513-aae3-e759e2280616`. Smoke completed 1,056/1,056;
+all five 2019–2023 years completed 96/96 each; 480/480 annual fold-cost records,
+32/32 slots, 16 programs, all four families, no partial or failed replays.
+DSR_VERIFIED (64 effective trials; 1,258 daily observations per slot).
+Zero economically qualified slots and zero statistically qualified slots;
+freeze `2d83bd02-a89a-5820-9f60-f81686f7ff1b` / fingerprint
+`abdac525fb76414cee81dddc29b68145db39d966d39ffc5e77cb4e616bd3033a`:
+`ZERO_CANDIDATES_NO_QUALIFIED_SURVIVOR`. No candidate or authenticated
+candidate-evidence handoff exists. This is a valid completed negative strategy
+result, distinct from consumed E1/E2 operational failures.
+
+Run `217024eb-4904-51b8-b53e-f6100cad7a18`; report `3bf56887-7647-545d-8547-910d841f638a`;
+selection-bias calculation `c5bffe91-b7ef-5c1a-9aa9-8be7bcc5ea23`;
+population digest `a400a2d83c116c61fd4d52dff084621503d0c0e03821e8abe7ea9e9047c4fbc3`.
+Source attestation `64374e05-38a8-5fb4-a068-54b99b04b999` is not candidate authority.
+
+See the owning validation plan for exact artifact commitments and performance diagnostics.
 
 Current implemented intraday runtime authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
 

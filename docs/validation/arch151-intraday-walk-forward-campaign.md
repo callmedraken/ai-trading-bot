@@ -1,12 +1,91 @@
 # Architecture 151 — Validation plan and evidence boundary
 
-**Status:** this document records the accepted E2 source correction, both consumed observations, E3's numerical-reliability correction and preserved mapped FULL timing failure, the E3-C1 fixture correction, and E4's offline-runner candidate. E4 mapped FULL run `45916194897` attempt 1 is preserved as a broad-1 timing failure; all selected tests passed or skipped without failures. E4-C1 reuses the existing synthetic campaign history in smoke and partial-evidence tests. Its exact review and mapped FULL remain pending before source acceptance. No real E4 CLI operation, custody-content read, or replay occurred.
+**Status:** this document records the accepted E2 source correction, both consumed observations, E3's numerical-reliability correction and preserved mapped FULL timing failure, the E3-C1 fixture correction, and E4's offline-runner candidate. E4 mapped FULL run `45916194897` attempt 1 is preserved as a broad-1 timing failure; all selected tests passed or skipped without failures. E4-C1 reuses the existing synthetic campaign history in smoke and partial-evidence tests. E4-C1 was independently accepted and integrated after mapped FULL SUCCESS. The subsequent real combined campaign completed all 480 records and verified DSR; zero candidates qualified. Arch151 is terminal without holdout or extension.
 
 ## 1. Scope and safety boundary
 
-The current validation surface covers immutable population identity, deterministic sparse feature contracts, pure completed-bar signal/setup predicates, the chronological one-minute evaluator, exact 480-record development composition, DSR calculation, report-only annual/campaign economics diagnostics, source-bound passive SPY adjusted-price benchmarks, source-bound report serialization, qualification, prior-trial accounting, descriptive ranking, zero-or-one freeze, fail-closed holdout/extension authorization, the complete-development custody adapter contract, and the E4 read-only preflight and one-shot offline runner. E2 verified accepted source loading and source-history construction but failed before producing a completed annual artifact. E3/E4 implementation tests use synthetic fixtures. Synthetic CLI tests exercised argument parsing and a stubbed preflight display; the E4 campaign test ran the production attestation issuer against synthetic provenance and verified fail-closed rejection. No real CLI preflight, source load, real evaluation, or custody-content read occurred.
+The current validation surface covers immutable population identity, deterministic sparse feature contracts, pure completed-bar signal/setup predicates, the chronological one-minute evaluator, exact 480-record development composition, DSR calculation, report-only annual/campaign economics diagnostics, source-bound passive SPY adjusted-price benchmarks, source-bound report serialization, qualification, prior-trial accounting, descriptive ranking, zero-or-one freeze, fail-closed holdout/extension authorization, the complete-development custody adapter contract, and the E4 read-only preflight and one-shot offline runner. E2 verified accepted source loading and source-history construction but failed before producing a completed annual artifact. E3/E4 implementation tests use synthetic fixtures. Synthetic CLI tests exercised argument parsing and a stubbed preflight display; the E4 campaign test ran the production attestation issuer against synthetic provenance and verified fail-closed rejection. No real CLI preflight, source load, real evaluation, or custody-content read occurred during implementation.
 
 During E3/E4 implementation, no accepted-custody content was read and no real-data strategy replay, provider/credential/Robinhood/broker call, paper/live effect, or production mutation occurred. Only hashes and lengths of the two already-consumed observation roots were reverified. No 2024+ data was opened. Architecture 150 remains immutable and was neither modified nor rerun.
+
+### Accepted real E4 development observation — terminal economic rejection
+
+The exact integrated execution source was `6d420d20b7eab6689d84432ecfe38a68e5dbb367` / tree
+`1cd21a0cb26b5f7781e84be2f7a2ea8b07eb8df2`. Coordination feature `45929687618` and develop
+`45931754827` both passed DOCS_ONLY on attempt 1. The read-only preflight was
+READY with no custody-content read or attempt creation; its SHA-256 was
+`29d090873195d9648b602181aaa31da739e797672071ae70e3cde17cac4d1c68`.
+The separately reviewed combined campaign consumed attempt
+`9ac36178-906b-416b-ba5a-9df687595a3f`, invocation `7aa001a7-5a11-5cf6-9834-a5803b6e7f58`,
+at `F:\AI\temp\arch151-offline-development\attempts\9ac36178-906b-416b-ba5a-9df687595a3f`. Terminal COMPLETED, no failure, exit 0,
+elapsed 1597.9507193 seconds. Preserve the attempt; no retry or resume.
+
+The source digest `69537a0b180bf995f1e645bda5e7b25fc32f66d2f5c6104a407d57e764a7b40b`
+matches the earlier E2 loaded history. Validated-input digest
+`01c4af0cfa114d4dd6cbe96a08c7e3832d23f25ed2def696b87f6bd4bc89dfed`;
+source binding `bccf6de5-3721-5513-aae3-e759e2280616`. Smoke completed 1,056/1,056;
+all five 2019–2023 years completed 96/96 each; 480/480 annual fold-cost records,
+32/32 slots, 16 programs, all four families, no partial or failed replays.
+DSR_VERIFIED (64 effective trials; 1,258 daily observations per slot).
+Zero economically qualified slots and zero statistically qualified slots;
+freeze `2d83bd02-a89a-5820-9f60-f81686f7ff1b` / fingerprint
+`abdac525fb76414cee81dddc29b68145db39d966d39ffc5e77cb4e616bd3033a`:
+`ZERO_CANDIDATES_NO_QUALIFIED_SURVIVOR`. No candidate or authenticated
+candidate-evidence handoff exists. This is a valid completed negative strategy
+result, distinct from consumed E1/E2 operational failures.
+
+Run `217024eb-4904-51b8-b53e-f6100cad7a18`; report `3bf56887-7647-545d-8547-910d841f638a`;
+selection-bias calculation `c5bffe91-b7ef-5c1a-9aa9-8be7bcc5ea23`;
+population digest `a400a2d83c116c61fd4d52dff084621503d0c0e03821e8abe7ea9e9047c4fbc3`.
+Source attestation `64374e05-38a8-5fb4-a068-54b99b04b999` is not candidate authority.
+
+| Relative artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `attempt-result.json` | 4997 | `7ec255abbae8b1aae06121fd02bc410015d8f07603d99e3b85916081dd5ac8c8` |
+| `campaign/campaign.json` | 2890 | `183421f243db48fe673f0158a37ee754f46f400b5c20f431ed0910476d85abdd` |
+| `campaign/development-report.json` | 52186215 | `379933f7352fa597fab7c53935b1d08cebd23b5d740a8141996d7266d37a7ab9` |
+| `campaign/smoke.json` | 3335588 | `9536650f0410ef189898da8a95d7f815053850e691cbb50a3f8f03d2b154af70` |
+| `source.json` | 1752 | `8e47ca459e7deb7e847b4a8cabb5a338589a63978b2fe65213063205d0d6c3ab` |
+| `campaign/source-attestation.json` | 3716 | `b4958ccb0f15a7bd092e6df41ea628d379dbfa021eadc4b5725beb2b7533ba20` |
+| `campaign/year-2019.json` | 33935 | `dd2e1d37e0e95620f8b6413d1bc063d8190a4863f7aeeb1c06390e1d2738053d` |
+| `campaign/year-2020.json` | 33935 | `67defc10698736cbebb2afc8705ff5bd8f7419dacf82ee093ac60e3fe20c8b92` |
+| `campaign/year-2021.json` | 33935 | `efa67488fa13c0b07ce175b2c6bbe5c1fd515e1dd3b2433fa14361d3f5e457a5` |
+| `campaign/year-2022.json` | 33935 | `378dbec52fa15dc853ac0f04c35258019cc5b40e06e1cab71086f4e0f6072472` |
+| `campaign/year-2023.json` | 33935 | `5a42f046b5a08809c4b916d08043bbace346b03f3f770fd841c30fafe3e2099b` |
+| `source-revision.json` | not recorded in terminal | `0ac7702e757754560eb71ac34bd0fe2d1bf06dc9f23e698588e7b6ab29e7a1ee` |
+
+Independent report review checked the uploaded terminal/report/campaign bytes,
+exact report and campaign lengths/hashes, their cross-bindings, all 480 unique
+slot/year/cost coordinates in both record populations, five batch identities,
+all 32 DSR evidence entries, and all annual and five-year compounded returns
+against the embedded daily-return series (floating-point diagnostic check).
+The other artifact commitments above are from the terminal; the local
+closeout guard verifies their bytes before publication. This is not a second
+historical replay or independent reauthentication of raw market custody.
+
+| Five-year cost case | Positive slots | Best cumulative | Median cumulative | Worst cumulative |
+|---|---:|---:|---:|---:|
+| ZERO | 24/32 | +14.49% | +2.85% | -9.61% |
+| BASE | 1/32 | +0.78% | -8.43% | -31.97% |
+| STRESS | 0/32 | -5.43% | -23.52% | -61.80% |
+
+STRESS had 11,148 total simulated round trips across independent slots; all 32
+failed positive net return, PF >1, four positive years, four profitable years
+and DSR probability >=0.95. 28 failed average >=100 trades/year, 24 failed
+active fraction >=35%, 22 failed drawdown <=20%, 11 failed worst-year >-10%.
+Best BASE/STRESS slot D15-02 QQQ (`a84e8d52-44e4-5107-b155-0843a54f49a4`)
+returned +0.78%/-5.43%, with 106 trades across five years, 21.2/year, active
+fraction 8.43%, STRESS PF 0.714 and max drawdown 6.77%. Best ZERO slot A5-02
+QQQ +14.49%. Passive SPY all-adjusted price return +109.70%, not a separately
+reconstructed dividend-cash-flow total return. Diagnostics are descriptive,
+not additional selection authority.
+
+Arch151 is terminal: no holdout or extension, no retuning, no rerun, no
+candidate promotion, no live authority. Prioritize the separate longer-horizon
+AI Portfolio Manager before further intraday discovery. Arch149 remains an
+exploratory initial portfolio candidate; its frozen full-calendar 2024–2026
+confirmation cannot be opened until calendar 2026 is complete. Source-only
+portfolio preparation may proceed under a separately reviewed milestone.
 
 ## 2. Synthetic test map
 
@@ -342,10 +421,10 @@ The route and GitHub-owned canonical FULL profile are specified in §3. Mapped c
 
 ## 5. Remaining holdout and extension authority boundary
 
-The offline development evaluator, canonical report, source-owned authenticated development-evidence issuer, and E4 offline source runner are implemented. E2 loaded the authorized 2016–2023 source and then failed before producing a completed annual artifact; E3/E4 implementation did not read custody content or run a real replay. Both E1 and E2 public execution routes are permanently retired, and the consumed attempts must remain unchanged. E4's first mapped FULL attempt failed only the broad-1 timing ceiling; E4-C1 exact review and mapped FULL remain pending before source acceptance. No E4 real invocation occurred. The following capabilities remain unavailable and require separate authorization before either sealed later period can be opened:
+The offline development evaluator, canonical report, source-owned authenticated development-evidence issuer, and E4 offline source runner are implemented. E2 loaded the authorized 2016–2023 source and then failed before producing a completed annual artifact; E3/E4 implementation did not read custody content or run a real replay. Both E1 and E2 public execution routes are permanently retired, and the consumed attempts must remain unchanged. E4's first mapped FULL attempt failed only the broad-1 timing ceiling; E4-C1 was independently accepted and integrated after mapped FULL SUCCESS. The real E4 campaign subsequently completed with zero survivors. The following capabilities remain unavailable; neither sealed later period is authorized:
 
-- Any later real E4 invocation remains a separate reviewed action against the exact accepted source. The fixed smoke is non-authorizing; campaign qualification uses only the frozen five-year development population. No E4 execution, source attestation or candidate qualification was performed in this implementation checkpoint.
-- The source-owned evidence issuer is exercised only with synthetic rejection tests in this pass. A future accepted-source run must produce and bind its exact report, all 480 records, complete freeze/DSR evidence, and clean source revision before holdout authorization can be issued.
+- The accepted E4 campaign is terminal and no further execution is authorized. The fixed smoke was non-authorizing; campaign qualification used only the frozen five-year development population.
+- The accepted real run bound its exact report, all 480 records, complete freeze/DSR evidence and clean source revision; no qualifying candidate or candidate-evidence handoff was issued. Holdout authorization is unavailable.
 - Authenticated holdout result issuance and a reader remain unavailable. The pure `qualify_later_period` function derives the exact 502-session/24-month 2024–2025 population from the published XNYS schedule and checks STRESS net return >0, each year >0, PF >1.10, drawdown <=15%, active-session fraction >=30%, average completed round trips/year >=80, and no month >40% of positive realized net trade P&L. Its synthetic PASS is not authenticated and cannot open data. No strategy mutation is allowed after holdout visibility.
 - Authenticated same-candidate Jan–Oct 2026 extension result issuance and a reader remain unavailable. The pure qualifier checks the exact 204-session/10-month XNYS population and STRESS net return >0, PF >1.05, drawdown <=15%, at least 6/10 complete calendar months positive, and active-session fraction >=30%. Extension authorization requires the same candidate and an authenticated holdout PASS; pure synthetic output cannot satisfy that boundary. A resulting `ARCH151_INTRADAY_RESEARCH_SURVIVOR` classification permits only a separately authorized paper/shadow translation study and grants no runtime, order, Robinhood, or live authority.
 

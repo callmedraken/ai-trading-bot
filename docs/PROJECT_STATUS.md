@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 E4-C1 integrated; offline evaluation next
+## Current milestone - Architecture 151 terminal; AI Portfolio Manager priority
 
 Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
@@ -67,17 +67,17 @@ Architecture 150 remains terminal: 24 evaluated, 0 qualified,
 2016-2023 sparse SPY/QQQ custody without reacquisition. The frozen 16 programs /
 32 slots score five expanding years (2019-2023) under BASE 2 bps/fill,
 STRESS 5 bps/fill and ZERO diagnostic: 480 fold-cost records. Effective DSR
-trial count is 64. No completed real Arch151 development replay or actual DSR
-result exists yet.
+trial count is 64. The accepted E4 real campaign completed all 480 records
+and DSR_VERIFIED; zero of 32 slots qualified. See the handoff and validation
+plan for the terminal evidence. No candidate advances.
 The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Immediate next step: after this closeout is integrated and certified, run the
-reviewed source-bound read-only E4 preflight. On independent acceptance,
-review one fresh combined smoke/full campaign invocation. The preflight reads
-no custody content and creates no attempt; campaign execution is separately
-reviewed and stops if smoke fails. No new source milestone is required.
+Immediate next step: integrate and certify this terminal documentation
+closeout, then review existing Arch149, account adoption, GUI, broker and
+research infrastructure for a bounded source-only AI Portfolio Manager
+implementation plan. No new Arch151 execution is authorized.
 Preserve the E4 and E3 red runs. E1 and E2 public execution routes remain
 retired and fail closed even if the E2 evidence root is missing. E4 is a
 distinct current route; it does not resume, replace, or mutate either consumed
@@ -91,9 +91,8 @@ provider/credential access, broker/order effects, or 2024+ access.
 
 The primary product remains an autonomous same-day AI day trader, seeking
 frequent opportunities but not forcing trades, ending each session flat.
-Finish Arch151 evaluation and conditional holdout/extension first. A full
-survivor permits only a separately authorized paper/shadow translation study.
-If Arch151 fails qualification or its subsequent validation, prioritize an
+Arch151 completed development with no qualified survivor; its conditional
+holdout/extension will not run. The previously agreed priority is now an
 operational AI Portfolio Manager before another intraday strategy campaign.
 
 The separate portfolio-manager product is a longer-horizon, continuously

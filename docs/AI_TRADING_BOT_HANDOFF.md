@@ -42,14 +42,21 @@ PM2A is **SOURCE/CERTIFICATION ACCEPTED** at C3 HEAD
 `0051affa15e94253a15a47c7d51e6f5b9ca625ec`, on
 `feature/robinhood-portfolio-manager-current`. C3 mapped run `45984464000`,
 attempt 1, passed source-static, active-tests, all seven canonical FULL lanes,
-and source-gates. No local FULL was run. C4 docs-only closeout HEAD
-`02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
-`c8f93e5765ea05f12538bcdac455c1879413bcc4` was fast-forward integrated into
-`develop`; this is the PM2A integration identity. C4 feature docs-only run
-`45987424791`, attempt 1, passed source-static and source-gates; the other
-profiles were skipped for the docs-only checkpoint. This post-integration
-documentation closeout is a docs-only feature-branch descendant. C3
-implementation source and C4 develop integration are unchanged.
+and source-gates. No local FULL was run. C4 feature docs-only run `45987424791`,
+attempt 1, passed source-static and source-gates; other profiles were skipped.
+C4 develop run `45988604704` was terminal FAILURE: `full-tests (3)` and
+`full-tests (1)` passed shard verification but failed the 300-second hygiene
+budget at 331.893s and 419.295s. `source-static` passed; `source-gates` failed
+because FULL_RESULT was failure; active and certification profiles were
+skipped. ChatGPT classified this as `DEVELOP_FULL_HYGIENE_BUDGET_FAILURE`, not
+`PREPUBLICATION_COVERAGE_DEFECT`. The run was preserved and not retried.
+
+C5 docs-only closeout HEAD `5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` / tree
+`59b065160a33005932fa0c27725b0bd17bd007cb` is the current develop integration
+identity. Develop run `45990688069`, attempt 1, passed source-static and
+source-gates after docs-only range validation; active, full, and certification
+jobs were skipped. C6 is a docs-only feature-branch descendant, is not
+integrated into `develop`, and changes no PM2A implementation source.
 
 The public-reference review and complete source capability matrix are in
 [Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md).

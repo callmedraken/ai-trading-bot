@@ -5,12 +5,12 @@
 This record covers the PM2A source-only implementation accepted at C3 HEAD
 `834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
 `0051affa15e94253a15a47c7d51e6f5b9ca625ec` and fast-forward integrated on
-`develop` at C4 HEAD `02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
-`c8f93e5765ea05f12538bcdac455c1879413bcc4`. The C4 integration method and
-feature docs-only CI result are recorded in the chronology below; no develop CI
-run at C4 is claimed. This record does not contain a real Robinhood observation
-result. The currently authorized provider's actual tool schemas have not been
-observed, so order scope remains
+`develop`, currently at C5 HEAD `5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` /
+tree `59b065160a33005932fa0c27725b0bd17bd007cb`. The C4 integration method and
+C4/C5 feature and develop CI results are recorded in the chronology below.
+This record does not contain a real Robinhood observation result. The currently
+authorized provider's actual tool schemas have not been observed, so order
+scope remains
 `CURRENT_PROVIDER_ORDER_SCOPE_UNQUALIFIED`; the existing read path remains
 `ROBINHOOD_AGENTIC_BOUNDED`. No account-wide open-order completeness is claimed.
 
@@ -211,11 +211,11 @@ active-tests, source-gates, and all seven canonical FULL lanes passed. Lane
 durations were broad-1 5m45s, broad-2 4m29s, broad-3 3m48s, broad-4 3m46s,
 broad-5 3m12s, broad-6 4m37s, and broad-7 5m23s. C3 is the accepted PM2A
 implementation source. At C3 publication, `develop` was still at the starting
-parent; it was later advanced to C4 as recorded below. The earlier red run
-`45974606765` and artifact `15185959030` remain unchanged and preserved; neither
-C2 nor C3 reran or overwrote them.
+parent; it was later advanced through C4 to C5 as recorded below. The earlier
+red run `45974606765` and artifact `15185959030` remain unchanged and preserved;
+neither C2 nor C3 reran or overwrote them.
 
-## Post-integration C4 chronology
+## Post-integration C4-C5 chronology
 
 C4 is docs-only HEAD `02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
 `c8f93e5765ea05f12538bcdac455c1879413bcc4`, a descendant of the accepted C3
@@ -232,9 +232,36 @@ remained at C4 when integration completed.
 C4 feature docs-only run `45987424791`, attempt 1, is terminal SUCCESS:
 source-static and source-gates passed. Active-tests, certification-tests,
 certification-full, and full-tests were skipped for that docs-only profile.
-This is a feature-branch CI result; no develop CI run at C4 is claimed. The
-current post-integration C5 closeout is a docs-only feature-branch descendant;
-it changes no PM2A source and does not merge anything into `develop`.
+
+C4 develop run `45988604704`, attempt 1, is terminal FAILURE. `source-static`
+passed. `full-tests (0)` and `(2)` passed. In `full-tests (3)` and `(1)`,
+`Verify full batch test shard` succeeded, then `Enforce broad test hygiene
+budget` failed at 331.893s and 419.295s, respectively, against the 300-second
+threshold. `source-gates` failed because `FULL_RESULT=failure`; active-tests
+and certification profiles were skipped. No test assertion, source-static,
+authority, or provider-schema failure was reported. ChatGPT classified this as
+`DEVELOP_FULL_HYGIENE_BUDGET_FAILURE`, not `PREPUBLICATION_COVERAGE_DEFECT`.
+The measured elapsed times are runner-dependent; no deterministic locally
+reproducible source defect was established, and no local FULL or retry was run.
+Run artifacts remain attached and unchanged: source-static `15193331178`,
+full-tests shard 0 `15192972192`, shard 1 `15192188888`, shard 2 `15193086999`,
+and shard 3 `15192284130`.
+The C4 prepublication admission at
+`F:\AI\temp\ai-trading-bot-checkpoints\arch132-r3n-prepublication-admission\source-gate-20261127T105918.968151Z\report.json`
+passed but recorded `mode=FULL` with `test_shard=null`; its authority/runner
+checks, Ruff and diff checks did not exercise these hosted full-shard timing
+thresholds. The earlier C3 feature FULL remains green.
+
+C5 docs-only feature run `45990380031`, attempt 1, is terminal SUCCESS:
+source-static and source-gates passed; other profiles were skipped. C5
+`5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` / tree
+`59b065160a33005932fa0c27725b0bd17bd007cb` was later integrated on `develop`
+by ordinary push. Develop run `45990688069`, attempt 1, is terminal SUCCESS:
+source-static and source-gates passed after docs-only range validation;
+active-tests, full-tests, certification-tests, and certification-full were
+skipped. This is not a new FULL certification. The current C6 status correction
+is a docs-only feature-branch descendant; it changes no PM2A source and is not
+integrated into `develop` here.
 
 Across implementation, focused tests, admission, and mapped CI, no provider,
 OAuth, credential, account, or order read occurred. Review, placement,

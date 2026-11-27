@@ -32,13 +32,23 @@ ACCEPTED** at C3 HEAD `834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
 attempt 1, is terminal SUCCESS: source-static, active-tests, all seven mapped
 canonical FULL lanes, and source-gates passed. No local FULL was run.
 
-C4 docs-only closeout HEAD `02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
-`c8f93e5765ea05f12538bcdac455c1879413bcc4` was fast-forward integrated into
-`develop`; this is the PM2A integration identity. C4 feature docs-only run
-`45987424791`, attempt 1, is terminal SUCCESS: source-static and source-gates
-passed; the other profiles were skipped for the docs-only checkpoint. The
-current post-integration docs closeout is a docs-only feature-branch descendant
-and does not change the accepted C3 implementation or integrated C4 source.
+C4 feature docs-only run `45987424791`, attempt 1, passed source-static and
+source-gates; other profiles were skipped. The C4 develop run `45988604704`
+was terminal FAILURE: two full-test shards passed test verification but
+exceeded the 300-second hygiene threshold at 331.893s and 419.295s. Source-
+static passed, source-gates failed because FULL_RESULT was failure, and the
+other profiles were skipped. ChatGPT classified this as
+`DEVELOP_FULL_HYGIENE_BUDGET_FAILURE`, not
+`PREPUBLICATION_COVERAGE_DEFECT`; the preserved run was not retried.
+
+C5 docs-only closeout HEAD `5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` / tree
+`59b065160a33005932fa0c27725b0bd17bd007cb` is the current fast-forward
+integration identity on `develop`. Develop run `45990688069`, attempt 1, is
+terminal SUCCESS: source-static and source-gates passed after docs-only range
+validation; active, full, and certification jobs were skipped. No local FULL
+was run. The current C6 validation/status correction is a docs-only feature-
+branch descendant, is not integrated into `develop`, and does not change the
+accepted C3 implementation.
 
 The public-reference review, bounded capability matrix, and metadata-only
 schema qualification path are recorded in

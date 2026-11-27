@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 E3-C1 integrated; E4 offline runner next
+## Current milestone - Architecture 151 E3-C1 integrated; E4 source review pending
 
 Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
@@ -37,6 +37,18 @@ develop certification reuse succeeded. See the handoff for identities and
 the validation plan for the preserved red run and timing audit. No E3/E3-C1
 custody-content read or real replay occurred.
 
+E4 implements a read-only exact-source preflight and a reusable offline runner
+with separate smoke-only and complete campaign modes. Smoke covers the fixed
+2019 population through the actual diagnostic simulator without qualification
+or attestation. Campaign requires that smoke, then uses the frozen annual
+simulator, complete 480-record composition, canonical report and existing
+source-attestation/evidence gates. Both modes use create-once UUID attempts,
+bounded progress, sanitized failures and partial evidence. Exact source review
+and mapped FULL remain pending; no real E4 CLI operation or accepted-custody
+content read occurred during implementation. Synthetic tests covered CLI
+argument sanitization, stubbed preflight display and rejection of synthetic
+provenance by the real attestation issuer.
+
 Architecture 150 remains terminal: 24 evaluated, 0 qualified,
 `NO_HOLDOUT_CANDIDATES`; no rerun or mutation. Arch151 reuses its accepted
 2016-2023 sparse SPY/QQQ custody without reacquisition. The frozen 16 programs /
@@ -48,20 +60,18 @@ The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Immediate next milestone: E4 source-only reusable offline development runner.
-Reuse the accepted custody adapter, frozen simulator and qualification logic.
-Provide a fixed non-authorizing smoke mode and a complete campaign mode that
-authenticates custody once and qualifies the complete in-memory population
-without a duplicate full replay. Preserve immutable attempts, structured
-failure attribution and progress; no real execution during implementation.
-Preserve E3's red run and do not rerun it. The E1 and E2 public
-execution routes are retired and fail closed even if the E2 evidence root is
-missing. No third observation route is implemented. Review any future
-development result and its full trial accounting before a separately reviewed
-later-period decision. 2024–2025 and Jan–Oct 2026 remain sealed; real later-
-period readers/issuers are not implemented. Documentation or source publication
-does not authorize real replay, provider/credential access, broker/order
-effects, or 2024+ access.
+Immediate next step: review the exact E4 source diff, complete admission, publish
+the single candidate, and inspect its mapped FULL terminal result before source
+acceptance. The E4 implementation is synthetic-tested only; do not run its real
+CLI or read accepted custody content in this checkpoint. Preserve E3's red run
+and do not rerun it. E1 and E2 public execution routes remain retired and fail
+closed even if the E2 evidence root is missing. E4 is a distinct current route;
+it does not resume, replace, or mutate either consumed predecessor. Review any
+future development result and its full trial accounting before a separately
+reviewed later-period decision. 2024–2025 and Jan–Oct 2026 remain sealed; real
+later-period readers/issuers are not implemented. Documentation or source
+publication does not authorize real replay, provider/credential access,
+broker/order effects, or 2024+ access.
 
 ### Product direction and conditional roadmap
 

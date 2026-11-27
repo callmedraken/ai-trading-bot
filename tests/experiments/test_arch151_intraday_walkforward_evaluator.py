@@ -3364,3 +3364,626 @@ def test_year_batch_identity_binds_complete_replay_outputs(
 
     with pytest.raises(evaluator.EvaluationIntegrityError, match="batch IDs"):
         evaluator.compose_development_evaluation((changed_first, *year_batches[1:]))
+
+
+@cache
+def _synthetic_e4_smoke_history():
+    current_minutes = []
+    smoke_sessions = operator._offline_smoke_sessions()
+    current_minutes.extend(
+        _campaign_signal_session_minutes(smoke_sessions[0], include_flat_padding=True)
+    )
+    for session in smoke_sessions[1:]:
+        schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
+        assert schedule is not None
+        count = int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
+        for symbol in arch151.INITIAL_UNIVERSE:
+            current_minutes.extend(
+                arch151.OneMinuteBar(
+                    symbol,
+                    schedule.opens_at + timedelta(minutes=offset),
+                    Decimal("100"),
+                    Decimal("100.01"),
+                    Decimal("99.99"),
+                    Decimal("100"),
+                    100,
+                )
+                for offset in range(count)
+            )
+    return arch151._test_only_synthetic_source_history(
+        (
+            *_a_prior_minutes("SPY"),
+            *_a_prior_minutes("QQQ"),
+            *current_minutes,
+        )
+    )
+
+
+def test_e4_smoke_reuses_actual_simulator_for_fixed_population(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    history = _synthetic_e4_smoke_history()
+    revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        "b" * 40,
+        "c" * 40,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    attempt_id = UUID(int=9501)
+    source_material = {
+        "source_digest": history.source_digest,
+        "validated_input_digest": "d" * 64,
+        "source_binding_id": str(UUID(int=9502)),
+        "dataset_id": str(UUID(int=9503)),
+        "custody_id": str(UUID(int=9504)),
+        "evidence_id": str(UUID(int=9505)),
+    }
+    preflight = {
+        "source": {"head": revision.head, "tree": revision.tree},
+        "run_shape": operator._offline_run_shape(),
+    }
+
+    def forbidden_annual_path(*_args, **_kwargs):
+        pytest.fail("smoke must not invoke annual evaluation or authority")
+
+    monkeypatch.setattr(evaluator, "_simulate_canonical_year", forbidden_annual_path)
+    monkeypatch.setattr(
+        evaluator, "compose_development_evaluation", forbidden_annual_path
+    )
+    monkeypatch.setattr(
+        evaluator, "serialize_development_evaluation", forbidden_annual_path
+    )
+    monkeypatch.setattr(
+        operator, "_issue_development_source_attestation", forbidden_annual_path
+    )
+
+    outcome = operator._offline_run_smoke(
+        mode=operator.OfflineMode.SMOKE,
+        history=history,
+        source_material=source_material,
+        attempt_id=attempt_id,
+        invocation_id=operator._invocation_id(revision),
+        preflight=preflight,
+        started_ns=0,
+        progress_sink=None,
+    )
+
+    assert outcome.error is None
+    assert outcome.complete is True
+    assert outcome.evidence is not None
+    assert outcome.evidence["sessions"] == [
+        "2019-01-02",
+        "2019-01-03",
+        "2019-01-04",
+        "2019-01-07",
+        "2019-01-08",
+        "2019-01-09",
+        "2019-01-10",
+        "2019-01-11",
+        "2019-01-14",
+        "2019-01-15",
+        "2019-07-03",
+    ]
+    assert outcome.evidence["expected_session_cost_records"] == 1056
+    assert outcome.evidence["observed_session_cost_records"] == 1056
+    assert outcome.evidence["observed_coordinates_match_expected"] is True
+    assert outcome.evidence["equity_chains_reconciled"] is True
+    assert all(
+        row["equity_chain_reconciled"] is True
+        and row["cash_reconciled"] is True
+        and row["failure"] is None
+        for row in outcome.evidence["records"]
+    )
+    assert sum(row["trade_count"] for row in outcome.evidence["records"]) > 0
+    assert sum(row["fill_count"] for row in outcome.evidence["records"]) > 0
+    assert outcome.evidence["candidate_evaluation"] == "NOT_EVALUATED"
+    assert outcome.evidence["source_attestation"] is None
+
+
+def test_e4_smoke_interrupt_retains_completed_replay_material(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    history = _synthetic_e4_smoke_history()
+    real_simulate = evaluator._simulate_diagnostic_sessions
+
+    def interrupt_after_first_record(
+        history_arg,
+        slot,
+        sessions,
+        *,
+        preparation_cache,
+        calibration_cache,
+        on_session_replay=None,
+    ):
+        def observe(progress):
+            if on_session_replay is not None:
+                on_session_replay(progress)
+            raise KeyboardInterrupt
+
+        return real_simulate(
+            history_arg,
+            slot,
+            tuple(sessions[:1]),
+            preparation_cache=preparation_cache,
+            calibration_cache=calibration_cache,
+            on_session_replay=observe,
+        )
+
+    monkeypatch.setattr(
+        evaluator, "_simulate_diagnostic_sessions", interrupt_after_first_record
+    )
+    source_material = {
+        "source_digest": history.source_digest,
+        "validated_input_digest": "d" * 64,
+        "source_binding_id": str(UUID(int=9512)),
+        "dataset_id": str(UUID(int=9513)),
+        "custody_id": str(UUID(int=9514)),
+        "evidence_id": str(UUID(int=9515)),
+    }
+    revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        "b" * 40,
+        "c" * 40,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    outcome = operator._offline_run_smoke(
+        mode=operator.OfflineMode.SMOKE,
+        history=history,
+        source_material=source_material,
+        attempt_id=UUID(int=9511),
+        invocation_id=operator._invocation_id(revision),
+        preflight={
+            "source": {"head": revision.head, "tree": revision.tree},
+            "run_shape": operator._offline_run_shape(),
+        },
+        started_ns=0,
+        progress_sink=None,
+    )
+
+    assert outcome.error is not None
+    assert isinstance(outcome.error, operator.OfflineError)
+    assert outcome.failure_code is operator.OfflineFailureCode.INTERRUPTED
+    assert outcome.partial_evidence is not None
+    assert outcome.partial_evidence["schema"] == ("arch151-offline-partial-smoke/v1")
+    assert outcome.partial_evidence["observed_session_cost_records"] == 1
+    assert len(outcome.partial_evidence["records"]) == 1
+    assert outcome.partial_evidence["last_completed_coordinate"]["session_date"] == (
+        "2019-01-02"
+    )
+    assert outcome.partial_evidence["candidate_evaluation"] == "NOT_EVALUATED"
+
+
+def test_e4_campaign_composes_real_report_and_rejects_synthetic_authority(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    idle_year_batches: tuple[evaluator.CanonicalYearBatch, ...],
+    idle_run: evaluator.DevelopmentEvaluationRun,
+    idle_report: evaluator.DevelopmentEvaluationReport,
+) -> None:
+    history = arch151._SyntheticSourceHistory(
+        source_digest="a" * 64,
+        session_projections=(),
+        _seal=arch151._SYNTHETIC_HISTORY_SEAL,
+    )
+    revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        "b" * 40,
+        "c" * 40,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    source = {
+        "branch": operator.EXPECTED_BRANCH,
+        "origin_fetch_url": operator.EXPECTED_ORIGIN,
+        "origin_push_url": operator.EXPECTED_ORIGIN,
+        "head": revision.head,
+        "tree": revision.tree,
+        "upstream": "origin/feature/research-arch151-intraday-walkforward-current",
+        "feature_tracking_head": revision.head,
+        "feature_live_head": revision.head,
+        "develop_tracking_head": "d" * 40,
+        "develop_live_head": "d" * 40,
+    }
+    preflight = {
+        "schema": operator._OFFLINE_PREFLIGHT_SCHEMA,
+        "status": operator.OfflineStatus.READY.value,
+        "expected_source_head": revision.head,
+        "preflight_sha256": "e" * 64,
+        "source": source,
+        "run_shape": operator._offline_run_shape(),
+        "custody_content_authenticated": False,
+    }
+    evidence_root = tmp_path / "arch151-e4-campaign-compose"
+    monkeypatch.setattr(operator, "OFFLINE_EVIDENCE_ROOT", evidence_root)
+    monkeypatch.setattr(operator, "preflight_offline", lambda _expected: preflight)
+    monkeypatch.setattr(operator, "_load_accepted_source_history", lambda: history)
+    source_binding = evaluator._development_source_binding(history)
+    monkeypatch.setattr(
+        operator,
+        "_offline_source_material",
+        lambda *_args: {
+            "source_digest": history.source_digest,
+            "validated_input_digest": "f" * 64,
+            "source_binding_id": str(source_binding.binding_id),
+            "dataset_id": str(UUID(int=9521)),
+            "custody_id": str(UUID(int=9522)),
+            "evidence_id": str(UUID(int=9523)),
+        },
+    )
+    monkeypatch.setattr(
+        operator,
+        "_offline_run_smoke",
+        lambda **_kwargs: operator._OfflineSmokeOutcome(
+            {
+                "expected_session_cost_records": 1056,
+                "observed_session_cost_records": 1056,
+                "complete": True,
+                "candidate_evaluation": "NOT_EVALUATED",
+                "qualification": "NOT_EVALUATED",
+                "source_attestation": None,
+                "records": [],
+            },
+            True,
+        ),
+    )
+    batches_by_year = {batch.scored_year: batch for batch in idle_year_batches}
+    simulated_years: list[int] = []
+    composition_requests: list[tuple[evaluator.CanonicalYearBatch, ...]] = []
+    serialization_requests: list[evaluator.DevelopmentEvaluationRun] = []
+
+    def compose_using_fixture_cache(batches):
+        observed = tuple(batches)
+        composition_requests.append(observed)
+        assert len(observed) == len(arch151.SCORED_YEARS)
+        assert all(
+            actual is expected
+            for actual, expected in zip(observed, idle_year_batches, strict=True)
+        )
+        return idle_run
+
+    def serialize_using_fixture_cache(run):
+        serialization_requests.append(run)
+        assert run is idle_run
+        return idle_report
+
+    monkeypatch.setattr(
+        evaluator, "compose_development_evaluation", compose_using_fixture_cache
+    )
+    monkeypatch.setattr(
+        evaluator, "serialize_development_evaluation", serialize_using_fixture_cache
+    )
+
+    def return_canonical_fixture_batch(_history, year, *, on_session_replay=None):
+        assert on_session_replay is not None
+        simulated_years.append(year)
+        return batches_by_year[year]
+
+    monkeypatch.setattr(
+        evaluator, "_simulate_canonical_year", return_canonical_fixture_batch
+    )
+    attempt_id = "42345678-1234-4234-8234-123456789abc"
+
+    result = operator._run_offline_attempt(
+        operator.OfflineMode.CAMPAIGN, revision.head, attempt_id
+    )
+
+    attempt_root = evidence_root / "attempts" / attempt_id
+    terminal = json.loads((attempt_root / "attempt-result.json").read_text())
+    failure = json.loads((attempt_root / "operator-failure.json").read_text())
+    report_path = attempt_root / "campaign" / "development-report.json"
+    report_bytes = report_path.read_bytes()
+    assert simulated_years == list(arch151.SCORED_YEARS)
+    assert len(composition_requests) == 1
+    assert composition_requests[0] == idle_year_batches
+    assert len(serialization_requests) == 1
+    assert serialization_requests[0] is idle_run
+    assert result["status"] == operator.OfflineStatus.FAILED.value
+    assert result["failure_code"] == "SOURCE_ATTESTATION_FAILED"
+    assert terminal["attempted_years"] == list(arch151.SCORED_YEARS)
+    assert terminal["completed_years"] == list(arch151.SCORED_YEARS)
+    assert terminal["run"]["record_count"] == 480
+    assert terminal["final_freeze_status"] == idle_run.final_freeze.status.value
+    assert terminal["final_freeze_id"] == str(idle_run.final_freeze.freeze_id)
+    assert [item["observed_replay_count"] for item in terminal["year_artifacts"]] == [
+        96,
+        96,
+        96,
+        96,
+        96,
+    ]
+    assert terminal["report_artifact"]["path"] == "campaign/development-report.json"
+    assert terminal["report_artifact"]["byte_length"] == len(report_bytes)
+    assert terminal["report_sha256"] == sha256(report_bytes).hexdigest()
+    assert terminal["report_sha256"] == terminal["report_artifact"]["sha256"]
+    assert report_bytes == idle_report.canonical_json_bytes
+    assert terminal["report_sha256"] == idle_report.sha256
+    assert terminal["source_attestation_id"] is None
+    assert terminal["development_evidence_id"] is None
+    assert failure["failure_code"] == "SOURCE_ATTESTATION_FAILED"
+    assert not (attempt_root / "campaign" / "source-attestation.json").exists()
+
+
+def test_e4_incomplete_bound_year_is_persisted_before_campaign_stops(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    idle_year_batches: tuple[evaluator.CanonicalYearBatch, ...],
+) -> None:
+    history = arch151._SyntheticSourceHistory(
+        source_digest="a" * 64,
+        session_projections=(),
+        _seal=arch151._SYNTHETIC_HISTORY_SEAL,
+    )
+    revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        "b" * 40,
+        "c" * 40,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    source = {
+        "branch": operator.EXPECTED_BRANCH,
+        "origin_fetch_url": operator.EXPECTED_ORIGIN,
+        "origin_push_url": operator.EXPECTED_ORIGIN,
+        "head": revision.head,
+        "tree": revision.tree,
+        "upstream": "origin/feature/research-arch151-intraday-walkforward-current",
+        "feature_tracking_head": revision.head,
+        "feature_live_head": revision.head,
+        "develop_tracking_head": "d" * 40,
+        "develop_live_head": "d" * 40,
+    }
+    preflight = {
+        "schema": operator._OFFLINE_PREFLIGHT_SCHEMA,
+        "status": operator.OfflineStatus.READY.value,
+        "expected_source_head": revision.head,
+        "preflight_sha256": "e" * 64,
+        "source": source,
+        "run_shape": operator._offline_run_shape(),
+        "custody_content_authenticated": False,
+    }
+    evidence_root = tmp_path / "arch151-e4-incomplete-year"
+    monkeypatch.setattr(operator, "OFFLINE_EVIDENCE_ROOT", evidence_root)
+    monkeypatch.setattr(operator, "preflight_offline", lambda _expected: preflight)
+    monkeypatch.setattr(operator, "_load_accepted_source_history", lambda: history)
+    source_binding = evaluator._development_source_binding(history)
+    monkeypatch.setattr(
+        operator,
+        "_offline_source_material",
+        lambda *_args: {
+            "source_digest": history.source_digest,
+            "validated_input_digest": "f" * 64,
+            "source_binding_id": str(source_binding.binding_id),
+            "dataset_id": str(UUID(int=9621)),
+            "custody_id": str(UUID(int=9622)),
+            "evidence_id": str(UUID(int=9623)),
+        },
+    )
+    monkeypatch.setattr(
+        operator,
+        "_offline_run_smoke",
+        lambda **_kwargs: operator._OfflineSmokeOutcome(
+            {
+                "expected_session_cost_records": 1056,
+                "observed_session_cost_records": 1056,
+                "complete": True,
+                "candidate_evaluation": "NOT_EVALUATED",
+                "qualification": "NOT_EVALUATED",
+                "source_attestation": None,
+                "records": [],
+            },
+            True,
+        ),
+    )
+
+    first_batch = idle_year_batches[0]
+    first_session = arch151._published_sessions_for_year(first_batch.scored_year)[0]
+    failure = evaluator.ReplayFailureEvidence(
+        UUID(int=9624),
+        evaluator.ReplayFailureKind.MANDATORY_LIQUIDATION_UNOBSERVED,
+        first_session,
+        datetime(2019, 1, 2, 20, 55, tzinfo=UTC),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        evaluator.ExitReason.SESSION_LIQUIDATION,
+        None,
+        history.source_digest,
+    )
+    first_replay = replace(first_batch.evaluations[0], complete=False, failure=failure)
+    incomplete_evaluations = (first_replay, *first_batch.evaluations[1:])
+    incomplete_batch = replace(
+        first_batch,
+        batch_id=evaluator._canonical_year_batch_id(
+            first_batch.source_binding,
+            first_batch.scored_year,
+            incomplete_evaluations,
+            first_batch.passive_spy_benchmark,
+        ),
+        evaluations=incomplete_evaluations,
+    )
+    assert not incomplete_batch.complete
+    assert operator._offline_batch_population_is_exact(
+        incomplete_batch, history, arch151.SCORED_YEARS[0]
+    )
+    simulated_years: list[int] = []
+
+    def return_incomplete_year(_history, year, *, on_session_replay=None):
+        assert on_session_replay is not None
+        simulated_years.append(year)
+        assert year == arch151.SCORED_YEARS[0]
+        return incomplete_batch
+
+    monkeypatch.setattr(evaluator, "_simulate_canonical_year", return_incomplete_year)
+    monkeypatch.setattr(
+        evaluator,
+        "compose_development_evaluation",
+        lambda _batches: pytest.fail("incomplete evidence must not be composed"),
+    )
+    attempt_id = "52345678-1234-4234-8234-123456789abc"
+
+    result = operator._run_offline_attempt(
+        operator.OfflineMode.CAMPAIGN, revision.head, attempt_id
+    )
+
+    attempt_root = evidence_root / "attempts" / attempt_id
+    terminal = json.loads((attempt_root / "attempt-result.json").read_text())
+    failure_record = json.loads((attempt_root / "operator-failure.json").read_text())
+    year_artifact = json.loads(
+        (attempt_root / "campaign" / "year-2019.json").read_text()
+    )
+    assert result["status"] == operator.OfflineStatus.INCOMPLETE.value
+    assert result["failure_code"] == "YEAR_INCOMPLETE"
+    assert simulated_years == [2019]
+    assert year_artifact["schema"] == operator._YEAR_EVIDENCE_SCHEMA
+    assert year_artifact["complete"] is False
+    assert year_artifact["expected_replay_count"] == 96
+    assert year_artifact["observed_replay_count"] == 96
+    assert year_artifact["records"][0]["complete"] is False
+    assert year_artifact["records"][0]["failure"]["failure_id"] == str(
+        failure.failure_id
+    )
+    assert terminal["attempted_years"] == [2019]
+    assert terminal["completed_years"] == []
+    assert terminal["candidate_evaluation"] == "NOT_EVALUATED"
+    assert terminal["report_artifact"] is None
+    assert terminal["source_attestation_id"] is None
+    assert failure_record["failure_code"] == "YEAR_INCOMPLETE"
+    assert not (attempt_root / "campaign" / "development-report.json").exists()
+
+
+@pytest.mark.parametrize("interrupted", (False, True))
+def test_e4_annual_failure_persists_completed_current_year_records(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, interrupted: bool
+) -> None:
+    history = _synthetic_e4_smoke_history()
+    revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        "b" * 40,
+        "c" * 40,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    source = {
+        "branch": operator.EXPECTED_BRANCH,
+        "origin_fetch_url": operator.EXPECTED_ORIGIN,
+        "origin_push_url": operator.EXPECTED_ORIGIN,
+        "head": revision.head,
+        "tree": revision.tree,
+        "upstream": "origin/feature/research-arch151-intraday-walkforward-current",
+        "feature_tracking_head": revision.head,
+        "feature_live_head": revision.head,
+        "develop_tracking_head": "d" * 40,
+        "develop_live_head": "d" * 40,
+    }
+    preflight = {
+        "schema": operator._OFFLINE_PREFLIGHT_SCHEMA,
+        "status": operator.OfflineStatus.READY.value,
+        "expected_source_head": revision.head,
+        "preflight_sha256": "e" * 64,
+        "source": source,
+        "run_shape": operator._offline_run_shape(),
+        "custody_content_authenticated": False,
+    }
+    monkeypatch.setattr(operator, "OFFLINE_EVIDENCE_ROOT", tmp_path / "e4-evidence")
+    monkeypatch.setattr(operator, "preflight_offline", lambda _expected: preflight)
+    source_loads = []
+    monkeypatch.setattr(
+        operator,
+        "_load_accepted_source_history",
+        lambda: source_loads.append(history) or history,
+    )
+    monkeypatch.setattr(
+        operator,
+        "_offline_source_material",
+        lambda *_args: {
+            "source_digest": history.source_digest,
+            "validated_input_digest": "f" * 64,
+            "source_binding_id": str(UUID(int=9601)),
+            "dataset_id": str(UUID(int=9602)),
+            "custody_id": str(UUID(int=9603)),
+            "evidence_id": str(UUID(int=9604)),
+        },
+    )
+    monkeypatch.setattr(
+        operator,
+        "_offline_run_smoke",
+        lambda **_kwargs: operator._OfflineSmokeOutcome(
+            {
+                "expected_session_cost_records": 1056,
+                "observed_session_cost_records": 1056,
+                "complete": True,
+                "candidate_evaluation": "NOT_EVALUATED",
+                "qualification": "NOT_EVALUATED",
+                "source_attestation": None,
+                "records": [],
+            },
+            True,
+        ),
+    )
+    first_session = arch151._published_sessions_for_year(2019)[0]
+
+    def fail_after_one_slot(history_arg, year, *, on_session_replay=None):
+        slot = arch151.CANONICAL_SLOTS[0]
+        evaluator._simulate_diagnostic_sessions(
+            history_arg,
+            slot,
+            (first_session,),
+            calibration_cache=evaluator._FamilyACalibrationCache(history_arg),
+            on_session_replay=on_session_replay,
+        )
+        if interrupted:
+            raise KeyboardInterrupt
+        raise ValueError("private injected annual failure")
+
+    monkeypatch.setattr(evaluator, "_simulate_canonical_year", fail_after_one_slot)
+    attempt_id = "32345678-1234-4234-8234-123456789abc"
+
+    result = operator._run_offline_attempt(
+        operator.OfflineMode.CAMPAIGN, revision.head, attempt_id
+    )
+
+    attempt_root = tmp_path / "e4-evidence" / "attempts" / attempt_id
+    terminal = json.loads((attempt_root / "attempt-result.json").read_text())
+    failure = json.loads((attempt_root / "operator-failure.json").read_text())
+    partial_ref = terminal["partial_artifacts"][0]
+    partial = json.loads((attempt_root / partial_ref["path"]).read_text())
+    assert len(source_loads) == 1
+    assert result["status"] == (
+        operator.OfflineStatus.INTERRUPTED.value
+        if interrupted
+        else operator.OfflineStatus.FAILED.value
+    )
+    assert terminal["attempted_years"] == [2019]
+    assert terminal["completed_years"] == []
+    assert terminal["candidate_evaluation"] == "NOT_EVALUATED"
+    assert terminal["failure_code"] == (
+        "INTERRUPTED" if interrupted else "ANNUAL_SIMULATION_FAILED"
+    )
+    assert partial["scored_year"] == 2019
+    assert partial["schema"] == operator._OFFLINE_PARTIAL_YEAR_SCHEMA
+    assert len(partial["records"]) == len(arch151.EVALUATION_ECONOMICS_ORDER)
+    assert all(
+        row["session_date"] == first_session.isoformat() for row in partial["records"]
+    )
+    assert failure["failure_type"] == ("OfflineError" if interrupted else "ValueError")
+    assert failure["failure_attribution"]["scored_year"] == 2019
+    if interrupted:
+        assert partial["last_completed_coordinate"]["session_date"] == (
+            first_session.isoformat()
+        )
+    else:
+        assert "private injected annual failure" not in json.dumps(failure)
+
+
+def test_candidate_probability_uses_frozen_inclusive_threshold() -> None:
+    threshold = arch151.SELECTION_BIAS_INPUT.required_probability
+
+    assert arch151._selection_bias_probability_meets_threshold(threshold)
+    assert not arch151._selection_bias_probability_meets_threshold(
+        threshold - Decimal("0.0001")
+    )

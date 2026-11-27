@@ -7,7 +7,7 @@ protected-effect surface.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, fields, is_dataclass, replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, localcontext
@@ -459,6 +459,27 @@ class SessionReplayRecord:
     @property
     def active(self) -> bool:
         return bool(self.trades)
+
+
+@dataclass(frozen=True, slots=True)
+class _SessionReplayProgress:
+    """One completed session-cost record observed without changing its identity."""
+
+    scored_year: int
+    slot: arch151.TrialSlot
+    cost_case: arch151.FillCostCase
+    record: SessionReplayRecord
+
+
+@dataclass(frozen=True, slots=True)
+class _DiagnosticSlotSessions:
+    """Unqualified selected-session results; never a canonical year batch."""
+
+    slot: arch151.TrialSlot
+    cost_case: arch151.FillCostCase
+    scored_year: int
+    calibration_available: bool | None
+    sessions: tuple[SessionReplayRecord, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -2731,83 +2752,27 @@ def _finish_slot_year(
     )
 
 
-def _simulate_slot_year_cases(
+def _replay_session_cost_cases(
     history: SourceHistory,
     slot: arch151.TrialSlot,
+    program: arch151.Arch151Program,
     year: int,
+    sessions: tuple[date, ...],
+    cache: _PreparationCache,
+    calibration: arch151.FamilyACalibration | None,
     *,
-    preparation_cache: _PreparationCache | None = None,
-    calibration_cache: _FamilyACalibrationCache | None = None,
-) -> tuple[SlotYearReplay, ...]:
+    on_session_replay: Callable[[_SessionReplayProgress], None] | None = None,
+) -> dict[arch151.FillCostCase, list[SessionReplayRecord]]:
+    """Run the shared chronological multi-cost loop for a bounded session set."""
+
     history_digest = _history_digest(history)
-    program = _slot_program(slot)
-    if type(year) is not int or year not in arch151.SCORED_YEARS:
-        raise ValueError("scored year is outside the frozen walk-forward period")
     cases = arch151.EVALUATION_ECONOMICS_ORDER
-    calibration = None
-    if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT:
-        try:
-            if calibration_cache is None:
-                calibration = arch151.calibrate_family_a_from_source_history(
-                    history, program, slot.symbol, year
-                )
-            else:
-                if calibration_cache.source_digest != history_digest:
-                    raise EvaluationIntegrityError(
-                        "Family A calibration cache belongs to another source"
-                    )
-                calibration = calibration_cache.calibration(program, slot.symbol, year)
-        except arch151.UnavailableIndicatorError:
-            first_session = arch151._published_sessions_for_year(year)[0]
-            schedule = arch151._SESSION_AUTHORITY.schedule_for(first_session)
-            assert schedule is not None
-            failure = _failure_evidence(
-                source_digest=history_digest,
-                slot=slot,
-                session=first_session,
-                kind=ReplayFailureKind.CALIBRATION_UNAVAILABLE,
-                liquidation_boundary=schedule.closes_at.astimezone(UTC)
-                - timedelta(minutes=5),
-                position=None,
-                pending=None,
-                last_observed_timestamp=None,
-            )
-            return tuple(
-                _slot_year_failure(history_digest, slot, year, case, failure)
-                for case in cases
-            )
-        except Exception as error:
-            raise AnnualReplayFailure(
-                AnnualReplayFailureContext(
-                    year,
-                    slot.program_id,
-                    slot.slot_id,
-                    slot.symbol,
-                    None,
-                    None,
-                    AnnualReplayOperationStage.FAMILY_A_CALIBRATION,
-                )
-            ) from error
-    try:
-        cache = preparation_cache or _PreparationCache(history)
-    except Exception as error:
-        raise AnnualReplayFailure(
-            AnnualReplayFailureContext(
-                year,
-                slot.program_id,
-                slot.slot_id,
-                slot.symbol,
-                None,
-                None,
-                AnnualReplayOperationStage.PROGRAM_FEATURE_PREPARATION,
-            )
-        ) from error
     sessions_by_case: dict[arch151.FillCostCase, list[SessionReplayRecord]] = {
         case: [] for case in cases
     }
     equity_by_case = {case: Decimal(1) for case in cases}
     stopped_cases: set[arch151.FillCostCase] = set()
-    for session in arch151._published_sessions_for_year(year):
+    for session in sessions:
         try:
             tape = _session_tape(
                 history, cache, program, slot.symbol, session, calibration
@@ -2858,6 +2823,227 @@ def _simulate_slot_year_cases(
                 stopped_cases.add(case)
             else:
                 equity_by_case[case] = record.closing_equity
+            if on_session_replay is not None:
+                on_session_replay(_SessionReplayProgress(year, slot, case, record))
+    return sessions_by_case
+
+
+def _family_a_calibration_for_slot(
+    history: SourceHistory,
+    history_digest: str,
+    slot: arch151.TrialSlot,
+    program: arch151.Arch151Program,
+    year: int,
+    calibration_cache: _FamilyACalibrationCache | None,
+) -> tuple[arch151.FamilyACalibration | None, bool]:
+    if program.family is not arch151.StrategyFamily.NOISE_VWAP_BREAKOUT:
+        return None, False
+    try:
+        if calibration_cache is None:
+            return (
+                arch151.calibrate_family_a_from_source_history(
+                    history, program, slot.symbol, year
+                ),
+                False,
+            )
+        if calibration_cache.source_digest != history_digest:
+            raise EvaluationIntegrityError(
+                "Family A calibration cache belongs to another source"
+            )
+        return calibration_cache.calibration(program, slot.symbol, year), False
+    except arch151.UnavailableIndicatorError:
+        return None, True
+    except Exception as error:
+        raise AnnualReplayFailure(
+            AnnualReplayFailureContext(
+                year,
+                slot.program_id,
+                slot.slot_id,
+                slot.symbol,
+                None,
+                None,
+                AnnualReplayOperationStage.FAMILY_A_CALIBRATION,
+            )
+        ) from error
+
+
+def _simulate_diagnostic_sessions(
+    history: SourceHistory,
+    slot: arch151.TrialSlot,
+    sessions: tuple[date, ...],
+    *,
+    preparation_cache: _PreparationCache | None = None,
+    calibration_cache: _FamilyACalibrationCache | None = None,
+    on_session_replay: Callable[[_SessionReplayProgress], None] | None = None,
+) -> tuple[_DiagnosticSlotSessions, ...]:
+    """Replay selected published sessions through the real multi-cost simulator.
+
+    This diagnostic surface returns only session records. It does not construct
+    a ``SlotYearReplay``, ``CanonicalYearBatch``, report, qualification, or
+    source attestation, and is intended for the guarded smoke operation.
+    """
+
+    if (
+        type(sessions) is not tuple
+        or not sessions
+        or any(type(item) is not date for item in sessions)
+        or tuple(sorted(set(sessions))) != sessions
+        or len({item.year for item in sessions}) != 1
+    ):
+        raise ValueError("diagnostic sessions must be one ordered published year")
+    year = sessions[0].year
+    if any(
+        not arch151.DEVELOPMENT_START <= session < arch151.DEVELOPMENT_END
+        or arch151._SESSION_AUTHORITY.schedule_for(session) is None
+        for session in sessions
+    ):
+        raise ValueError("diagnostic sessions must be published development dates")
+    history_digest = _history_digest(history)
+    program = _slot_program(slot)
+    calibration, calibration_unavailable = _family_a_calibration_for_slot(
+        history, history_digest, slot, program, year, calibration_cache
+    )
+    if calibration_unavailable:
+        first_session = sessions[0]
+        schedule = arch151._SESSION_AUTHORITY.schedule_for(first_session)
+        assert schedule is not None
+        results = []
+        for case in arch151.EVALUATION_ECONOMICS_ORDER:
+            failure = _failure_evidence(
+                source_digest=history_digest,
+                slot=slot,
+                session=first_session,
+                kind=ReplayFailureKind.CALIBRATION_UNAVAILABLE,
+                liquidation_boundary=schedule.closes_at.astimezone(UTC)
+                - timedelta(minutes=5),
+                position=None,
+                pending=None,
+                last_observed_timestamp=None,
+            )
+            record = SessionReplayRecord(
+                _session_replay_id(
+                    history_digest,
+                    slot,
+                    case,
+                    first_session,
+                    (),
+                    failure,
+                    (),
+                ),
+                first_session,
+                Decimal(1),
+                None,
+                None,
+                (),
+                (),
+                (),
+                (),
+                Decimal(0),
+                failure,
+                (),
+            )
+            if on_session_replay is not None:
+                on_session_replay(_SessionReplayProgress(year, slot, case, record))
+            results.append(_DiagnosticSlotSessions(slot, case, year, False, (record,)))
+        return tuple(results)
+    try:
+        cache = preparation_cache or _PreparationCache(history)
+    except Exception as error:
+        raise AnnualReplayFailure(
+            AnnualReplayFailureContext(
+                year,
+                slot.program_id,
+                slot.slot_id,
+                slot.symbol,
+                None,
+                None,
+                AnnualReplayOperationStage.PROGRAM_FEATURE_PREPARATION,
+            )
+        ) from error
+    records_by_case = _replay_session_cost_cases(
+        history,
+        slot,
+        program,
+        year,
+        sessions,
+        cache,
+        calibration,
+        on_session_replay=on_session_replay,
+    )
+    return tuple(
+        _DiagnosticSlotSessions(
+            slot,
+            case,
+            year,
+            calibration is not None
+            if program.family is arch151.StrategyFamily.NOISE_VWAP_BREAKOUT
+            else None,
+            tuple(records_by_case[case]),
+        )
+        for case in arch151.EVALUATION_ECONOMICS_ORDER
+    )
+
+
+def _simulate_slot_year_cases(
+    history: SourceHistory,
+    slot: arch151.TrialSlot,
+    year: int,
+    *,
+    preparation_cache: _PreparationCache | None = None,
+    calibration_cache: _FamilyACalibrationCache | None = None,
+    on_session_replay: Callable[[_SessionReplayProgress], None] | None = None,
+) -> tuple[SlotYearReplay, ...]:
+    history_digest = _history_digest(history)
+    program = _slot_program(slot)
+    if type(year) is not int or year not in arch151.SCORED_YEARS:
+        raise ValueError("scored year is outside the frozen walk-forward period")
+    cases = arch151.EVALUATION_ECONOMICS_ORDER
+    calibration, calibration_unavailable = _family_a_calibration_for_slot(
+        history, history_digest, slot, program, year, calibration_cache
+    )
+    if calibration_unavailable:
+        first_session = arch151._published_sessions_for_year(year)[0]
+        schedule = arch151._SESSION_AUTHORITY.schedule_for(first_session)
+        assert schedule is not None
+        failure = _failure_evidence(
+            source_digest=history_digest,
+            slot=slot,
+            session=first_session,
+            kind=ReplayFailureKind.CALIBRATION_UNAVAILABLE,
+            liquidation_boundary=schedule.closes_at.astimezone(UTC)
+            - timedelta(minutes=5),
+            position=None,
+            pending=None,
+            last_observed_timestamp=None,
+        )
+        return tuple(
+            _slot_year_failure(history_digest, slot, year, case, failure)
+            for case in cases
+        )
+    try:
+        cache = preparation_cache or _PreparationCache(history)
+    except Exception as error:
+        raise AnnualReplayFailure(
+            AnnualReplayFailureContext(
+                year,
+                slot.program_id,
+                slot.slot_id,
+                slot.symbol,
+                None,
+                None,
+                AnnualReplayOperationStage.PROGRAM_FEATURE_PREPARATION,
+            )
+        ) from error
+    sessions_by_case = _replay_session_cost_cases(
+        history,
+        slot,
+        program,
+        year,
+        arch151._published_sessions_for_year(year),
+        cache,
+        calibration,
+        on_session_replay=on_session_replay,
+    )
     results = []
     for case in cases:
         try:
@@ -2901,8 +3087,11 @@ def _simulate_slot_year(
     )
 
 
-def simulate_canonical_year(
-    history: SourceHistory, scored_year: int
+def _simulate_canonical_year(
+    history: SourceHistory,
+    scored_year: int,
+    *,
+    on_session_replay: Callable[[_SessionReplayProgress], None] | None = None,
 ) -> CanonicalYearBatch:
     """Replay the immutable complete 32-slot × 3-economics population.
 
@@ -2950,6 +3139,7 @@ def simulate_canonical_year(
                 scored_year,
                 preparation_cache=program_cache,
                 calibration_cache=calibration_cache,
+                on_session_replay=on_session_replay,
             )
         )
     evaluations = tuple(evaluations_list)
@@ -2979,6 +3169,14 @@ def simulate_canonical_year(
         source_binding,
         _CANONICAL_YEAR_BATCH_SEAL,
     )
+
+
+def simulate_canonical_year(
+    history: SourceHistory, scored_year: int
+) -> CanonicalYearBatch:
+    """Replay one complete canonical year without an observer side channel."""
+
+    return _simulate_canonical_year(history, scored_year)
 
 
 def _validate_session_trade_cash(session: SessionReplayRecord) -> None:
@@ -4101,8 +4299,9 @@ def authenticate_development_evidence(
     if (
         candidate_qualification.slot_id != freeze.candidate_slot_id
         or not candidate_qualification.qualified
-        or candidate_evidence.probability
-        < arch151.SELECTION_BIAS_INPUT.minimum_probability
+        or not arch151._selection_bias_probability_meets_threshold(
+            candidate_evidence.probability
+        )
     ):
         raise arch151.AuthorizationUnavailableError(
             "the frozen candidate is not qualified by the complete development evidence"

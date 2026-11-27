@@ -903,6 +903,388 @@ def test_create_only_writer_preserves_collision_and_cli_has_no_period_override(
             "argument parsing must reject overrides before source inspection"
         ),
     )
-    with pytest.raises(SystemExit) as error:
-        operator.main(["--period", "2024"])
-    assert error.value.code == 2
+    assert operator.main(["--period", "2024"]) == 2
+
+
+def _install_offline_smoke_operator(
+    monkeypatch: pytest.MonkeyPatch,
+    root: Path,
+    *,
+    complete: bool,
+) -> tuple[dict[str, object], list[operator.OfflineMode]]:
+
+    run_shape = operator._offline_run_shape()
+    source = {
+        "branch": operator.EXPECTED_BRANCH,
+        "origin_fetch_url": operator.EXPECTED_ORIGIN,
+        "origin_push_url": operator.EXPECTED_ORIGIN,
+        "head": _HEAD,
+        "tree": _TREE,
+        "upstream": "origin/feature/research-arch151-intraday-walkforward-current",
+        "feature_tracking_head": _HEAD,
+        "feature_live_head": _HEAD,
+        "develop_tracking_head": "d" * 40,
+        "develop_live_head": "d" * 40,
+    }
+    preflight = {
+        "schema": operator._OFFLINE_PREFLIGHT_SCHEMA,
+        "status": operator.OfflineStatus.READY.value,
+        "expected_source_head": _HEAD,
+        "preflight_sha256": "e" * 64,
+        "source": source,
+        "run_shape": run_shape,
+        "custody_content_authenticated": False,
+    }
+    monkeypatch.setattr(operator, "OFFLINE_EVIDENCE_ROOT", root)
+    monkeypatch.setattr(operator, "preflight_offline", lambda _expected: preflight)
+    history = SimpleNamespace(
+        source_digest=_SOURCE_DIGEST,
+        validated_input_digest="f" * 64,
+    )
+    monkeypatch.setattr(operator, "_load_accepted_source_history", lambda: history)
+    monkeypatch.setattr(
+        operator,
+        "_offline_source_material",
+        lambda *_args: {
+            "source_digest": _SOURCE_DIGEST,
+            "validated_input_digest": "f" * 64,
+            "source_binding_id": str(UUID(int=91)),
+            "dataset_id": str(UUID(int=92)),
+            "custody_id": str(UUID(int=93)),
+            "evidence_id": str(UUID(int=94)),
+        },
+    )
+    called: list[operator.OfflineMode] = []
+
+    def fake_smoke(**kwargs):
+        called.append(kwargs["mode"])
+        evidence = {
+            "expected_session_cost_records": run_shape["expected_smoke_records"],
+            "observed_session_cost_records": run_shape["expected_smoke_records"],
+            "complete": complete,
+            "candidate_evaluation": "NOT_EVALUATED",
+            "qualification": "NOT_EVALUATED",
+            "source_attestation": None,
+            "records": [],
+        }
+        return operator._OfflineSmokeOutcome(evidence, complete)
+
+    monkeypatch.setattr(operator, "_offline_run_smoke", fake_smoke)
+    return preflight, called
+
+
+def test_e4_smoke_attempt_is_create_once_and_cannot_issue_qualification(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from trading_bot.experiments.arch151_intraday_walkforward_operator import (
+        OfflineMode,
+    )
+
+    root = tmp_path / "arch151-offline"
+    _, called = _install_offline_smoke_operator(monkeypatch, root, complete=True)
+    attempt_id = "12345678-1234-4234-8234-123456789abc"
+
+    result = operator._run_offline_attempt(OfflineMode.SMOKE, _HEAD, attempt_id)
+
+    attempt_root = root / "attempts" / attempt_id
+    terminal = json.loads((attempt_root / "attempt-result.json").read_text())
+    smoke = json.loads((attempt_root / "smoke" / "smoke.json").read_text())
+    original = {
+        item.name: item.read_bytes()
+        for item in attempt_root.iterdir()
+        if item.is_file()
+    }
+    duplicate = operator._run_offline_attempt(OfflineMode.SMOKE, _HEAD, attempt_id)
+
+    assert result["status"] == operator.OfflineStatus.COMPLETED.value
+    assert result["terminal_persisted"] is True
+    assert terminal["smoke_artifact"]["path"] == "smoke/smoke.json"
+    assert terminal["candidate_evaluation"] == "NOT_EVALUATED"
+    assert terminal["final_freeze_status"] == "NOT_EVALUATED"
+    assert terminal["source_attestation_id"] is None
+    assert smoke["candidate_evaluation"] == "NOT_EVALUATED"
+    assert smoke["qualification"] == "NOT_EVALUATED"
+    assert smoke["source_attestation"] is None
+    assert called == [OfflineMode.SMOKE]
+    assert duplicate["status"] == operator.OfflineStatus.NOT_RUN.value
+    assert duplicate["failure_code"] == "ATTEMPT_ALREADY_CONSUMED"
+    assert {
+        item.name: item.read_bytes()
+        for item in attempt_root.iterdir()
+        if item.is_file()
+    } == original
+
+
+def test_e4_campaign_persists_failed_smoke_without_annual_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from trading_bot.experiments.arch151_intraday_walkforward_operator import (
+        OfflineMode,
+    )
+
+    root = tmp_path / "arch151-offline"
+    _install_offline_smoke_operator(monkeypatch, root, complete=False)
+    monkeypatch.setattr(
+        evaluator,
+        "_simulate_canonical_year",
+        lambda *_args, **_kwargs: pytest.fail("incomplete smoke must stop campaign"),
+    )
+    attempt_id = "22345678-1234-4234-8234-123456789abc"
+
+    result = operator._run_offline_attempt(OfflineMode.CAMPAIGN, _HEAD, attempt_id)
+
+    attempt_root = root / "attempts" / attempt_id
+    terminal = json.loads((attempt_root / "attempt-result.json").read_text())
+    assert result["status"] == operator.OfflineStatus.INCOMPLETE.value
+    assert result["failure_code"] == "SMOKE_INCOMPLETE"
+    assert terminal["smoke_artifact"]["path"] == "campaign/smoke.json"
+    assert terminal["attempted_years"] == []
+    assert terminal["candidate_evaluation"] == "NOT_EVALUATED"
+    assert terminal["final_freeze_status"] == "NOT_EVALUATED"
+    assert terminal["source_attestation_id"] is None
+    assert not (attempt_root / "campaign" / "development-report.json").exists()
+
+
+def test_e4_reparse_failure_after_uuid_creation_is_consumed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "arch151-offline-reservation"
+    attempt_id = UUID("62345678-1234-4234-8234-123456789abc")
+    attempt_root = root / "attempts" / str(attempt_id)
+    real_check = operator._is_reparse_point
+
+    def fail_reserved_path(path: Path) -> bool:
+        if path == attempt_root:
+            raise operator.OperatorError(
+                operator.OperatorFailureCode.EVIDENCE_ROOT_INVALID
+            )
+        return real_check(path)
+
+    monkeypatch.setattr(operator, "OFFLINE_EVIDENCE_ROOT", root)
+    monkeypatch.setattr(operator, "_is_reparse_point", fail_reserved_path)
+
+    with pytest.raises(operator.OfflineError) as error:
+        operator._offline_reserve_attempt(attempt_id)
+
+    assert error.value.code is operator.OfflineFailureCode.EVIDENCE_ROOT_INVALID
+    assert error.value.attempt_reserved is True
+    assert attempt_root.is_dir()
+
+
+def test_e4_partial_smoke_uses_smoke_specific_schema(tmp_path: Path) -> None:
+    revision = _revision()
+    state = operator._OfflineAttemptState(
+        attempt_root=tmp_path,
+        attempt_id=UUID("72345678-1234-4234-8234-123456789abc"),
+        mode=operator.OfflineMode.SMOKE,
+        preflight={"run_shape": operator._offline_run_shape()},
+        revision=revision,
+        invocation_id=operator._invocation_id(revision),
+        started_ns=0,
+        source_digest=_SOURCE_DIGEST,
+        validated_input_digest="f" * 64,
+    )
+
+    partial = operator._offline_partial_smoke_material(
+        state=state,
+        progresses=[],
+        error=operator.OfflineError(operator.OfflineFailureCode.INTERRUPTED),
+    )
+
+    assert partial["schema"] == operator._OFFLINE_PARTIAL_SMOKE_SCHEMA
+
+
+def test_e4_cli_sanitizes_unknown_and_duplicate_arguments(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        operator,
+        "preflight_offline",
+        lambda *_args: pytest.fail("invalid arguments must not run preflight"),
+    )
+    assert operator.main(["--preflight-offline", "--mystery", "sensitive-value"]) == 2
+    assert "sensitive-value" not in capsys.readouterr().out
+    assert (
+        operator.main(
+            [
+                "--preflight-offline",
+                "--expected-source-head",
+                _HEAD,
+                "--expected-source-head",
+                _TREE,
+            ]
+        )
+        == 2
+    )
+    assert _HEAD not in capsys.readouterr().out
+    assert operator.main(["--preflight-offline", "--preflight-offline"]) == 2
+    assert "--preflight-offline" not in capsys.readouterr().out
+    assert operator.main(["--preflight-offline", "--run-offline-smoke"]) == 2
+    assert "--run-offline-smoke" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("tamper", ("same_length", "truncated"))
+def test_consumed_observation_binding_rechecks_generated_artifact_bytes(
+    tmp_path: Path, tamper: str
+) -> None:
+    root = tmp_path / f"consumed-observation-{tamper}"
+    root.mkdir()
+    artifact = root / "result.json"
+    original = b'{"status":"observed"}'
+    artifact.write_bytes(original)
+    commitment = (
+        artifact.name,
+        len(original),
+        hashlib.sha256(original).hexdigest(),
+    )
+
+    bound = operator._offline_observation_binding(
+        root,
+        (commitment,),
+        "00000000-0000-4000-8000-000000000001",
+    )
+    assert bound["artifacts"] == [
+        {
+            "name": artifact.name,
+            "byte_length": len(original),
+            "sha256": hashlib.sha256(original).hexdigest(),
+        }
+    ]
+
+    artifact.write_bytes(
+        original[:-1] if tamper == "truncated" else b'{"status":"tampered"}'
+    )
+    with pytest.raises(operator.OfflineError) as error:
+        operator._offline_observation_binding(
+            root,
+            (commitment,),
+            "00000000-0000-4000-8000-000000000001",
+        )
+    assert (
+        error.value.code is operator.OfflineFailureCode.PREDECESSOR_OBSERVATION_INVALID
+    )
+
+
+def test_e4_preflight_checks_metadata_and_frozen_shape_without_reading_custody(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from trading_bot.experiments import arch150_g1_discovery as arch150_d1r
+
+    expected_head = _HEAD
+    revision = operator.SourceRevision(
+        operator.EXPECTED_BRANCH,
+        operator.EXPECTED_ORIGIN,
+        expected_head,
+        _TREE,
+        _seal=operator._SOURCE_REVISION_SEAL,
+    )
+    source_snapshot = operator._OfflineSourceSnapshot(
+        revision,
+        expected_head,
+        "d" * 40,
+        expected_head,
+        "d" * 40,
+        f"origin/{operator.EXPECTED_BRANCH}",
+        operator.EXPECTED_ORIGIN,
+        operator.EXPECTED_ORIGIN,
+    )
+    custody_root = tmp_path / "accepted-metadata-only"
+    normalized = custody_root / "normalized"
+    normalized.mkdir(parents=True)
+    metadata_lengths = {
+        name: index + 1 for index, name in enumerate(arch150_d1r._ARTIFACT_LENGTHS)
+    }
+    monkeypatch.setattr(arch150_d1r, "_ARTIFACT_LENGTHS", metadata_lengths)
+    for name, byte_length in metadata_lengths.items():
+        path = custody_root.joinpath(*name.split("/"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x" * byte_length)
+    evidence_root = tmp_path / "offline-evidence"
+    evidence_root.parent.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(arch150_d1r, "ACCEPTED_INPUT_ROOT", custody_root)
+    monkeypatch.setattr(operator, "OFFLINE_EVIDENCE_ROOT", evidence_root)
+    monkeypatch.setattr(
+        operator, "_read_offline_source_snapshot", lambda _expected: source_snapshot
+    )
+    e1_binding = {"binding_id": str(UUID(int=9531)), "binding_sha256": "1" * 64}
+    e1_summary = {"observation_id": str(UUID(int=9532)), "binding_sha256": "2" * 64}
+    monkeypatch.setattr(
+        operator,
+        "_offline_e1_observation_binding",
+        lambda: (e1_binding, e1_summary),
+    )
+    e2_summary = {"observation_id": str(UUID(int=9533)), "binding_sha256": "3" * 64}
+
+    def validate_generated_e2(root, artifacts, observation_id, *, e1_binding=None):
+        assert root == operator.SUCCESSOR_EVIDENCE_ROOT
+        assert artifacts == operator._E2_CONSUMED_ARTIFACTS
+        assert observation_id == str(operator._E2_CONSUMED_ATTEMPT_ID)
+        assert e1_binding == {
+            "binding_id": str(UUID(int=9531)),
+            "binding_sha256": "1" * 64,
+        }
+        return e2_summary
+
+    monkeypatch.setattr(operator, "_offline_observation_binding", validate_generated_e2)
+    original_read_bytes = Path.read_bytes
+
+    def reject_custody_content(path: Path) -> bytes:
+        if path == custody_root or custody_root in path.parents:
+            pytest.fail("preflight must not read accepted custody content")
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", reject_custody_content)
+
+    result = operator.preflight_offline(expected_head)
+
+    shape = result["run_shape"]
+    assert result["status"] == operator.OfflineStatus.READY.value
+    assert result["custody_content_authenticated"] is False
+    assert result["consumed_observations"] == [e1_summary, e2_summary]
+    assert result["source"]["develop_tracking_head"] == "d" * 40
+    assert result["source"]["develop_live_head"] == "d" * 40
+    assert shape["program_count"] == 16
+    assert shape["slot_count"] == 32
+    assert shape["prior_trial_count"] == 29
+    assert shape["expected_campaign_replays"] == 480
+    assert shape["expected_smoke_records"] == 1056
+    assert len(shape["smoke_sessions"]) == 11
+    assert result["attempt_namespace"]["reserved_attempt_count"] == 0
+    assert not evidence_root.exists()
+
+
+def test_e4_cli_preflight_reports_verified_refs_without_authenticating_custody(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source = {
+        "tree": _TREE,
+        "feature_tracking_head": _HEAD,
+        "feature_live_head": _HEAD,
+        "develop_tracking_head": "d" * 40,
+        "develop_live_head": "d" * 40,
+    }
+    monkeypatch.setattr(
+        operator,
+        "preflight_offline",
+        lambda _expected: {
+            "expected_source_head": _HEAD,
+            "preflight_sha256": "e" * 64,
+            "source": source,
+            "custody_content_authenticated": False,
+        },
+    )
+
+    assert operator.main(["--preflight-offline", "--expected-source-head", _HEAD]) == 0
+    output = capsys.readouterr().out
+    assert f"SOURCE_TREE={_TREE}" in output
+    assert f"FEATURE_LIVE_HEAD={_HEAD}" in output
+    assert "CUSTODY_CONTENT_AUTHENTICATED=false" in output
+    assert "ATTEMPT_CREATED=false" in output
+
+
+def test_module_entrypoint_delegates_to_canonical_operator_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(operator, "main", lambda: 17)
+
+    assert operator._canonical_entrypoint_main() == 17

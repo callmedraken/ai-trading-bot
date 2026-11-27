@@ -1,6 +1,6 @@
 # Architecture 151 — Intraday walk-forward campaign
 
-**Status:** this document records the frozen design, accepted E2 source correction, consumed E1/E2 observations, E3 numerical-reliability correction, and E3's preserved mapped FULL timing failure. E3's source is not independently accepted or integrated; E3-C1 is the bounded synthetic test-fixture timing correction. Review its exact commit and mapped result before any source acceptance or integration. E2 source loading succeeded before the operator failed without a completed annual artifact; neither E3 nor E3-C1 reread custody or ran a real replay. Architecture 150 remains immutable and unchanged.
+**Status:** this document records the frozen design, accepted E2 source correction, consumed E1/E2 observations, E3 numerical-reliability correction and preserved mapped FULL timing failure, and the E3-C1 fixture correction. E4 adds a fixed read-only preflight, bounded smoke, and full campaign runner. E4 source acceptance remains pending exact commit review and mapped FULL; E4 implementation did not run its CLI, read custody content, or execute a real replay. E2 source loading succeeded before the operator failed without a completed annual artifact. Architecture 150 remains immutable and unchanged.
 
 ## 1. Purpose and information boundary
 
@@ -277,17 +277,138 @@ The targeted arithmetic audit also froze the demonstrated annual-path operations
 
 Annual replay exceptions carry sanitized scored-year, canonical program/slot, symbol, optional cost case, session date, and operation stage. The operator records failure stage, closed reason, root exception type, repository-owned function, and safe repository-relative file/line in failure schema v3. It preserves the existing failure code (including `UNCLASSIFIED_FAILURE` for the consumed E2 `ValueError` classification), partial annual evidence, and source-load reason. Exception messages, raw traceback text, locals, credentials, and absolute paths are excluded.
 
-#### Proposed offline diagnostics authority and evidence contract
+#### E4 offline preflight, smoke, and campaign runner
 
-E2's create-once qualification attempt surfaced a useful design split: ordinary debugging diagnostics should not require issuing qualification evidence or using the same one-shot route that can produce a candidate attestation. A future diagnostics-only operator could use this bounded contract:
+E2's consumed one-shot observation motivates separating a safe operator smoke
+from annual qualification. E4 implements a narrow offline interface in
+`arch151_intraday_walkforward_operator.py`; this source contract does not
+authorize executing it against the accepted custody. Exact source acceptance
+and mapped FULL review remain prerequisites to any later separately reviewed
+real invocation.
 
-1. A read-only preflight binds the exact branch, origin, HEAD, tree, clean source state, canonical manifest, accepted D1R dataset/custody/evidence identities, existing custody artifact inventory and normalized CSV commitments, and hashes/bindings of both consumed E1/E2 observations. Preflight reads no custody content and creates no attempt; it cannot compute or claim the full validated-input digest without reading that content.
-2. A separately reviewed explicit invocation names one exact source HEAD and uses only accepted 2016–2023 development history. During the invocation, the source-owned loader validates the fixed accepted artifacts and computes the complete validated-input digest, which is bound into the attempt evidence. The invocation creates a fresh create-once attempt in a dedicated diagnostics evidence namespace, separate from the qualification root. No source, symbol, program, period, dataset, output-path, or holdout override is exposed.
-3. Attempt evidence binds the exact source revision and custody provenance, frozen manifest and trial ledger, all 32 slots, all three economics cases, the five scored years, and expected/observed counts for each 96-record annual batch and all 480 records. Preserve every completed annual artifact and its digest if a later stage fails; write a terminal failure with exact completed-artifact references. Do not resume, overwrite, or automatically rerun a consumed attempt; a new invocation requires a fresh immutable attempt and reviewed bounds.
-4. The diagnostics report may contain descriptive replay, cost, calibration, and failure-stage results, but its type and issuer cannot call the qualification evaluator, source-attestation issuer, authenticated development-evidence issuer, final-freeze handoff, holdout authorization, or extension authorization. A future qualification observation remains a separate source-owned operator transition with its own exact-source review and evidence contract.
-5. Keep 2024+, provider/credential access, Robinhood/broker effects, paper/live effects, and production mutation outside the diagnostics route. Preserve both consumed observations and all frozen strategy and qualification semantics.
+The read-only preflight verifies the expected source HEAD against the current
+worktree path, branch, exact fetch and push origin URLs, clean source state,
+upstream and tracking refs, and live feature/develop refs from a targeted
+`git ls-remote` query. It performs no fetch or Git mutation. It binds the fixed
+manifest and ledger, requires the three ledger sources to sum to the frozen 29
+prior trials and the source-owned effective trial count of 64, checks metadata
+and lengths for the existing accepted-custody inventory, and verifies both
+consumed E1/E2 evidence bindings. It reads no custody content, creates no
+attempt, and reports `CUSTODY_CONTENT_AUTHENTICATED=false`. Preflight commits
+the custody identity and artifact metadata, not the validated-input digest,
+which only exists after the fixed loader reads and authenticates the inputs.
 
-This contract is a proposal only. E3 implements no diagnostics API or operator transition and runs no real diagnostic. ChatGPT must review and authorize the exact implementation and evidence contract before either route is built.
+Smoke and campaign require an explicit exact source HEAD and a canonical,
+non-nil attempt UUID. The parser rejects abbreviated, duplicate, mixed-mode,
+unknown, and extra arguments without echoing rejected values. Both modes
+reserve the same UUID namespace through one atomic create-only directory before
+source loading; a collision is `NOT_RUN`, while any failure after reservation
+is consumed and cannot be resumed or retried. The E4 attempt UUID is separate
+from the legacy deterministic invocation UUID, preserving predecessor
+identities and attestation validation. Each attempt has one mode child and
+create-once artifacts. A hard process kill can leave a consumed attempt with
+no terminal file; catchable failures and interrupts persist bounded progress
+and a terminal status where the filesystem remains writable.
+
+The fixed interface has exactly these argument forms:
+
+```text
+--preflight-offline --expected-source-head <exact-lowercase-git-object-id>
+--run-offline-smoke --expected-source-head <exact-lowercase-git-object-id> --attempt-id <canonical-nonzero-uuid>
+--run-offline-campaign --expected-source-head <exact-lowercase-git-object-id> --attempt-id <canonical-nonzero-uuid>
+```
+
+The form descriptions are not run instructions. Any future command requires
+independent review of the exact source, custody boundary and invocation bounds.
+For process-local type and issuer identity, the reviewed command uses
+`python -B -u -c`, inserts the selected checkout's `src` directory into
+`sys.path`, imports
+`trading_bot.experiments.arch151_intraday_walkforward_operator` canonically,
+and calls its `main([...])`. It does not use `runpy`; the `__main__` entry point
+delegates to the same canonical module.
+
+The process-local harness shape is:
+
+```powershell
+# Proposal only; do not execute until the exact source and bounds are reviewed.
+& $Python -B -u -c "import sys; sys.path.insert(0, r'F:\AI\worktrees\ai-trading-bot-arch151-intraday-walkforward-current\src'); from trading_bot.experiments import arch151_intraday_walkforward_operator as runner; raise SystemExit(runner.main(['--preflight-offline', '--expected-source-head', '<exact-reviewed-head>']))"
+```
+
+For a reviewed smoke or campaign form, replace the argument list with its
+matching form above and supply a fresh operator-generated canonical UUID. This
+example describes process identity only and does not authorize a preflight or
+real invocation.
+
+Synthetic tests call the CLI parser with stubbed preflight data to verify the
+display and sanitized argument rules. Synthetic evaluation/qualification tests
+exercise the fixed contracts; the E4 campaign path keeps the real production
+attestation issuer active and confirms it rejects synthetic provenance. These
+tests did not dispatch the real preflight, load accepted history, or evaluate a
+real candidate.
+
+The create-once namespace is
+`F:\AI\temp\arch151-offline-development\attempts\<uuid>\`. Each attempt holds
+`attempt.json`, `preflight.json`, `source-revision.json`, `source.json`, and the
+terminal `attempt-result.json`; sanitized failures are in
+`operator-failure.json`. Its single child is `smoke\` or `campaign\`. Smoke
+stores `smoke.json` or `partial-smoke.json`
+(`arch151-offline-partial-smoke/v1`). Campaign stores its smoke record,
+`year-2019.json` through `year-2023.json`, `development-report.json`,
+`source-attestation.json`, and `campaign.json` when those stages complete;
+current-year partial evidence is `partial-year-<year>.json`
+(`arch151-offline-partial-year/v1`). Terminal artifact paths are relative to
+the attempt root.
+
+Versioned E4 envelope schemas are `arch151-offline-preflight/v1`,
+`arch151-offline-attempt-namespace/v1`,
+`arch151-offline-attempt-claim/v1`,
+`arch151-offline-source-revision/v1`,
+`arch151-offline-authenticated-source/v1`,
+`arch151-offline-smoke-evidence/v1`,
+`arch151-offline-partial-smoke/v1`,
+`arch151-development-year-evidence/v1`,
+`arch151-offline-partial-year/v1`,
+`arch151-offline-failure/v1`,
+`arch151-offline-campaign-evidence/v1`, and
+`arch151-offline-terminal/v1`. The canonical development report remains
+`arch151-development-evaluation-report/v3`; its identity is independent of the
+E4 attempt UUID. Existing annual batch, run, report, selection-bias,
+attestation, and deterministic invocation schemas and identities are not
+redefined by E4.
+
+Both modes load and authenticate the accepted 2016–2023 source once per
+invocation. Smoke uses the first ten published 2019 sessions and the first
+published 2019 early close. It runs all 32 slots × three economics cases × 11
+sessions (1,056 session-cost records) through the actual diagnostic replay
+path, with Family A calibration restricted to strictly prior history. It
+checks the exact coordinate population, per-slot/cost equity chain from 1.0,
+cash reconciliation, and required liquidation. Smoke has no annual batch,
+canonical composition, report, qualification, source attestation, or
+authenticated evidence path; its terminal is always `NOT_EVALUATED`.
+
+Campaign must complete the same smoke before annual work. It then runs all five
+published 2019–2023 years using the canonical annual simulator and requires
+the exact source-bound 96 replay records in each year and 480 total.
+Structurally bound incomplete year batches are persisted once with their typed
+failure material, then stop before composition. Complete year batches are
+composed in memory through the unchanged qualification evaluator, canonical
+report serializer, source-attestation issuer, and authenticated one-candidate
+gate. Its terminal preserves the
+exact `FinalFreezeStatus`, including statistical unavailability versus a
+valid no-survivor result, and the original evidence, slot, freeze, and DSR
+identities when one candidate is authorized. An incomplete smoke or year
+cannot proceed to composition. Unexpected current-year failures retain
+completed session-cost material and sanitized source attribution; partial
+outputs are never composable.
+
+Progress is bounded to stage/slot/year counts and monotonic elapsed time. It
+includes the attempt UUID and expected populations but emits no per-minute
+rows, digests, or custody content. Terminal artifact references are relative
+to the attempt root. E1/E2 public routes remain permanently retired, including
+when their evidence roots are absent. E4 adds no provider, credential, broker,
+paper/live, 2024+, holdout, or extension reader or issuer. No E4 CLI operation,
+accepted-custody content read, or real replay was performed during this
+implementation.
 
 The later-period data path remains unavailable: there is no authenticated holdout or extension result issuer, 2024+/2026 reader, opener, or acquisition path, and no operation enforces or observes later-period execution. Pure synthetic qualifications cannot be used as authenticated results. E2 accessed only the authorized 2016–2023 source path and did not complete an annual replay; E3 did not read custody content. No holdout/extension source was read or replayed, and no 2024+ data was opened. The survivor classification requires the ordered same-candidate authenticated holdout and extension PASS records; it grants only `ARCH151_INTRADAY_RESEARCH_SURVIVOR` and no runtime, order, Robinhood, or live authority. Any paper/shadow translation study remains separately authorized.
 

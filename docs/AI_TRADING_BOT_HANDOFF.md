@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 E3-C1 integrated; E4 offline runner next
+## Current milestone: Architecture 151 E3-C1 integrated; E4 source review pending
 
 Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
@@ -139,21 +139,34 @@ E2 accessed the accepted development source path and did not produce an annual
 artifact; E3 did not access custody content. No later-period or holdout source
 was read or replayed. The E3 work adds deterministic Decimal behavior and
 sanitized attribution to the annual evaluator/operator, with synthetic-only
-focused verification. It does not perform an offline diagnostic replay or
-issue qualification evidence. The separate offline diagnostics proposal remains unimplemented. E4 is the
-next source-only milestone: one reusable development-only runner with fixed
-smoke-only and full-campaign modes, separate immutable attempts, source/custody
-provenance, progress and sanitized failure evidence. Full mode should load
-custody once, perform an operational smoke check, then evaluate and qualify
-the exact complete in-memory campaign using the existing frozen evaluator.
-Smoke results cannot select, tune, qualify or authorize candidates. Annual
-summary artifacts alone cannot reconstitute qualification authority; do not
-add a separate persisted replay reader or duplicate full diagnostic campaign
-without a separately reviewed need. E4 must retain both retired routes and
-all later-period and broker/provider prohibitions. No real custody-content
-read or replay during E4 implementation. Exact local invocation requires
-independent source/certification review and reviewed bounds. No source-only
-checkpoint grants real replay permission.
+focused verification. It did not perform an offline diagnostic replay or issue
+qualification evidence. E4 implements a fixed exact-source read-only preflight
+and reusable development-only runner with separate smoke-only and full-campaign
+modes. Preflight checks current local/live source refs, the consumed E1/E2
+bindings, custody metadata and frozen manifest/ledger without reading custody
+content or creating an attempt. Execution authenticates accepted 2016–2023
+history once, binds a canonical attempt UUID, and records bounded progress and
+sanitized failure evidence. Smoke replays the fixed 1,056-record 2019 diagnostic
+population and cannot compose, report, qualify, or attest. Campaign requires a
+complete smoke, then evaluates the full five-year 480-record population through
+the existing simulator, composer, report serializer, attestation issuer and
+authenticated evidence gate. Incomplete data never composes; catchable
+interrupts preserve available partial rows, while a hard kill can leave a
+consumed attempt unterminated. The exact terminal freeze status preserves
+statistical unavailability versus a valid no-survivor result.
+
+The E4 source candidate is not yet source-accepted or integrated. Exact-diff
+review, admission and mapped GitHub FULL are the next gates. No E4 CLI operation,
+accepted-custody content read, or real replay occurred during implementation.
+Synthetic tests called `main` to verify argument sanitization and a stubbed
+preflight display, and exercised the real attestation issuer's synthetic-source
+rejection; none dispatched current-source preflight, loaded accepted history,
+or evaluated a real candidate.
+The E1 and E2 routes remain permanently retired, and E4 does not resume or alter
+either consumed root. Annual summary artifacts still cannot reconstitute
+qualification authority; no separate persisted replay reader is added. All
+later-period, provider/credential, broker, paper/live and production boundaries
+remain unchanged. No source-only checkpoint grants real replay permission.
 2024-2025 remains sealed until a single authenticated qualifying development
 candidate and separate reviewed later-period authority; Jan-Oct 2026 remains
 sealed until that same candidate's authenticated holdout PASS. Actual later-

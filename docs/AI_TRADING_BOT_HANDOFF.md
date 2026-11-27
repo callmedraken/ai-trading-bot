@@ -13,7 +13,7 @@ data, AI request, or execution path is introduced.
 
 PM1 remains synthetic, disarmed, and preview-only. PM2A C3 remains the accepted
 implementation identity. The PM2A documentation lineage terminates at the
-historical C6-C3 predecessor; later C4/C5/C6/C6-C1/C6-C2 entries below are
+historical C6-C3 predecessor; earlier C4/C5/C6/C6-C1/C6-C2 entries below are
 historical documentation corrections, not a replacement implementation. Real
 PM2A read-only qualification remains **NOT YET AUTHORIZED**. The next bounded
 milestone is **PM2C — synthetic typed evidence/catalog/snapshot

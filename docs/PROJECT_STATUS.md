@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 E3-C1 integrated; E4 source review pending
+## Current milestone - Architecture 151 E3-C1 integrated; E4-C1 source review pending
 
 Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
@@ -49,6 +49,19 @@ content read occurred during implementation. Synthetic tests covered CLI
 argument sanitization, stubbed preflight display and rejection of synthetic
 provenance by the real attestation issuer.
 
+E4's first mapped FULL attempt `45916194897`, attempt 1, is preserved as a
+terminal timing failure on broad-1: 301.670 seconds against the unchanged
+300-second gate. The lane completed with 2,449 passed, one skipped, and zero
+test failures or errors; source-static, active-tests and the other six lanes
+passed. Failed job `140236126413` retains timing artifact `15162936229`.
+E4-C1 shares one module-scoped generated five-year SPY/QQQ history between the
+480-record annual regression and E4 smoke/partial tests. Its paired five-test
+selection passed and fell from 93.17 to 69.90 local seconds, without changing
+the annual or 1,056-record smoke assertions. This is a test-fixture correction;
+production source and certification timing inputs are unchanged. E4-C1 exact
+review and mapped FULL remain pending; the measured local saving is not hosted
+certification evidence.
+
 Architecture 150 remains terminal: 24 evaluated, 0 qualified,
 `NO_HOLDOUT_CANDIDATES`; no rerun or mutation. Arch151 reuses its accepted
 2016-2023 sparse SPY/QQQ custody without reacquisition. The frozen 16 programs /
@@ -60,18 +73,18 @@ The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Immediate next step: review the exact E4 source diff, complete admission, publish
-the single candidate, and inspect its mapped FULL terminal result before source
-acceptance. The E4 implementation is synthetic-tested only; do not run its real
-CLI or read accepted custody content in this checkpoint. Preserve E3's red run
-and do not rerun it. E1 and E2 public execution routes remain retired and fail
-closed even if the E2 evidence root is missing. E4 is a distinct current route;
-it does not resume, replace, or mutate either consumed predecessor. Review any
-future development result and its full trial accounting before a separately
-reviewed later-period decision. 2024–2025 and Jan–Oct 2026 remain sealed; real
-later-period readers/issuers are not implemented. Documentation or source
-publication does not authorize real replay, provider/credential access,
-broker/order effects, or 2024+ access.
+Immediate next step: review the exact E4-C1 test-and-documentation diff and
+focused evidence, then complete its one admission, one feature push and mapped
+FULL terminal result before deciding source acceptance. Do not rerun the E4
+candidate unchanged, invoke the real E4 CLI, or read accepted custody content.
+Preserve the E4 and E3 red runs. E1 and E2 public execution routes remain
+retired and fail closed even if the E2 evidence root is missing. E4 is a
+distinct current route; it does not resume, replace, or mutate either consumed
+predecessor. Review any future development result and its full trial accounting
+before a separately reviewed later-period decision. 2024–2025 and Jan–Oct 2026
+remain sealed; real later-period readers/issuers are not implemented.
+Documentation or source publication does not authorize real replay,
+provider/credential access, broker/order effects, or 2024+ access.
 
 ### Product direction and conditional roadmap
 

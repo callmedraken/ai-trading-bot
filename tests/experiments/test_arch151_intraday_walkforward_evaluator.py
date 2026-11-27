@@ -470,6 +470,11 @@ def _synthetic_five_year_campaign_history():
     return history, representative_sessions
 
 
+@pytest.fixture(scope="module")
+def generated_five_year_campaign_history():
+    return _synthetic_five_year_campaign_history()
+
+
 def _campaign_signal_session_minutes(
     session: date, *, include_flat_padding: bool = True
 ) -> tuple[arch151.OneMinuteBar, ...]:
@@ -1911,6 +1916,7 @@ def test_family_a_calibration_cache_matches_per_program_reference(
 
 def test_generated_five_year_simulation_composes_non_idle_480_records(
     monkeypatch: pytest.MonkeyPatch,
+    generated_five_year_campaign_history,
 ) -> None:
     source_measure_function = arch151._family_a_historical_measures_from_source_history
 
@@ -1922,7 +1928,7 @@ def test_generated_five_year_simulation_composes_non_idle_480_records(
     monkeypatch.setattr(
         arch151, "_family_a_historical_measures_from_source_history", campaign_measures
     )
-    history, representative_sessions = _synthetic_five_year_campaign_history()
+    history, representative_sessions = generated_five_year_campaign_history
     expected_binding = evaluator._synthetic_source_binding_for_test(
         history.source_digest
     )
@@ -3366,43 +3372,11 @@ def test_year_batch_identity_binds_complete_replay_outputs(
         evaluator.compose_development_evaluation((changed_first, *year_batches[1:]))
 
 
-@cache
-def _synthetic_e4_smoke_history():
-    current_minutes = []
-    smoke_sessions = operator._offline_smoke_sessions()
-    current_minutes.extend(
-        _campaign_signal_session_minutes(smoke_sessions[0], include_flat_padding=True)
-    )
-    for session in smoke_sessions[1:]:
-        schedule = arch151._SESSION_AUTHORITY.schedule_for(session)
-        assert schedule is not None
-        count = int((schedule.closes_at - schedule.opens_at).total_seconds() // 60)
-        for symbol in arch151.INITIAL_UNIVERSE:
-            current_minutes.extend(
-                arch151.OneMinuteBar(
-                    symbol,
-                    schedule.opens_at + timedelta(minutes=offset),
-                    Decimal("100"),
-                    Decimal("100.01"),
-                    Decimal("99.99"),
-                    Decimal("100"),
-                    100,
-                )
-                for offset in range(count)
-            )
-    return arch151._test_only_synthetic_source_history(
-        (
-            *_a_prior_minutes("SPY"),
-            *_a_prior_minutes("QQQ"),
-            *current_minutes,
-        )
-    )
-
-
 def test_e4_smoke_reuses_actual_simulator_for_fixed_population(
     monkeypatch: pytest.MonkeyPatch,
+    generated_five_year_campaign_history,
 ) -> None:
-    history = _synthetic_e4_smoke_history()
+    history, _ = generated_five_year_campaign_history
     revision = operator.SourceRevision(
         operator.EXPECTED_BRANCH,
         operator.EXPECTED_ORIGIN,
@@ -3483,8 +3457,9 @@ def test_e4_smoke_reuses_actual_simulator_for_fixed_population(
 
 def test_e4_smoke_interrupt_retains_completed_replay_material(
     monkeypatch: pytest.MonkeyPatch,
+    generated_five_year_campaign_history,
 ) -> None:
-    history = _synthetic_e4_smoke_history()
+    history, _ = generated_five_year_campaign_history
     real_simulate = evaluator._simulate_diagnostic_sessions
 
     def interrupt_after_first_record(
@@ -3858,9 +3833,12 @@ def test_e4_incomplete_bound_year_is_persisted_before_campaign_stops(
 
 @pytest.mark.parametrize("interrupted", (False, True))
 def test_e4_annual_failure_persists_completed_current_year_records(
-    tmp_path, monkeypatch: pytest.MonkeyPatch, interrupted: bool
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupted: bool,
+    generated_five_year_campaign_history,
 ) -> None:
-    history = _synthetic_e4_smoke_history()
+    history, _ = generated_five_year_campaign_history
     revision = operator.SourceRevision(
         operator.EXPECTED_BRANCH,
         operator.EXPECTED_ORIGIN,

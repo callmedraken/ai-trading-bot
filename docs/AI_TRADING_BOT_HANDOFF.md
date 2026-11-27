@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 E3-C1 integrated; E4 source review pending
+## Current milestone: Architecture 151 E3-C1 integrated; E4-C1 source review pending
 
 Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
@@ -155,13 +155,29 @@ interrupts preserve available partial rows, while a hard kill can leave a
 consumed attempt unterminated. The exact terminal freeze status preserves
 statistical unavailability versus a valid no-survivor result.
 
-The E4 source candidate is not yet source-accepted or integrated. Exact-diff
-review, admission and mapped GitHub FULL are the next gates. No E4 CLI operation,
-accepted-custody content read, or real replay occurred during implementation.
-Synthetic tests called `main` to verify argument sanitization and a stubbed
-preflight display, and exercised the real attestation issuer's synthetic-source
-rejection; none dispatched current-source preflight, loaded accepted history,
-or evaluated a real candidate.
+E4 candidate `1ca21d8e9af513198d442fb0b620de1c41dbc49b` / tree
+`f44799ffe0ac43ee9a6b014fd1852e12c2cbb645` was evaluated by mapped FULL run
+`45916194897`, attempt 1. It is preserved as terminal FAILURE only because
+broad-1 exceeded the unchanged 300-second hygiene ceiling: 301.670 seconds,
+with 2,449 passed, one skipped, and zero failures or errors. Failed job
+`140236126413` retains timing artifact `15162936229`; source-static,
+active-tests, and broad-2 through broad-7 passed. This red result is not
+source acceptance.
+
+E4-C1 shares the existing generated five-year history between the 480-record
+annual regression and smoke/interruption/partial-year tests. The paired local
+selection passed five tests in 69.90 seconds after fixture sharing versus
+93.17 seconds before; all smoke population, trade, and equity assertions remain
+active. No production source, authority, deterministic identity, timing weight,
+lane membership, or budget changes. Exact C1 review, one general admission,
+one feature push, and its mapped FULL terminal result remain pending. The
+measured local delta is not hosted timing evidence.
+
+No E4 CLI operation, accepted-custody content read, or real replay occurred
+during implementation. Synthetic tests called `main` to verify argument
+sanitization and a stubbed preflight display, and exercised the real attestation
+issuer's synthetic-source rejection; none dispatched current-source preflight,
+loaded accepted history, or evaluated a real candidate.
 The E1 and E2 routes remain permanently retired, and E4 does not resume or alter
 either consumed root. Annual summary artifacts still cannot reconstitute
 qualification authority; no separate persisted replay reader is added. All

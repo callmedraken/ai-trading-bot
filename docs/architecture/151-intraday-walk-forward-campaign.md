@@ -1,6 +1,6 @@
 # Architecture 151 — Intraday walk-forward campaign
 
-**Status:** this document records the frozen design, accepted E2 source correction, consumed E1/E2 observations, E3 numerical-reliability correction and preserved mapped FULL timing failure, and the E3-C1 fixture correction. E4 adds a fixed read-only preflight, bounded smoke, and full campaign runner. E4 source acceptance remains pending exact commit review and mapped FULL; E4 implementation did not run its CLI, read custody content, or execute a real replay. E2 source loading succeeded before the operator failed without a completed annual artifact. Architecture 150 remains immutable and unchanged.
+**Status:** this document records the frozen design, accepted E2 source correction, consumed E1/E2 observations, E3 numerical-reliability correction and preserved mapped FULL timing failure, and the E3-C1 fixture correction. E4 adds a fixed read-only preflight, bounded smoke, and full campaign runner. Its first mapped FULL attempt is preserved as a broad-1 timing failure with no test failures. E4-C1 is a test-only fixture-reuse correction; exact review and mapped FULL remain pending before source acceptance. No real E4 CLI operation, custody-content read, or replay occurred. E2 source loading succeeded before the operator failed without a completed annual artifact. Architecture 150 remains immutable and unchanged.
 
 ## 1. Purpose and information boundary
 

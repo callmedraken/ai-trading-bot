@@ -1,6 +1,6 @@
 # Architecture 151 — Validation plan and evidence boundary
 
-**Status:** this document records the accepted E2 source correction, both consumed observations, E3's numerical-reliability correction and preserved mapped FULL timing failure, the E3-C1 fixture correction, and the E4 offline-runner source candidate. E4 exact-diff review and mapped FULL are pending before source acceptance; implementation used synthetic tests only and did not run the E4 CLI or read accepted custody content.
+**Status:** this document records the accepted E2 source correction, both consumed observations, E3's numerical-reliability correction and preserved mapped FULL timing failure, the E3-C1 fixture correction, and E4's offline-runner candidate. E4 mapped FULL run `45916194897` attempt 1 is preserved as a broad-1 timing failure; all selected tests passed or skipped without failures. E4-C1 reuses the existing synthetic campaign history in smoke and partial-evidence tests. Its exact review and mapped FULL remain pending before source acceptance. No real E4 CLI operation, custody-content read, or replay occurred.
 
 ## 1. Scope and safety boundary
 
@@ -243,7 +243,7 @@ sanitization, create-once attempt behavior and the existing inclusive DSR
 threshold boundary. The E4 CLI was not invoked against the accepted source.
 
 The pre-edge E4 selection passed 27 cases in 64.68 seconds at
-`F:\AI\temp\pytest\arch151-e3-final-focused-719f3df1-d9da-46f4-8276-768e3d5e1c1b`.
+`F:\AI\temp\pytest\arch151-e4-final-focused-719f3df1-d9da-46f4-8276-768e3d5e1c1b`.
 After adding the structurally bound incomplete-batch, post-reservation reparse,
 and partial-schema regressions, the exact edited-edge selection passed 6 cases
 in 23.51 seconds at
@@ -270,6 +270,70 @@ seven-lane topology and 300-second ceiling unchanged. Do not run local canonical
 FULL. Earlier E1/E2 counts and timing, E3's preserved terminal failure, and
 E3-C1 focused measurements remain historical evidence.
 
+### E4-C1 fixture timing correction
+
+E4 candidate `1ca21d8e9af513198d442fb0b620de1c41dbc49b` / tree
+`f44799ffe0ac43ee9a6b014fd1852e12c2cbb645` was evaluated by mapped FULL run
+`45916194897`, attempt 1. Source-static, active-tests, and broad-2 through
+broad-7 passed. Broad-1 job `140236126413` completed 2,449 passed and one
+skipped test with zero failures/errors, but its certification hygiene wall was
+301.670 seconds against the unchanged 300-second ceiling. The run's timing
+artifact is `15162936229`. This is preserved red certification evidence, not
+source acceptance; no tests failed.
+
+E4-C1 changes only the evaluator test fixture. The existing generated
+five-year SPY/QQQ history is now one module-scoped fixture shared by the
+complete 480-record annual regression and E4 smoke, interrupt, and partial-year
+tests. It already contains both symbols' 60-session prior-only Family A
+calibration inputs and a non-idle B5 pattern on 2019-01-03, within the frozen
+smoke dates. Smoke still evaluates all 11 dates × 32 slots × 3 cost cases,
+checks its exact 1,056 coordinates, and proves non-idle fills/trades and equity
+reconciliation through the real diagnostic simulator. The annual path still
+asserts all five canonical batches and the exact 480-record report. No
+production evaluator/operator source, identities, assertions, timing inputs,
+lane assignments, or 300-second limit changed.
+
+The matched local paired selection used the same five tests in one process and
+the same interpreter, checkout, pytest config, and `--durations=15` options.
+Before sharing, the annual test call was 66.31 seconds, the smoke call was
+23.95 seconds (including its separate history construction), interrupt was
+0.66 seconds, and partial-year failures were 0.74/0.70 seconds; total was
+93.17 seconds. After sharing, the shared module fixture setup was 17.87
+seconds, annual call 47.62 seconds, smoke call 1.50 seconds, interrupt 0.68
+seconds, and partial-year failures 0.74/0.73 seconds; total was 69.90 seconds.
+Both selections passed 5/5. The paired process time fell 23.27 seconds; this
+is local measured evidence, not a claim that hosted runtime will fall by the
+same amount.
+
+If the entire measured 23.27-second delta transferred to the E4 hosted broad-1
+wall with every other cost and overhead unchanged, the arithmetic sensitivity
+would be 278.400 seconds, 21.600 seconds below the ceiling. That is not a
+hosted timing prediction or certification result; only the new mapped FULL
+attempt can establish the actual outcome. No timing overlay or lane topology
+change is proposed.
+
+The exact paired commands were:
+
+```powershell
+$python = 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe'
+$projectRoot = 'F:\AI\worktrees\ai-trading-bot-arch151-intraday-walkforward-current'
+$selection = 'generated_five_year_simulation_composes_non_idle_480_records or e4_smoke_reuses_actual_simulator_for_fixed_population or e4_smoke_interrupt_retains_completed_replay_material or e4_annual_failure_persists_completed_current_year_records'
+
+# Before, on E4 SHA 1ca21d8e9af513198d442fb0b620de1c41dbc49b:
+& $python -m pytest -q --durations=15 -p no:cacheprovider `
+  -c (Join-Path $projectRoot 'pyproject.toml') --rootdir $projectRoot `
+  --basetemp=F:\AI\temp\pytest\arch151-e4c1-before-772627d6-5492-4229-b397-36294f053c9d `
+  (Join-Path $projectRoot 'tests/experiments/test_arch151_intraday_walkforward_evaluator.py') `
+  -k $selection
+
+# After, with the E4-C1 fixture edit in the same checkout:
+& $python -m pytest -q --durations=15 -p no:cacheprovider `
+  -c (Join-Path $projectRoot 'pyproject.toml') --rootdir $projectRoot `
+  --basetemp=F:\AI\temp\pytest\arch151-e4c1-after-027266b1-b114-4bf0-a7ba-3fd04068fdea `
+  (Join-Path $projectRoot 'tests/experiments/test_arch151_intraday_walkforward_evaluator.py') `
+  -k $selection
+```
+
 Use the repository-approved interpreter resolved to this checkout and a fresh
 GUID basetemp under `F:\AI\temp\pytest` for each pytest invocation. Ruff and
 `git diff --check` retain their current whole-repository source-gate scope.
@@ -278,7 +342,7 @@ The route and GitHub-owned canonical FULL profile are specified in §3. Mapped c
 
 ## 5. Remaining holdout and extension authority boundary
 
-The offline development evaluator, canonical report, source-owned authenticated development-evidence issuer, and E4 offline source runner are implemented. E2 loaded the authorized 2016–2023 source and then failed before producing a completed annual artifact; E3/E4 implementation did not read custody content or run a real replay. Both E1 and E2 public execution routes are permanently retired, and the consumed attempts must remain unchanged. E4 exact-source review and mapped FULL are pending; no E4 real invocation occurred. The following capabilities remain unavailable and require separate authorization before either sealed later period can be opened:
+The offline development evaluator, canonical report, source-owned authenticated development-evidence issuer, and E4 offline source runner are implemented. E2 loaded the authorized 2016–2023 source and then failed before producing a completed annual artifact; E3/E4 implementation did not read custody content or run a real replay. Both E1 and E2 public execution routes are permanently retired, and the consumed attempts must remain unchanged. E4's first mapped FULL attempt failed only the broad-1 timing ceiling; E4-C1 exact review and mapped FULL remain pending before source acceptance. No E4 real invocation occurred. The following capabilities remain unavailable and require separate authorization before either sealed later period can be opened:
 
 - Any later real E4 invocation remains a separate reviewed action against the exact accepted source. The fixed smoke is non-authorizing; campaign qualification uses only the frozen five-year development population. No E4 execution, source attestation or candidate qualification was performed in this implementation checkpoint.
 - The source-owned evidence issuer is exercised only with synthetic rejection tests in this pass. A future accepted-source run must produce and bind its exact report, all 480 records, complete freeze/DSR evidence, and clean source revision before holdout authorization can be issued.

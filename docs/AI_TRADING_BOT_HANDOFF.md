@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 152-PM1 accepted/integrated; PM2A next
+## Current milestone: PM1 closed; PM2A source-only checkpoint pending review
 
 Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
@@ -37,23 +37,39 @@ It binds synthetic PM state under `F:\AI\portfolio-manager-state\pm1`,
 starts disarmed, and waits for the owner to click Start. It has no live
 placement method.
 
-The next substantive milestone is **Architecture 152-PM2A — read-only
-account-binding and reconciliation qualification**. Before writing new
-Robinhood-read behavior, review and compare working public references,
-especially `arunitmaity/robinhood-portfolio-mcp`,
-`jmfernandes/robin_stocks`, and `nirholas/robinhood-mcp`. Reuse or adapt
-only behavior whose account scope, pagination, completeness, authentication
-boundary and failure semantics are compatible with this repository. PM2A must
-establish the actual coverage of authorized account, position, quote,
-cash/buying-power and order reads and preserve explicit UNKNOWN/incomplete
-states when exhaustive reconciliation cannot be proved. It remains read-only
-and grants no execution authority.
+PM2A source work is scoped to the supplied feature worktree at parent HEAD
+`6cc6a815325b49165ef5d0f48af744707715dc1f` / tree
+`cb7cd3b5e422b65429782b42f1cfe822082e75cc`. The feature ref and canonical
+`develop` were independently verified at that same identity before edits. The
+canonical develop checkout had exactly 17 expected untracked artifacts; they
+were preserved. Pre-existing off-root worktree entries were left untouched.
 
-The following research checkpoint, PM2B, should separately define provider
-inputs, evidence provenance, model identity, cost limits, output validation and
-the fundamental/technical signal catalog before any real AI-provider request.
-Arch149 confirmation remains frozen until its existing calendar-2026 contract
-permits it.
+The public-reference review and complete source capability matrix are in
+[Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md).
+Focused synthetic verification is recorded in the
+[PM2A validation plan](validation/arch152-pm2a-brokerage-observation-validation.md).
+The current source query remains `ROBINHOOD_AGENTIC_BOUNDED` (selected account,
+`placed_agent=agentic`, seven-day window, bounded pages/rows); account-wide open
+orders and manual/external visibility are not proven. The new schema observer is
+source-only and has not contacted the provider. Current-provider order scope is
+`CURRENT_PROVIDER_ORDER_SCOPE_UNQUALIFIED` because actual schemas were not
+observed; no insufficiency conclusion or speculative endpoint/argument is
+claimed. The explicit stop result after any separately reviewed schema
+qualification is `CURRENT_PROVIDER_ORDER_SCOPE_INSUFFICIENT` if those schemas
+cannot prove exhaustive selected-account open equity orders.
+
+PM1 stays disarmed: previews are not dispatch authority, pending-order and
+missing/unknown safety checks remain blocking, and the current read facade still
+exposes only its five explicit read methods. Source publication, mapped CI and
+independent acceptance remain pending in this handoff. No real credentials,
+OAuth, provider requests, account/order reads, review/place/cancel/transfer, or
+production mutation occurred. A real read-only qualification is a separate
+reviewed next operation and is **NOT YET AUTHORIZED**.
+
+After PM2A acceptance, PM2B should separately define evidence provenance and
+the valuation/fundamental/technical signal catalog, with its own review of Qlib
+and PyPortfolioOpt. PM2B is not implemented here. Arch149 confirmation remains
+frozen until its existing calendar-2026 contract permits it.
 
 ### Prior terminal Arch151 evidence
 

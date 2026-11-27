@@ -48,6 +48,7 @@ def to_portfolio_state(observation: PortfolioObservation) -> PortfolioState:
         ObservationCondition.MISSING_VALUATION,
         ObservationCondition.NEGATIVE_CASH,
         ObservationCondition.UNSUPPORTED_ASSET,
+        ObservationCondition.ASSET_TYPE_UNKNOWN,
         ObservationCondition.SHORT_POSITION,
         ObservationCondition.POSITION_TYPE_UNKNOWN,
         ObservationCondition.BROKER_EQUITY_DIFFERS_FROM_LOCAL,

@@ -202,6 +202,7 @@ class ObservationCondition(StrEnum):
     UNKNOWN_ORDER_OWNER = "UNKNOWN_ORDER_OWNER"
     UNKNOWN_ORDER_STATE = "UNKNOWN_ORDER_STATE"
     UNSUPPORTED_ASSET = "UNSUPPORTED_ASSET"
+    ASSET_TYPE_UNKNOWN = "ASSET_TYPE_UNKNOWN"
     SHORT_POSITION = "SHORT_POSITION"
     POSITION_TYPE_UNKNOWN = "POSITION_TYPE_UNKNOWN"
     NEGATIVE_CASH = "NEGATIVE_CASH"
@@ -239,7 +240,7 @@ class PositionObservation:
     average_cost: Decimal | None
     current_price: Decimal | None
     price_observed_at: datetime | None
-    supported: bool = True
+    supported: bool | None = None
     position_type: PositionType = PositionType.LONG
 
     def __post_init__(self) -> None:
@@ -268,8 +269,8 @@ class PositionObservation:
                 "price_observed_at",
                 normalize_utc(self.price_observed_at, "price_observed_at"),
             )
-        if not isinstance(self.supported, bool):
-            raise TypeError("supported must be a bool")
+        if self.supported is not None and not isinstance(self.supported, bool):
+            raise TypeError("supported must be a bool or None")
         if not isinstance(self.position_type, PositionType):
             raise TypeError("position_type must be PositionType")
         expected_type = (
@@ -456,8 +457,10 @@ class PortfolioObservation:
             generated.append(ObservationCondition.MISSING_BUYING_POWER)
         if self.unleveraged_buying_power is None:
             generated.append(ObservationCondition.MISSING_UNLEVERAGED_BUYING_POWER)
-        if any(not item.supported for item in positions):
+        if any(item.supported is False for item in positions):
             generated.append(ObservationCondition.UNSUPPORTED_ASSET)
+        if any(item.supported is None for item in positions):
+            generated.append(ObservationCondition.ASSET_TYPE_UNKNOWN)
         if any(item.quantity < _ZERO for item in positions):
             generated.append(ObservationCondition.SHORT_POSITION)
         if any(item.position_type is PositionType.UNKNOWN for item in positions):
@@ -557,7 +560,9 @@ class PortfolioObservation:
                     "none"
                     if position.price_observed_at is None
                     else position.price_observed_at.isoformat(),
-                    str(position.supported),
+                    "unknown"
+                    if position.supported is None
+                    else str(position.supported),
                     position.position_type.value,
                 )
             )
@@ -622,6 +627,7 @@ class PortfolioObservation:
             ObservationCondition.QUOTES_INCOMPLETE,
             ObservationCondition.PAGINATION_INCOMPLETE,
             ObservationCondition.UNSUPPORTED_ASSET,
+            ObservationCondition.ASSET_TYPE_UNKNOWN,
             ObservationCondition.SHORT_POSITION,
             ObservationCondition.POSITION_TYPE_UNKNOWN,
             ObservationCondition.NEGATIVE_CASH,

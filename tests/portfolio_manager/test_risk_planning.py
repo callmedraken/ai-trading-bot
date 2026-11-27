@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import timedelta
 from decimal import Decimal
 
+import pytest
+
 from trading_bot.domain import Symbol
 from trading_bot.portfolio_manager import (
     Action,
@@ -68,7 +70,12 @@ def _risk(observation, research, batch, policy=None):  # type: ignore[no-untyped
 
 
 def _order(
-    symbol: str, *, state="open", ownership=OrderOwnership.BOT, identifier="order-1"
+    symbol: str,
+    *,
+    state="open",
+    ownership=OrderOwnership.BOT,
+    identifier="order-1",
+    filled_quantity=Decimal("0"),
 ):
     return OrderObservation(
         order_id=identifier,
@@ -76,7 +83,7 @@ def _order(
         side="buy",
         state=state,
         quantity=Decimal("10"),
-        filled_quantity=Decimal("0"),
+        filled_quantity=filled_quantity,
         created_at=NOW - timedelta(minutes=1),
         ownership=ownership,
     )
@@ -98,6 +105,36 @@ def test_pending_order_conflicts_cover_unheld_opportunity_symbols():
     research = make_research(observation, opportunity_quotes=(("GLD", "100"),))
     batch = _batch(observation, research, ("GLD", Action.BUY, Decimal("1")))
     result = _risk(observation, research, batch)[0]
+    assert result.disposition is RiskDisposition.BLOCKED
+    assert RiskCode.PENDING_ORDER_CONFLICT in result.codes
+
+
+@pytest.mark.parametrize(
+    "state,filled_quantity",
+    [
+        ("queued", Decimal("0")),
+        ("pending", Decimal("0")),
+        ("confirmed", Decimal("0")),
+        ("partially_filled", Decimal("2")),
+    ],
+)
+def test_open_order_states_and_partial_fills_remain_pending(state, filled_quantity):
+    partial = _order(
+        "GLD",
+        state=state,
+        ownership=OrderOwnership.UNKNOWN,
+        identifier=f"pending-{state}",
+        filled_quantity=filled_quantity,
+    )
+    assert partial.pending
+    if state == "partially_filled":
+        assert partial.filled_quantity == Decimal("2")
+
+    observation = make_observation(orders=(partial,))
+    research = make_research(observation, opportunity_quotes=(("GLD", "100"),))
+    batch = _batch(observation, research, ("GLD", Action.BUY, Decimal("1")))
+    result = _risk(observation, research, batch)[0]
+
     assert result.disposition is RiskDisposition.BLOCKED
     assert RiskCode.PENDING_ORDER_CONFLICT in result.codes
 

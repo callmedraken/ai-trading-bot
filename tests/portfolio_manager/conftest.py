@@ -35,7 +35,8 @@ def make_position(
     cost: str | None = "90",
     available: str | None = None,
     price_at: datetime = NOW,
-    supported: bool = True,
+    # Synthetic fixtures model a known supported equity unless a test opts out.
+    supported: bool | None = True,
     position_type: PositionType | None = None,
 ) -> PositionObservation:
     quantity_value = Decimal(quantity)

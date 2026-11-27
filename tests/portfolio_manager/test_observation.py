@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 
+from trading_bot.desktop_paper.robinhood_reconciliation import MAX_POSITION_PAGES
 from trading_bot.portfolio_manager import (
     AccountBindingStatus,
     ObservationCondition,
@@ -176,6 +177,8 @@ def test_fake_robinhood_transport_adopts_fractional_holdings_without_filling_his
     assert result.positions[0].quantity == Decimal("1.5")
     assert result.positions[0].available_to_sell == Decimal("1.0")
     assert result.positions[0].average_cost is None
+    assert result.positions[0].supported is None
+    assert ObservationCondition.ASSET_TYPE_UNKNOWN in result.conditions
     assert result.positions[0].unrealized_pnl is None
     assert result.positions[1].average_cost == Decimal("190")
     assert result.positions[1].price_observed_at == NOW
@@ -208,6 +211,79 @@ def test_unknown_position_classification_and_explicit_unsupported_hint_stay_visi
     assert result.positions[0].supported is False
     assert ObservationCondition.UNSUPPORTED_ASSET in result.conditions
     assert not result.preview_eligible
+
+
+@pytest.mark.parametrize("page_kind", ["positions", "orders"])
+def test_row_account_echo_mismatch_blocks_before_adopting_rows(page_kind: str):
+    reads = FakeRead()
+    raw_account = "MISMATCHED-ROW-ACCOUNT"
+    if page_kind == "positions":
+        reads.position_pages = [
+            {"data": {"positions": [{"account_number": raw_account}]}}
+        ]
+    else:
+        reads.order_pages = [{"data": {"orders": [{"account_number": raw_account}]}}]
+
+    with pytest.raises(PortfolioObservationError) as caught:
+        observe_robinhood_portfolio(
+            reads,
+            observed_at=NOW,
+            selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
+        )
+
+    assert caught.value.code == "ACCOUNT_ECHO_MISMATCH"
+    assert caught.value.condition is ObservationCondition.ACCOUNT_MISMATCH
+    assert raw_account not in str(caught.value)
+
+
+def test_missing_cash_and_buying_power_remain_unknown():
+    reads = FakeRead()
+    reads.portfolio["data"].pop("cash")
+    reads.portfolio["data"].pop("buying_power")
+
+    result = observe_robinhood_portfolio(
+        reads,
+        observed_at=NOW,
+        selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
+    )
+
+    assert result.cash is None
+    assert result.buying_power is None
+    assert result.unleveraged_buying_power is None
+    assert ObservationCondition.MISSING_CASH in result.conditions
+    assert ObservationCondition.MISSING_BUYING_POWER in result.conditions
+    assert ObservationCondition.MISSING_UNLEVERAGED_BUYING_POWER in result.conditions
+    assert not result.preview_eligible
+
+
+def test_missing_unleveraged_buying_power_stays_unknown():
+    reads = FakeRead()
+    reads.portfolio["data"]["buying_power"].pop("unleveraged_buying_power")
+
+    result = observe_robinhood_portfolio(
+        reads,
+        observed_at=NOW,
+        selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
+    )
+
+    assert result.buying_power == Decimal("8850")
+    assert result.unleveraged_buying_power is None
+    assert ObservationCondition.MISSING_UNLEVERAGED_BUYING_POWER in result.conditions
+    assert not result.preview_eligible
+
+
+def test_empty_next_cursor_retains_current_terminal_sentinel():
+    reads = FakeRead()
+    reads.position_pages = [{"data": {"positions": [], "next": ""}}]
+
+    result = observe_robinhood_portfolio(
+        reads,
+        observed_at=NOW,
+        selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
+    )
+
+    assert result.positions == ()
+    assert result.coverage.pagination_complete
 
 
 def test_cash_only_account_is_valid_and_stable_account_namespace_isolated():
@@ -269,6 +345,86 @@ def test_malformed_pagination_is_explicit_and_prevents_quote_reads():
             selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
         )
     assert caught.value.condition is ObservationCondition.PAGINATION_INCOMPLETE
+    assert not any(name == "quotes" for name, _ in reads.calls)
+
+
+@pytest.mark.parametrize(
+    "position_page",
+    [
+        {"data": {"positions": [], "next": []}},
+        {"data": {"positions": [], "next": "x" * 4097}},
+    ],
+)
+def test_invalid_position_cursor_is_incomplete(position_page):
+    reads = FakeRead()
+    reads.position_pages = [position_page]
+
+    with pytest.raises(PortfolioObservationError) as caught:
+        observe_robinhood_portfolio(
+            reads,
+            observed_at=NOW,
+            selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
+        )
+
+    assert caught.value.code == "POSITIONS_CURSOR_INVALID"
+    assert caught.value.condition is ObservationCondition.PAGINATION_INCOMPLETE
+    assert not any(name == "quotes" for name, _ in reads.calls)
+
+
+def test_position_page_limit_is_incomplete_without_partial_observation():
+    reads = FakeRead()
+    reads.position_pages = [
+        {"data": {"positions": [], "next": f"page-{index}"}}
+        for index in range(MAX_POSITION_PAGES)
+    ]
+
+    with pytest.raises(PortfolioObservationError) as caught:
+        observe_robinhood_portfolio(
+            reads,
+            observed_at=NOW,
+            selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
+        )
+
+    assert caught.value.code == "POSITIONS_PAGE_BOUND_EXCEEDED"
+    assert caught.value.condition is ObservationCondition.PAGINATION_INCOMPLETE
+    assert not any(name == "quotes" for name, _ in reads.calls)
+
+
+def test_later_position_page_failure_does_not_return_partial_success():
+    class LaterPageFailure(FakeRead):
+        def get_equity_positions(self, arguments):
+            self.calls.append(("positions", dict(arguments)))
+            if "cursor" in arguments:
+                raise RuntimeError("raw provider response and token")
+            return {"data": {"positions": [], "next": "page-2"}}
+
+    reads = LaterPageFailure()
+
+    with pytest.raises(PortfolioObservationError) as caught:
+        observe_robinhood_portfolio(
+            reads,
+            observed_at=NOW,
+            selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
+        )
+
+    assert caught.value.code == "POSITIONS_READ_FAILED"
+    assert caught.value.condition is ObservationCondition.PAGINATION_INCOMPLETE
+    assert "token" not in str(caught.value)
+    assert not any(name == "quotes" for name, _ in reads.calls)
+
+
+def test_duplicate_position_rows_are_rejected_before_quote_reads():
+    reads = FakeRead()
+    reads.positions = [reads.positions[0], reads.positions[0]]
+
+    with pytest.raises(PortfolioObservationError) as caught:
+        observe_robinhood_portfolio(
+            reads,
+            observed_at=NOW,
+            selected_account_fingerprint=hashlib.sha256(ACCOUNT.encode()).hexdigest(),
+        )
+
+    assert caught.value.code == "POSITION_SYMBOL_DUPLICATE"
     assert not any(name == "quotes" for name, _ in reads.calls)
 
 

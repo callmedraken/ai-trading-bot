@@ -13,7 +13,6 @@ from trading_bot.desktop_paper.robinhood_read import (
     data,
     decimal_value,
     parse_order,
-    parse_portfolio,
     parse_position,
     resolve_account,
 )
@@ -193,6 +192,49 @@ def adopt_portfolio_observation(
     )
 
 
+def _portfolio_values(
+    payload: Mapping[str, object],
+) -> tuple[
+    Decimal | None, Decimal | None, Decimal | None, Decimal | None, Decimal | None
+]:
+    """Preserve missing portfolio facts as None; accept only known USD units."""
+    root = data(payload)
+    currency = root.get("currency")
+    if currency not in (None, "USD"):
+        raise PortfolioObservationError("PORTFOLIO_CURRENCY_UNSUPPORTED")
+    power = root.get("buying_power")
+    if power is not None and not isinstance(power, Mapping):
+        raise PortfolioObservationError("PORTFOLIO_INVALID")
+    if currency != "USD":
+        # Unitless values cannot be safely adopted as dollars.
+        return None, None, None, None, None
+
+    def optional_amount(container: Mapping[str, object], key: str) -> Decimal | None:
+        value = container.get(key)
+        return None if value is None else decimal_value(value)
+
+    total_value = optional_amount(root, "total_value")
+    cash = optional_amount(root, "cash")
+    equity_value = optional_amount(root, "equity_value")
+    buying_power: Decimal | None = None
+    unleveraged_buying_power: Decimal | None = None
+    if isinstance(power, Mapping) and power.get("display_currency") == "USD":
+        buying_power = optional_amount(power, "buying_power")
+        unleveraged_buying_power = optional_amount(power, "unleveraged_buying_power")
+    elif isinstance(power, Mapping) and power.get("display_currency") not in (
+        None,
+        "USD",
+    ):
+        raise PortfolioObservationError("PORTFOLIO_CURRENCY_UNSUPPORTED")
+    return (
+        total_value,
+        cash,
+        equity_value,
+        buying_power,
+        unleveraged_buying_power,
+    )
+
+
 def _read_pages(
     read: Callable[[Mapping[str, object]], Mapping[str, object]],
     *,
@@ -223,6 +265,7 @@ def _read_pages(
                 f"{key.upper()}_PAGE_INVALID",
                 condition=ObservationCondition.PAGINATION_INCOMPLETE,
             )
+        _validate_row_account_echo(items, expected_account_number)
         rows.extend(items)
         cursor = page.get("next")
         if cursor in (None, ""):
@@ -254,6 +297,23 @@ def _validate_account_echo(
         )
 
 
+def _validate_row_account_echo(
+    rows: list[object], expected_account_number: str | None
+) -> None:
+    """Reject a returned row explicitly bound to a different account."""
+    if expected_account_number is None:
+        return
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        echoed = row.get("account_number")
+        if echoed is not None and echoed != expected_account_number:
+            raise PortfolioObservationError(
+                "ACCOUNT_ECHO_MISMATCH",
+                condition=ObservationCondition.ACCOUNT_MISMATCH,
+            )
+
+
 def _position_type(value: str) -> PositionType:
     return {
         "long": PositionType.LONG,
@@ -273,10 +333,14 @@ def _position_facts(
         for name in ("asset_type", "asset_class", "instrument_type")
         if value.get(name) is not None
     )
-    supported = all(
-        isinstance(asset_hint, str)
-        and asset_hint.casefold() in {"equity", "stock", "etf", "equity_etf"}
-        for asset_hint in asset_hints
+    supported: bool | None = (
+        None
+        if not asset_hints
+        else all(
+            isinstance(asset_hint, str)
+            and asset_hint.casefold() in {"equity", "stock", "etf", "equity_etf"}
+            for asset_hint in asset_hints
+        )
     )
     try:
         parsed = parse_position(value)
@@ -406,7 +470,7 @@ def observe_robinhood_portfolio(
             try:
                 portfolio_payload = scoped.get_portfolio(arguments)
                 _validate_account_echo(portfolio_payload, raw_account_number)
-                broker_portfolio = parse_portfolio(portfolio_payload)
+                portfolio_facts = _portfolio_values(portfolio_payload)
             except PortfolioObservationError:
                 raise
             except Exception:
@@ -498,7 +562,7 @@ def observe_robinhood_portfolio(
             )
             coverage = ObservationCoverage(
                 account_bound=True,
-                portfolio_complete=True,
+                portfolio_complete=all(value is not None for value in portfolio_facts),
                 positions_complete=True,
                 quotes_complete=quote_coverage,
                 pagination_complete=True,
@@ -508,11 +572,11 @@ def observe_robinhood_portfolio(
                 binding,
                 observed_at=stamp,
                 observed_account_fingerprint=binding.fingerprint,
-                broker_reported_equity=broker_portfolio.total_value,
-                broker_reported_position_value=broker_portfolio.equity_value,
-                cash=broker_portfolio.cash,
-                buying_power=broker_portfolio.buying_power,
-                unleveraged_buying_power=broker_portfolio.unleveraged_buying_power,
+                broker_reported_equity=portfolio_facts[0],
+                broker_reported_position_value=portfolio_facts[2],
+                cash=portfolio_facts[1],
+                buying_power=portfolio_facts[3],
+                unleveraged_buying_power=portfolio_facts[4],
                 positions=tuple(positions),
                 orders=orders,
                 coverage=coverage,

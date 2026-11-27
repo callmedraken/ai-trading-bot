@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 152-PM1 accepted/integrated; PM2A next
+## Current milestone - PM1 closed; PM2A source-only checkpoint pending review
 
 Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
@@ -26,17 +26,20 @@ planning, durable service and synthetic desktop contracts remain as documented
 in [Architecture 152-PM1](architecture/152-pm1-account-aware-portfolio-manager.md)
 and the [validation record](validation/arch152-pm1-portfolio-manager-foundation.md).
 
-The next substantive milestone is **Architecture 152-PM2A — read-only
-account-binding and reconciliation qualification**. Before adding new
-Robinhood-read implementation, compare the accepted transport against working
-public references including `arunitmaity/robinhood-portfolio-mcp`,
-`jmfernandes/robin_stocks`, and `nirholas/robinhood-mcp`; reuse proven
-patterns only after compatibility, account-scope, pagination, completeness and
-security review. PM2A must establish what authorized account, position, quote,
-cash/buying-power and order reads actually cover, and fail closed where
-account-wide exhaustiveness is unproven. The separate PM2B research milestone
-will define AI/fundamental/technical signal inputs and provenance. Arch149's
-frozen 2024-2026 confirmation remains sealed.
+Architecture 152-PM2A is the current source-only checkpoint. Its public-reference
+review, bounded capability matrix, and metadata-only schema qualification path
+are recorded in [Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md)
+and its [validation record](validation/arch152-pm2a-brokerage-observation-validation.md).
+The source preserves `ROBINHOOD_AGENTIC_BOUNDED`; actual provider schemas and
+account-wide open-order semantics remain unobserved. No source acceptance,
+mapped CI result, integration, or real qualification is claimed here. The next
+safe transition after source publication, mapped CI, and independent exact-source
+acceptance is a separately reviewed read-only qualification proposal. It is not
+authorized or performed by this source checkpoint.
+
+PM2B remains the separate research milestone for valuation/fundamental and
+technical signal provenance; it is not part of PM2A. Arch149's frozen 2024-2026
+confirmation remains sealed.
 
 ### Terminal Architecture 151 background
 
@@ -113,9 +116,10 @@ cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
 Architecture 151's research and execution are closed. PM1 source,
-certification and integration are also closed as recorded above. PM2A is the
-next separately reviewed read-only qualification; it does not reopen Arch151
-or authorize Arch149 confirmation.
+certification and integration are also closed as recorded above. PM2A is a
+separate source-only observation checkpoint; it does not reopen Arch151 or
+authorize Arch149 confirmation. Any later real Robinhood read requires its own
+exact-source review and separate authorization.
 Preserve the E4 and E3 red runs. E1 and E2 public execution routes remain
 retired and fail closed even if the E2 evidence root is missing. E4 is a
 distinct current route; it does not resume, replace, or mutate either consumed

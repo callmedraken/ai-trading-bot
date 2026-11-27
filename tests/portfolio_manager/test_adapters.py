@@ -55,6 +55,15 @@ def test_cash_only_and_unknown_cost_observations_remain_observation_only() -> No
         to_portfolio_state(unknown_cost)
 
 
+def test_unknown_asset_classification_blocks_preview_and_strict_conversion() -> None:
+    unknown_asset = make_observation((make_position("SPY", supported=None),))
+
+    assert ObservationCondition.ASSET_TYPE_UNKNOWN in unknown_asset.conditions
+    assert not unknown_asset.preview_eligible
+    with pytest.raises(PortfolioStateAdapterError, match="NOT_STRICTLY_VALUED"):
+        to_portfolio_state(unknown_asset)
+
+
 def test_stale_and_reconciliation_conditions_block_strict_conversion() -> None:
     base = make_observation((make_position("SPY"),))
     stale = replace(base, conditions=(ObservationCondition.STALE_PRICE,))

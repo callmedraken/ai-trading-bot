@@ -79,6 +79,7 @@ class SyntheticDemoObservationSource:
                 average_cost=Decimal("450"),
                 current_price=Decimal("520"),
                 price_observed_at=stamp,
+                supported=True,
             ),
             PositionObservation(
                 symbol=Symbol("TLT"),
@@ -87,6 +88,7 @@ class SyntheticDemoObservationSource:
                 average_cost=None,
                 current_price=Decimal("95"),
                 price_observed_at=stamp,
+                supported=True,
             ),
         )
         return PortfolioObservation(

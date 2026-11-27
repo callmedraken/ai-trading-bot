@@ -5,6 +5,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from threading import Lock
 
 import pytest
@@ -217,7 +218,9 @@ class _FakeTransport(_FakeRead):
 
 
 def _prepare(monkeypatch, tmp_path, *, schema=None, reader_factory=None):
-    monkeypatch.setattr(attempt, "_ATTEMPT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        attempt, "_resolve_attempt_root", lambda: tmp_path.resolve(strict=True)
+    )
     monkeypatch.setattr(attempt, "_capture_source_identity", _source)
     events: list[str] = []
 
@@ -257,6 +260,15 @@ def _run_attempt(
         selected_account_fingerprint=selected_account_fingerprint,
         oauth_factory=oauth_factory,
     )
+
+
+def test_default_attempt_root_rejects_non_f_drive(monkeypatch) -> None:
+    non_f_root = Path(r"C:\Windows")
+    assert non_f_root.is_dir()
+    monkeypatch.setattr(attempt, "_ATTEMPT_ROOT", non_f_root)
+
+    with pytest.raises(ValueError, match="attempt root rejected"):
+        attempt._resolve_attempt_root()
 
 
 def test_schema_incomplete_reserves_before_provider_and_stops_before_reads(

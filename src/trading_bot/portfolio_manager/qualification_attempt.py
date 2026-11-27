@@ -473,9 +473,7 @@ def _reserve_attempt(
     expected_source_tree: str,
     selected_account_fingerprint: str,
 ) -> tuple[Path, str]:
-    root = _ATTEMPT_ROOT.resolve(strict=True)
-    if root != _ATTEMPT_ROOT or root.drive.upper() != "F:":
-        raise ValueError("attempt root rejected")
+    root = _resolve_attempt_root()
     directory = root / f"arch152-pm2a-attempt-{attempt_id}"
     directory.mkdir()
     _, digest = _write_once(
@@ -492,6 +490,13 @@ def _reserve_attempt(
         },
     )
     return directory, digest
+
+
+def _resolve_attempt_root() -> Path:
+    root = _ATTEMPT_ROOT.resolve(strict=True)
+    if root != _ATTEMPT_ROOT or root.drive.upper() != "F:":
+        raise ValueError("attempt root rejected")
+    return root
 
 
 def _evidence_material(

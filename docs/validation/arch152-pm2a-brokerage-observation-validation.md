@@ -59,6 +59,7 @@ that an account argument is honored or that rows are exhaustive.
 | Import/construction has no provider effect; read facade stays five-method | Existing `tests/robinhood_mcp/test_current_read_transport.py::test_exact_public_read_surface_and_frozen_131_contract`, `test_mutation_inventory_is_unneeded_and_not_surfaced`, and `test_each_read_discovers_all_required_tools_before_one_dispatch`; the schema provider wrapper is exercised only with a fake session. |
 | Fake PM vertical slice stays preview-only/disarmed | `tests/portfolio_manager/test_vertical_slice.py`; asserts `dispatch_authorized is False` and bounded order coverage blocks previews. |
 | Attempt reserves source/fingerprint metadata before OAuth, binds reviewed HEAD/tree, and rechecks identity after schemas before read tools | `tests/portfolio_manager/test_qualification_attempt.py::test_schema_incomplete_reserves_before_provider_and_stops_before_reads`; `test_reviewed_source_head_and_tree_are_required_before_reservation`; `test_source_change_after_schema_preflight_blocks_before_read_tools` |
+| Production attempt root stays fixed to `F:\AI\temp`; synthetic fixtures can use their pytest temp root without weakening the public operation | `tests/portfolio_manager/test_qualification_attempt.py::test_default_attempt_root_rejects_non_f_drive`; `_prepare` replaces only the private root resolver for fake attempt tests. |
 | Attempt IDs are create-once; repeat, collision, crash-reserved, and concurrent IDs do not retry; evidence is sanitized | `tests/portfolio_manager/test_qualification_attempt.py::test_attempt_id_collision_and_crash_reserved_slot_are_never_reused`; `test_concurrent_attempt_id_has_one_provider_winner`; `test_complete_fake_observation_records_only_sanitized_facts` |
 | Explicit fingerprint with multiple eligible accounts still blocks before any position/order read | `tests/portfolio_manager/test_qualification_attempt.py::test_explicit_account_fingerprint_does_not_override_multiple_account_block`; existing PM1 ambiguity behavior is unchanged. |
 | Incomplete/malformed schema or missing static argument/account echo/pagination shape stops before reads | `tests/portfolio_manager/test_qualification_attempt.py::test_schema_incomplete_reserves_before_provider_and_stops_before_reads`; `test_schema_missing_static_account_or_order_filter_arguments_blocks_reads`; schema fixture coverage in `tests/robinhood_mcp/test_current_read_schema_qualification.py` |
@@ -103,14 +104,16 @@ New-Item -ItemType Directory -Path $testBaseTemp
   tests/portfolio_manager/test_vertical_slice.py -q
 ```
 
-Latest complete focused result: **83 passed in 0.61s** using external
-basetemp `F:\AI\temp\pytest\7376e296bc79420a8ccbc8a47c12bba7`. An earlier
+Latest complete focused result after C1: **84 passed in 0.61s** using external
+basetemp `F:\AI\temp\pytest\759b515e64c2426c8cd278ff2a7a44e2`. The isolated
+attempt module also passed **11 tests in 0.20s** using fresh basetemp
+`F:\AI\temp\pytest\ffe71fd18fa24fa39592e00e236ecbab`. An earlier
 directory-creation attempt was denied and is not counted as a compliant test
 run.
 
-The relevant source-owner/current-authority command passed **60 tests in
-69.77s** using fresh external basetemp
-`F:\AI\temp\pytest\4b215c112a2a4474bc45a3532a1be734`:
+The source-owner/current-authority command passed **60 tests in 69.57s** using
+fresh external basetemp
+`F:\AI\temp\pytest\46be85ea320948abafc2ea5ad91e41a5`:
 
 ```powershell
 $ownerGuid = [guid]::NewGuid().ToString('N')
@@ -128,6 +131,28 @@ with only LF-to-CRLF warnings. Clean-candidate admission remains required on the
 final committed source before publication. No local FULL run is authorized or
 required for this source-only checkpoint; mapped canonical CI owns
 certification if the exact checkpoint profile is registered.
+
+## Preserved mapped CI failure and C1 correction
+
+The first mapped source-gate run, `45974606765` attempt 1, is preserved as a
+terminal failure on the prior candidate. Source-static and active checkpoint
+tests passed. FULL `broad-2` had nine failures, all in
+`test_qualification_attempt.py`; the six other FULL lanes passed. The failure
+was a test-host path mismatch: fake tests replaced `_ATTEMPT_ROOT` with
+`tmp_path`, but the real-operation resolver correctly rejected the hosted
+runner's non-F drive before reservation, schema observation, or any read tool.
+The broad-2 artifact is `15185959030`; the downloaded diagnostic copy is under
+`F:\AI\temp\arch152-pm2a-broad2-artifact-a91c4d6db745488daa344b722708d53d`.
+ChatGPT classified this as `PREPUBLICATION_COVERAGE_DEFECT`; the run and
+artifact remain unchanged and were not retried.
+
+C1 extracts the production F-drive check into a private root resolver and has
+fake fixtures replace only that resolver with their pytest temp directory. The
+public attempt API and production `F:\AI\temp` default are unchanged. The new
+`test_default_attempt_root_rejects_non_f_drive` regression proves the normal
+resolver continues to reject `C:\Windows`. C1's attempt module passed 11 tests,
+and the full focused PM2A/PM1 set passed 84 tests, as recorded above. This
+correction changes no provider schema, order-scope, or broker-effect claim.
 
 ## Prepared future real-read operation (NOT YET AUTHORIZED)
 

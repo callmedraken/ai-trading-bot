@@ -136,20 +136,62 @@ transient retry; no retry is added without evidence that the MCP/provider layer
 does not already implement the relevant behavior. Account IDs and raw provider
 payloads are not included in diagnostics.
 
-## Future real-read boundary
+## Prepared one-shot observation boundary — NOT YET AUTHORIZED
 
-After source publication, mapped CI, and independent exact-source acceptance,
-ChatGPT may separately review one real read-only qualification. It must be
-create-once/consumed-once with no automatic retry and sanitized evidence bound
-to the exact source HEAD/tree. The future evidence record must include the
-selected account fingerprint, account counts, session/tool-list attempts and
-pages, exact read tools invoked and per-tool counts, position/order page and row
-counts, pagination completion, result-account binding, quote freshness,
-cash/buying-power presence, explicit order-scope classification, unknown or
-incomplete conditions, and zero review/place/cancel/transfer/other-effect
-attempts. It must not contain credentials, tokens, full account numbers, raw
-provider payloads, or unnecessary personal financial values. This source
-checkpoint does not authorize or perform that operation.
+`portfolio_manager.qualification_attempt.run_pm2a_qualification_attempt` now
+prepares a source-bound, schema-first, read-only attempt. It is inert on import;
+this checkpoint did not call it, create an attempt directory, invoke OAuth, or
+contact a provider. Its required arguments are:
+
+```python
+run_pm2a_qualification_attempt(
+    attempt_id="<32 lowercase hex characters>",
+    expected_source_head="<literal independently accepted HEAD>",
+    expected_source_tree="<literal independently accepted tree>",
+    selected_account_fingerprint="<64 lowercase SHA-256 hex characters>",
+    oauth_factory=<existing separately reviewed OAuth factory>,
+)
+```
+
+The exact HEAD/tree must be supplied by the later reviewed invocation. Before
+reserving an attempt it checks the supplied source identity against the local
+clean feature checkout, canonical origin, live feature ref, develop ancestry,
+and FEATURE plus PROSPECTIVE_DEVELOP authority. It reserves
+`F:\\AI\\temp\\arch152-pm2a-attempt-<attempt_id>` with atomic directory
+creation, then writes immutable `attempt.json` using `O_EXCL` before any OAuth
+factory or provider method. The reservation binds the attempt ID, expected
+HEAD/tree, selected account fingerprint, and observed source identity. A
+pre-existing directory, including one left with reservation metadata but no
+final evidence after a crash, is consumed and cannot be retried. A separately
+reviewed later attempt must use a new ID.
+
+The operation rechecks the exact source after reservation, after schema
+qualification immediately before constructing the read transport, and after
+the read attempt. It first observes schemas through `tools/list`; incomplete or
+malformed schema, missing static account/pagination/order arguments, absent
+account echo paths, or absent position/order pagination paths writes a
+sanitized terminal record and stops before any read tool. Schema shape does not
+prove provider semantics. When the gate passes, observation uses only the
+existing `RobinhoodCurrentReadTransport` and its five static `READ_TOOLS`; there
+is no arbitrary dispatch surface or retry.
+
+Final `evidence.json` is create-once and contains only source identities,
+fingerprints, counts, schema digests and bounded schema facts, availability and
+freshness flags, order-scope classification, fixed unknown/incomplete codes,
+and effect counters. It contains no credentials, tokens, full account numbers,
+raw provider payloads, symbols, quantities, or cash/balance amounts. It records
+`ROBINHOOD_AGENTIC_BOUNDED` when the existing read pipeline returns an
+observation; it never promotes schema presence to exhaustive order coverage.
+If more than one account is eligible, the existing observer rejects before
+portfolio, positions, quotes, and orders even when the supplied fingerprint
+matches one account. The evidence records account counts and the selected
+fingerprint with `selected_account_bound=false`; PM1 account-selection behavior
+is unchanged.
+
+The one-shot API and evidence format are prepared, but this source checkpoint
+does not authorize a real attempt. ChatGPT may review a separately proposed
+operation only after source publication, mapped CI, and independent exact-source
+acceptance.
 
 ## Next milestone
 

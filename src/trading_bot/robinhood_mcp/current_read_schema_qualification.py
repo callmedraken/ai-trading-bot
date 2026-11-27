@@ -208,6 +208,8 @@ async def qualify_current_read_schemas(
 
 async def qualify_current_read_provider(
     oauth_factory: Callable[[], object],
+    *,
+    on_attempt: Callable[[str], None] | None = None,
 ) -> CurrentReadSchemaQualification:
     """Explicitly open the existing lazy provider session for ``tools/list`` only.
 
@@ -219,8 +221,17 @@ async def qualify_current_read_provider(
     """
     if not callable(oauth_factory):
         raise TypeError("oauth_factory must be callable")
+
+    def notify(name: str) -> None:
+        if on_attempt is not None:
+            on_attempt(name)
+
     try:
-        async with _open_robinhood_client(oauth_factory) as client:
+        async with _open_robinhood_client(
+            oauth_factory,
+            before_oauth=lambda: notify("oauth_factory"),
+            before_mcp_session=lambda: notify("mcp_session"),
+        ) as client:
             list_tools = getattr(client, "list_tools", None)
             if not callable(list_tools):
                 return _result(
@@ -230,7 +241,16 @@ async def qualify_current_read_provider(
                     False,
                     0,
                 )
-            return await qualify_current_read_schemas(list_tools)
+
+            async def count_list_tools(**arguments: object) -> object:
+                notify("tools_list_call")
+                listing = list_tools(**arguments)
+                if isinstance(listing, Awaitable):
+                    listing = await listing
+                notify("tools_list_page")
+                return listing
+
+            return await qualify_current_read_schemas(count_list_tools)
     except asyncio.CancelledError:
         raise
     except Exception:

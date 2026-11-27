@@ -15,6 +15,9 @@ production mutation, or real financial payload was used during source work.
 
 The architecture and public-reference matrix are in
 [Architecture 152-PM2A](../architecture/152-pm2a-brokerage-observation-and-reconciliation.md).
+The inert one-shot preparation is implemented in
+`src/trading_bot/portfolio_manager/qualification_attempt.py`; no attempt
+directory or real observation was created.
 
 ## Implemented source qualification
 
@@ -55,12 +58,30 @@ that an account argument is honored or that rows are exhaustive.
 | Unknown/effectful tools cannot be invoked or included in schema evidence | `test_schema_observation_is_allowlisted_paginated_and_never_dispatches`; existing `tests/robinhood_mcp/test_current_read_transport.py::test_mutation_inventory_is_unneeded_and_not_surfaced` |
 | Import/construction has no provider effect; read facade stays five-method | Existing `tests/robinhood_mcp/test_current_read_transport.py::test_exact_public_read_surface_and_frozen_131_contract`, `test_mutation_inventory_is_unneeded_and_not_surfaced`, and `test_each_read_discovers_all_required_tools_before_one_dispatch`; the schema provider wrapper is exercised only with a fake session. |
 | Fake PM vertical slice stays preview-only/disarmed | `tests/portfolio_manager/test_vertical_slice.py`; asserts `dispatch_authorized is False` and bounded order coverage blocks previews. |
+| Attempt reserves source/fingerprint metadata before OAuth, binds reviewed HEAD/tree, and rechecks identity after schemas before read tools | `tests/portfolio_manager/test_qualification_attempt.py::test_schema_incomplete_reserves_before_provider_and_stops_before_reads`; `test_reviewed_source_head_and_tree_are_required_before_reservation`; `test_source_change_after_schema_preflight_blocks_before_read_tools` |
+| Attempt IDs are create-once; repeat, collision, crash-reserved, and concurrent IDs do not retry; evidence is sanitized | `tests/portfolio_manager/test_qualification_attempt.py::test_attempt_id_collision_and_crash_reserved_slot_are_never_reused`; `test_concurrent_attempt_id_has_one_provider_winner`; `test_complete_fake_observation_records_only_sanitized_facts` |
+| Explicit fingerprint with multiple eligible accounts still blocks before any position/order read | `tests/portfolio_manager/test_qualification_attempt.py::test_explicit_account_fingerprint_does_not_override_multiple_account_block`; existing PM1 ambiguity behavior is unchanged. |
+| Incomplete/malformed schema or missing static argument/account echo/pagination shape stops before reads | `tests/portfolio_manager/test_qualification_attempt.py::test_schema_incomplete_reserves_before_provider_and_stops_before_reads`; `test_schema_missing_static_account_or_order_filter_arguments_blocks_reads`; schema fixture coverage in `tests/robinhood_mcp/test_current_read_schema_qualification.py` |
 
 The current provider does not expose cash-reservation semantics in source. Cash
 held for orders, unsettled cash, and withdrawal availability therefore remain
 unknown; no field names from public implementations are parsed as provider
 facts. Agent-created, manual, and external order ownership is not inferred from
 IDs. The current seven-day `placed_agent=agentic` query remains bounded.
+
+The prepared API requires an attempt ID, literal expected source HEAD/tree,
+explicit selected account fingerprint, and injected OAuth factory. It checks
+the exact clean source and current FEATURE/PROSPECTIVE_DEVELOP authority before
+reservation; binds those identities and the fingerprint in create-once
+`attempt.json`; rechecks the source after reservation and after schema
+qualification immediately before constructing the read transport; then writes
+create-once sanitized `evidence.json`. A directory containing only reservation
+metadata after a crash remains consumed and is incomplete evidence, never
+retryable under that ID. A later separately reviewed attempt uses a new ID.
+The schema step calls only `tools/list`; malformed/incomplete schemas or a
+missing static argument, account echo, or pagination path stop before any read
+tool. `SCHEMA_ONLY_UNPROVEN` does not establish provider semantics or exhaustive
+orders. No attempt ID was used and no attempt/evidence directory was created.
 
 ## Focused verification performed
 
@@ -75,38 +96,75 @@ New-Item -ItemType Directory -Path $testBaseTemp
   -p no:cacheprovider --basetemp $testBaseTemp `
   tests/robinhood_mcp/test_current_read_schema_qualification.py `
   tests/robinhood_mcp/test_current_read_transport.py `
+  tests/portfolio_manager/test_qualification_attempt.py `
   tests/portfolio_manager/test_observation.py `
   tests/portfolio_manager/test_adapters.py `
   tests/portfolio_manager/test_risk_planning.py `
   tests/portfolio_manager/test_vertical_slice.py -q
 ```
 
-Latest focused result before this document update: **73 passed** using external
-basetemp `F:\AI\temp\pytest\f2d11adacd9f4de78deb4250b79c7fc3`. The directory was
-created with scoped sandbox escalation. An earlier directory-creation attempt
-was denied and is not counted as a compliant test run.
+Latest complete focused result: **83 passed in 0.61s** using external
+basetemp `F:\AI\temp\pytest\7376e296bc79420a8ccbc8a47c12bba7`. An earlier
+directory-creation attempt was denied and is not counted as a compliant test
+run.
 
-Whole-repository Ruff check/format, `git diff --check`, relevant source-owner
-and current-authority gates, and clean-candidate admission remain required
-before publication. No local FULL run is authorized or required for this
-source-only checkpoint; mapped canonical CI owns certification if the exact
-checkpoint profile is registered.
+The relevant source-owner/current-authority command passed **60 tests in
+69.77s** using fresh external basetemp
+`F:\AI\temp\pytest\4b215c112a2a4474bc45a3532a1be734`:
 
-## Future real-read operation (NOT YET AUTHORIZED)
+```powershell
+$ownerGuid = [guid]::NewGuid().ToString('N')
+$ownerBaseTemp = "F:\AI\temp\pytest\$ownerGuid"
+New-Item -ItemType Directory -Path $ownerBaseTemp
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B -u -m pytest `
+  -p no:cacheprovider --basetemp $ownerBaseTemp `
+  tests/portfolio_manager/test_certification_ownership.py `
+  tests/runtime/checkpoint_runner/test_source_authority.py -q
+```
+
+Whole-repository `ruff check --no-cache .` passed; `ruff format --check
+--no-cache .` reported 1,775 files already formatted; `git diff --check` passed
+with only LF-to-CRLF warnings. Clean-candidate admission remains required on the
+final committed source before publication. No local FULL run is authorized or
+required for this source-only checkpoint; mapped canonical CI owns
+certification if the exact checkpoint profile is registered.
+
+## Prepared future real-read operation (NOT YET AUTHORIZED)
 
 After source publication, mapped CI completion, and independent exact-source
-acceptance, the next separately reviewed operation may invoke
-`qualify_current_read_provider(oauth_factory)` once to observe only provider
-tool schemas. It must be wired to a one-shot create-once attempt record with
-sanitized evidence containing exact source HEAD/tree, account fingerprint and
-counts, provider/session and discovery attempts/pages, exact read tools and
-invocation counts, page/row counts, pagination completion, result-account
-binding, quote freshness, cash/buying-power availability, order-scope outcome,
-unknown/incomplete conditions, and zero review/place/cancel/transfer/other
-effect attempts. It must contain no raw credentials, OAuth material, full
-account numbers, raw provider payloads, or unnecessary personal financial
-values. It has no automatic retry. This source checkpoint neither prepares an
-evidence file nor authorizes that operation.
+acceptance, ChatGPT may separately review one invocation of:
+
+```python
+run_pm2a_qualification_attempt(
+    attempt_id="<new 32-character lowercase hex ID>",
+    expected_source_head="<literal accepted feature HEAD>",
+    expected_source_tree="<literal accepted feature tree>",
+    selected_account_fingerprint="<64-character lowercase account fingerprint>",
+    oauth_factory=<existing separately reviewed OAuth factory>,
+)
+```
+
+The function reserves its attempt ID with immutable source/fingerprint metadata
+before OAuth, calls only `tools/list` until all closed schema and static read
+surface checks pass, then may call the exact existing five read methods once
+through `RobinhoodCurrentReadTransport`. It records exact source HEAD/tree,
+account fingerprint and observed/eligible counts, provider/session and schema
+discovery attempts/pages, exact read tools and per-tool counts, position/order
+pages/rows, pagination, selected-account binding, quote availability/freshness,
+cash/buying-power availability, the bounded order-scope result, unknown or
+incomplete conditions, and zero review/place/cancel/transfer/other-effect
+attempts. It writes immutable sanitized evidence with no raw credentials, OAuth
+material, full account numbers, raw provider payloads, symbols, quantities, or
+unnecessary personal financial values. Existing attempt directories, including
+crash-reserved directories missing final evidence, remain consumed. There is no
+automatic retry. This source checkpoint prepares the API and evidence schema;
+it creates no attempt/evidence file and does not authorize execution.
+
+If more than one account is eligible, PM1's observer rejects the observation
+even when the required fingerprint matches one of those accounts. The attempt
+records counts and the selected fingerprint, marks account binding false, and
+invokes no portfolio, position, quote, or order read. It does not change PM1
+account-selection behavior.
 
 If reviewed schemas cannot establish exhaustive selected-account open equity
 orders, record `CURRENT_PROVIDER_ORDER_SCOPE_INSUFFICIENT` (or the repository's

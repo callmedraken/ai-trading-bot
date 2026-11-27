@@ -30,12 +30,15 @@ Architecture 152-PM2A is the current source-only checkpoint. Its public-referenc
 review, bounded capability matrix, and metadata-only schema qualification path
 are recorded in [Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md)
 and its [validation record](validation/arch152-pm2a-brokerage-observation-validation.md).
-The source preserves `ROBINHOOD_AGENTIC_BOUNDED`; actual provider schemas and
-account-wide open-order semantics remain unobserved. No source acceptance,
-mapped CI result, integration, or real qualification is claimed here. The next
-safe transition after source publication, mapped CI, and independent exact-source
-acceptance is a separately reviewed read-only qualification proposal. It is not
-authorized or performed by this source checkpoint.
+The source also prepares an inert, create-once read qualification operation
+bound to literal expected HEAD/tree and an explicit account fingerprint; no
+attempt/evidence directory was created. It preserves
+`ROBINHOOD_AGENTIC_BOUNDED`; actual provider schemas and account-wide open-order
+semantics remain unobserved. No source acceptance, mapped CI result,
+integration, or real qualification is claimed here. The next safe transition
+after source publication, mapped CI, and independent exact-source acceptance is
+a separately reviewed read-only qualification proposal. It is not authorized or
+performed by this source checkpoint.
 
 PM2B remains the separate research milestone for valuation/fundamental and
 technical signal provenance; it is not part of PM2A. Arch149's frozen 2024-2026

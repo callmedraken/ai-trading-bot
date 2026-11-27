@@ -50,13 +50,23 @@ Focused synthetic verification is recorded in the
 [PM2A validation plan](validation/arch152-pm2a-brokerage-observation-validation.md).
 The current source query remains `ROBINHOOD_AGENTIC_BOUNDED` (selected account,
 `placed_agent=agentic`, seven-day window, bounded pages/rows); account-wide open
-orders and manual/external visibility are not proven. The new schema observer is
-source-only and has not contacted the provider. Current-provider order scope is
+orders and manual/external visibility are not proven. The schema qualifier and
+one-shot PM2A attempt API are source-only and have not contacted the provider.
+The attempt API requires the literal independently accepted HEAD/tree and an
+explicit account fingerprint, reserves immutable attempt metadata before OAuth,
+and refuses repeated IDs, including crash-reserved slots. Current-provider order scope is
 `CURRENT_PROVIDER_ORDER_SCOPE_UNQUALIFIED` because actual schemas were not
 observed; no insufficiency conclusion or speculative endpoint/argument is
 claimed. The explicit stop result after any separately reviewed schema
 qualification is `CURRENT_PROVIDER_ORDER_SCOPE_INSUFFICIENT` if those schemas
 cannot prove exhaustive selected-account open equity orders.
+
+The current observer rejects any account discovery with more than one eligible
+account even when the supplied fingerprint matches one of them. The prepared
+attempt records the observed/eligible counts and selected fingerprint, but does
+not proceed to portfolio, positions, quotes, or orders in that case. PM1
+selection behavior is unchanged. No attempt/evidence directory was created and
+the future operation remains **NOT YET AUTHORIZED**.
 
 PM1 stays disarmed: previews are not dispatch authority, pending-order and
 missing/unknown safety checks remain blocking, and the current read facade still

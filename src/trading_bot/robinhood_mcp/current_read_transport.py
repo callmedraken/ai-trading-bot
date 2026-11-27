@@ -48,6 +48,10 @@ class RobinhoodCurrentReadTransport:
         "_session_discovered",
         "_counts",
         "_observed",
+        "_oauth_factory_attempts",
+        "_mcp_session_open_attempts",
+        "_tools_list_call_attempts",
+        "_tools_list_pages_received",
     )
 
     def __init__(self, oauth_factory: Callable[[], object]) -> None:
@@ -58,6 +62,10 @@ class RobinhoodCurrentReadTransport:
         self._session_discovered = False
         self._counts = dict.fromkeys(READ_TOOLS, 0)
         self._observed: tuple[str, ...] = ()
+        self._oauth_factory_attempts = 0
+        self._mcp_session_open_attempts = 0
+        self._tools_list_call_attempts = 0
+        self._tools_list_pages_received = 0
         self._session_owner = _RobinhoodSession(
             self._new_session,
             on_stop=self._reset_session_state,
@@ -78,6 +86,16 @@ class RobinhoodCurrentReadTransport:
     @property
     def observed_read_tools(self) -> tuple[str, ...]:
         return self._observed
+
+    @property
+    def _provider_attempt_counts(self) -> tuple[tuple[str, int], ...]:
+        """Sanitized session and schema-discovery attempts for read evidence."""
+        return (
+            ("oauth_factory_attempts", self._oauth_factory_attempts),
+            ("mcp_session_open_attempts", self._mcp_session_open_attempts),
+            ("tools_list_call_attempts", self._tools_list_call_attempts),
+            ("tools_list_pages_received", self._tools_list_pages_received),
+        )
 
     def __enter__(self) -> Self:
         try:
@@ -174,9 +192,16 @@ class RobinhoodCurrentReadTransport:
             raise CurrentReadError("READ_REQUEST_FAILED") from None
 
     def _new_session(self) -> AbstractAsyncContextManager[object]:
+        self._mcp_session_open_attempts += 1
         if self._session_factory is not None:
             return cast(AbstractAsyncContextManager[object], self._session_factory())
-        return _open_robinhood_client(self._oauth_factory)
+        return _open_robinhood_client(
+            self._oauth_factory,
+            before_oauth=self._record_oauth_factory_attempt,
+        )
+
+    def _record_oauth_factory_attempt(self) -> None:
+        self._oauth_factory_attempts += 1
 
     async def _request(
         self, name: str, arguments: dict[str, object]
@@ -213,7 +238,9 @@ class RobinhoodCurrentReadTransport:
         seen = set()
         advertised = set()
         for _ in range(MAX_DISCOVERY_PAGES):
+            self._tools_list_call_attempts += 1
             listing = await client.list_tools(cursor=cursor)
+            self._tools_list_pages_received += 1
             entries = getattr(listing, "tools", None)
             if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
                 raise CurrentReadError("READ_DISCOVERY_INVALID")

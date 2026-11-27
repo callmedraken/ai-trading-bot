@@ -284,7 +284,11 @@ def test_explicit_provider_operation_uses_only_tools_list_with_fake_session(
     opened: list[object] = []
 
     @asynccontextmanager
-    async def open_fake(factory):
+    async def open_fake(factory, *, before_oauth=None, before_mcp_session=None):
+        if before_oauth is not None:
+            before_oauth()
+        if before_mcp_session is not None:
+            before_mcp_session()
         opened.append(factory)
         yield session
 
@@ -293,12 +297,21 @@ def test_explicit_provider_operation_uses_only_tools_list_with_fake_session(
     def oauth_factory() -> object:
         pytest.fail("fake session must not read credentials")
 
-    result = asyncio.run(qualify_current_read_provider(oauth_factory))
+    attempts: list[str] = []
+    result = asyncio.run(
+        qualify_current_read_provider(oauth_factory, on_attempt=attempts.append)
+    )
 
     assert result.status is SchemaQualificationStatus.COMPLETE
     assert opened == [oauth_factory]
     assert session.list_calls == 1
     assert session.tool_calls == 0
+    assert attempts == [
+        "oauth_factory",
+        "mcp_session",
+        "tools_list_call",
+        "tools_list_page",
+    ]
 
 
 def test_injected_schema_adapter_does_not_open_provider_session(

@@ -39,6 +39,7 @@ env:
               arch150-intraday-data-custody-source `
               arch151-intraday-walkforward-foundation `
               arch151-intraday-walkforward-evaluator `
+              arch152-portfolio-manager-foundation `
               arch-ai-strategy-discovery-foundation `
               arch-ai-strategy-discovery-g1-engine `
               arch146-a-historical-research-dataset-enforcement `

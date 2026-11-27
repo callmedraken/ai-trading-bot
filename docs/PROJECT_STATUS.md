@@ -1,6 +1,36 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 terminal; AI Portfolio Manager priority
+## Current milestone - Architecture 152-PM1 source foundation (prepublication)
+
+Architecture 151 is terminal and the current product priority is now a separate
+longer-horizon AI Portfolio Manager. PM1 is the source-only account-aware
+portfolio observation, deterministic decision/risk/preview, durable service,
+and synthetic desktop foundation on branch
+`feature/robinhood-portfolio-manager-current`, based on develop
+`e578a7ff0e128a1f9895a9df82296f73f550e9c5` / tree
+`f6b3036c00afebfce93a1500731e504edba954d4`. Its current registration is
+`arch152-portfolio-manager-foundation`, mapped to the existing GitHub-owned
+FULL profile. See the owning [Architecture 152-PM1](architecture/152-pm1-account-aware-portfolio-manager.md)
+and [validation record](validation/arch152-pm1-portfolio-manager-foundation.md).
+
+Focused domain, application, adapter, Arch149 firewall, directory-ownership,
+and checkpoint-route tests have passed; focused Ruff checks also pass. No local
+FULL was run. This is still an implementation candidate, not source admission,
+publication, canonical certification, source acceptance, integration, or
+trading authority. Next: complete the combined prepublication authority and
+diff gate, exact-source review, and one atomic feature publication; then follow
+the mapped GitHub run to terminal. The latest successful comparable FULL at
+the accepted base is run `45919230088` (18,566 passed, 10 skipped; slowest lane
+282.020 seconds; broad-1 258.979 seconds). Preserve the seven-lane topology
+and 300-second ceiling.
+
+PM1 uses fake/synthetic inputs only. It makes no real provider, credential,
+OAuth, broker, order, production, real AI-provider, or Arch149 confirmation
+request. Arch149 remains `EXPLORATORY_CANDIDATE_ONLY`; adapted signals are
+unadmitted research with no performance or order authority. Later-period
+2024+ evidence remains sealed.
+
+### Terminal Architecture 151 background
 
 Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
@@ -74,10 +104,10 @@ The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Immediate next step: integrate and certify this terminal documentation
-closeout, then review existing Arch149, account adoption, GUI, broker and
-research infrastructure for a bounded source-only AI Portfolio Manager
-implementation plan. No new Arch151 execution is authorized.
+Architecture 151's research and execution are closed. PM1 is now the current
+source implementation checkpoint; its bounded source and evidence status are
+recorded above and in the owning Architecture 152 documents. No new Arch151
+execution or Arch149 confirmation is authorized by this source checkpoint.
 Preserve the E4 and E3 red runs. E1 and E2 public execution routes remain
 retired and fail closed even if the E2 evidence root is missing. E4 is a
 distinct current route; it does not resume, replace, or mutate either consumed
@@ -89,11 +119,11 @@ provider/credential access, broker/order effects, or 2024+ access.
 
 ### Product direction and conditional roadmap
 
-The primary product remains an autonomous same-day AI day trader, seeking
-frequent opportunities but not forcing trades, ending each session flat.
-Arch151 completed development with no qualified survivor; its conditional
-holdout/extension will not run. The previously agreed priority is now an
-operational AI Portfolio Manager before another intraday strategy campaign.
+The long-term day-trading objective remains a same-day system that does not
+force trades and ends each session flat. Arch151 completed development with no
+qualified survivor; its conditional holdout/extension will not run. The current
+product priority is the separate operational AI Portfolio Manager before
+another intraday strategy campaign.
 
 The separate portfolio-manager product is a longer-horizon, continuously
 monitoring desktop application on its own brokerage account. It should adopt
@@ -113,9 +143,10 @@ complete. Source-only portfolio framework and synthetic/read-only readiness
 work may precede that date under separate review. No live trading is granted.
 Both products aim to outperform a comparable S&P 500 total-return benchmark
 net of costs and with explicit risk reporting; neither is guaranteed to do so.
-After the portfolio manager priority (if triggered), resume reusable AI-assisted
-edge discovery, broader predictive features, ML and independent intraday
-strategy validation. Do not mutate the frozen Arch151 or Arch149 trials.
+After the PM source foundation, follow its separately reviewed integration and
+read-only readiness boundaries before returning to reusable AI-assisted edge
+discovery, predictive features, ML, or independent intraday strategy work. Do
+not mutate the frozen Arch151 or Arch149 trials.
 
 ---
 

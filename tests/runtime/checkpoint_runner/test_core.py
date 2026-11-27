@@ -508,6 +508,37 @@ def test_arch151_evaluator_successor_is_source_only_and_diff_selected():
     assert runner._arch151_intraday_walkforward_evaluator_authority_check(repo) == ()
 
 
+def test_arch152_pm1_is_source_only_and_mapped_to_full():
+    from scripts import run_test_certification as certification
+
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    name = runner.ARCH152_PM1_NAME
+    spec = specs[name]
+
+    assert name == "arch152-portfolio-manager-foundation"
+    assert runner.ARCH152_PM1_BRANCH == "feature/robinhood-portfolio-manager-current"
+    assert spec.tests == runner.ARCH152_PM1_TESTS
+    assert spec.ruff_paths == runner.ARCH152_PM1_RUFF
+    assert set(runner.ARCH152_PM1_SOURCE_PATHS) <= set(spec.ruff_paths)
+    assert set(runner.ARCH152_PM1_TEST_PATHS) <= set(spec.tests)
+    assert set(runner.ARCH152_PM1_TEST_SUPPORT_PATHS) <= set(spec.ruff_paths)
+    assert "tests/portfolio_manager" in certification.FULL_DIRECTORIES
+    assert spec.authority_check is runner._arch152_pm1_authority_check
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert name not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CERTIFICATION_PROFILES[name] == "full"
+    assert (
+        runner.resolve_ci_checkpoint(specs, runner.ARCH152_PM1_BRANCH, "push") == name
+    )
+    assert (
+        runner.resolve_ci_checkpoint(specs, runner.ARCH152_PM1_BRANCH, "pull_request")
+        is None
+    )
+    assert runner._arch152_pm1_authority_check(repo) == ()
+
+
 def test_arch150_d1_data_custody_route_is_source_only_and_diff_selected():
     repo = Path(runner.__file__).resolve().parents[1]
     specs = runner._checkpoint_specs()

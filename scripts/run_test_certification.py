@@ -614,6 +614,7 @@ FULL_DIRECTORIES = (
     "tests/simulation",
     "tests/strategies",
     "tests/desktop_live",
+    "tests/portfolio_manager",
 )
 FULL_EXACT_MODULES = (
     "tests/gui/test_research_comparison_service.py",

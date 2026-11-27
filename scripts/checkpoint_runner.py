@@ -566,6 +566,75 @@ ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_RUFF: Final = (
     "src/trading_bot/experiments/arch151_intraday_walkforward_operator.py",
     "tests/experiments/test_arch151_intraday_walkforward_operator.py",
 )
+ARCH152_PM1_NAME: Final = "arch152-portfolio-manager-foundation"
+ARCH152_PM1_BRANCH: Final = "feature/robinhood-portfolio-manager-current"
+ARCH152_PM1_SOURCE_PATHS: Final = (
+    "src/trading_bot/portfolio_manager/__init__.py",
+    "src/trading_bot/portfolio_manager/models.py",
+    "src/trading_bot/portfolio_manager/observation.py",
+    "src/trading_bot/portfolio_manager/decision.py",
+    "src/trading_bot/portfolio_manager/risk.py",
+    "src/trading_bot/portfolio_manager/planning.py",
+    "src/trading_bot/portfolio_manager/arch149_adapter.py",
+    "src/trading_bot/portfolio_manager/adapters.py",
+    "src/trading_bot/portfolio_manager/store.py",
+    "src/trading_bot/portfolio_manager/application_service.py",
+    "src/trading_bot/portfolio_manager/synthetic_demo.py",
+    "src/trading_bot/portfolio_manager/window.py",
+    "src/trading_bot/portfolio_manager/application.py",
+)
+ARCH152_PM1_TEST_PATHS: Final = (
+    "tests/portfolio_manager/test_observation.py",
+    "tests/portfolio_manager/test_decision.py",
+    "tests/portfolio_manager/test_risk_planning.py",
+    "tests/portfolio_manager/test_arch149_adapter.py",
+    "tests/portfolio_manager/test_adapters.py",
+    "tests/portfolio_manager/test_certification_ownership.py",
+    "tests/portfolio_manager/test_store.py",
+    "tests/portfolio_manager/test_application_service.py",
+    "tests/portfolio_manager/test_vertical_slice.py",
+    "tests/portfolio_manager/test_window.py",
+)
+ARCH152_PM1_TEST_SUPPORT_PATHS: Final = (
+    "tests/portfolio_manager/__init__.py",
+    "tests/portfolio_manager/conftest.py",
+)
+ARCH152_PM1_PATHS: Final = (
+    *ARCH152_PM1_SOURCE_PATHS,
+    *ARCH152_PM1_TEST_PATHS,
+    *ARCH152_PM1_TEST_SUPPORT_PATHS,
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "scripts/checkpoint_runner.py",
+    "scripts/source_authority.py",
+    "scripts/run_test_certification.py",
+    ".github/workflows/checkpoint-source-gates.yml",
+    "docs/architecture/152-pm1-account-aware-portfolio-manager.md",
+    "docs/validation/arch152-pm1-portfolio-manager-foundation.md",
+    "docs/PROJECT_STATUS.md",
+    "docs/AI_TRADING_BOT_HANDOFF.md",
+)
+ARCH152_PM1_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    *ARCH152_PM1_TEST_PATHS,
+)
+ARCH152_PM1_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "scripts/source_authority.py",
+    "scripts/run_test_certification.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    *ARCH152_PM1_SOURCE_PATHS,
+    *ARCH152_PM1_TEST_PATHS,
+    *ARCH152_PM1_TEST_SUPPORT_PATHS,
+)
 AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: Final = "arch-ai-strategy-discovery-g1-engine"
 AI_STRATEGY_DISCOVERY_G1_ENGINE_BRANCH: Final = (
     "feature/research-ai-strategy-discovery-g1-engine-current"
@@ -893,6 +962,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
     ARCH151_INTRADAY_WALKFORWARD_NAME,
     ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME,
+    ARCH152_PM1_NAME,
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
@@ -913,6 +983,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME: "full",
     ARCH151_INTRADAY_WALKFORWARD_NAME: "full",
     ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME: "full",
+    ARCH152_PM1_NAME: "full",
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
     ARCH147_P5A_NAME: "full",
@@ -27084,6 +27155,17 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         remote_branch=ARCH151_INTRADAY_WALKFORWARD_BRANCH,
         remote_head_env=None,
     )
+    values[ARCH152_PM1_NAME] = CheckpointSpec(
+        ARCH152_PM1_NAME,
+        "Source-only Architecture 152-PM1 account-aware portfolio manager foundation",
+        ARCH152_PM1_TESTS,
+        ARCH152_PM1_RUFF,
+        _arch152_pm1_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH152_PM1_BRANCH,
+        remote_head_env=None,
+    )
     values[AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME] = CheckpointSpec(
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         "Source-only G1 daily evaluator and analysis; no campaign authority",
@@ -27745,6 +27827,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
         ARCH151_INTRADAY_WALKFORWARD_NAME,
         ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME,
+        ARCH152_PM1_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -27789,6 +27872,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH150_INTRADAY_AI_NAME,
         ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
         ARCH151_INTRADAY_WALKFORWARD_NAME,
+        ARCH152_PM1_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -29176,6 +29260,63 @@ def _arch151_intraday_walkforward_evaluator_authority_check(
         or not _arch147_current_batch_workflow_is_reviewed(workflow)
     ):
         failures.append("Architecture 151 evaluator active route selection drift")
+    return tuple(failures)
+
+
+def _arch152_pm1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Register PM1 as a source-only product route with mapped FULL coverage."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH152_PM1_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != ARCH152_PM1_TESTS
+        or spec.ruff_paths != ARCH152_PM1_RUFF
+        or spec.authority_check is not _arch152_pm1_authority_check
+        or spec.remote_branch != ARCH152_PM1_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH152_PM1_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH152_PM1_NAME) != 1
+        or ARCH152_PM1_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(specs, ARCH152_PM1_BRANCH, "push") != ARCH152_PM1_NAME
+        or resolve_ci_checkpoint(specs, ARCH152_PM1_BRANCH, "pull_request") is not None
+    ):
+        failures.append("Architecture 152-PM1 source-only registration drift")
+    if "tests/portfolio_manager" not in certification.FULL_DIRECTORIES:
+        failures.append("Architecture 152-PM1 tests are not FULL-owned")
+    try:
+        inventory = certification.discover_inventory(repo_root)
+        profiles = certification.classify_inventory(inventory)
+        pm_modules = tuple(
+            module
+            for module in inventory
+            if module.startswith("tests/portfolio_manager/")
+        )
+        if (
+            not pm_modules
+            or not set(pm_modules) <= set(profiles["full"])
+            or set(pm_modules) & set(profiles["legacy"])
+        ):
+            failures.append("Architecture 152-PM1 test ownership drift")
+    except (OSError, ValueError, certification.CertificationError):
+        failures.append("Architecture 152-PM1 test ownership unavailable")
+    for relative in ARCH152_PM1_PATHS:
+        if not (repo_root / relative).is_file():
+            failures.append("Architecture 152-PM1 route is missing " + relative)
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    row = f"              {ARCH152_PM1_NAME} {chr(96)}\n"
+    if (
+        workflow.count(row) != 1
+        or not _arch147_current_batch_workflow_is_reviewed(workflow)
+        or not _arch147_batch_workflow_is_reviewed(workflow)
+    ):
+        failures.append("Architecture 152-PM1 active CI projection drift")
     return tuple(failures)
 
 

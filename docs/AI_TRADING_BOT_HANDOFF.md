@@ -1,6 +1,61 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 terminal; AI Portfolio Manager priority
+## Current milestone: Architecture 152-PM1 source foundation (prepublication)
+
+Architecture 151 is terminal; the current product priority is the
+longer-horizon AI Portfolio Manager. PM1 is the source-only account-aware
+observation, deterministic recommendation/risk/preview, durable service, and
+synthetic desktop foundation. It is being implemented on
+`feature/robinhood-portfolio-manager-current` from the reviewed develop base
+`e578a7ff0e128a1f9895a9df82296f73f550e9c5` / tree
+`f6b3036c00afebfce93a1500731e504edba954d4`. Its source checkpoint slug is
+`arch152-portfolio-manager-foundation`, explicitly mapped to the existing
+GitHub-owned FULL profile. The owning [Architecture 152-PM1](architecture/152-pm1-account-aware-portfolio-manager.md)
+and [validation record](validation/arch152-pm1-portfolio-manager-foundation.md)
+define the contracts and evidence boundary.
+
+The implementation uses synthetic observations and fake injected providers.
+The account fingerprint and durable history are isolated from the intraday
+product; risk evaluation is independent of recommendations; plans are
+preview-only and cannot dispatch. A narrow Arch149 adapter exposes only
+identity-verified, unadmitted research signals and grants no performance or
+order authority. No real Robinhood transport, OAuth, credential, provider,
+broker/order, real AI-provider, production, or 2024+ confirmation effect is part
+of PM1.
+
+The synthetic example adopts 3.25 SPY shares at a synthetic $520 quote and
+four TLT shares at $95 with unknown average cost, plus $4,000 cash. The vertical
+slice includes a GLD BUY preview and a TLT REDUCE preview; its sell leg precedes
+and is a dependency of the buy leg, while proposed proceeds remain unavailable.
+The injected fake Robinhood-read pipeline exercises the existing transport
+without opening a real provider session; bounded agentic-order visibility
+blocks order previews. Full example assertions are in
+`tests/portfolio_manager/test_vertical_slice.py`.
+
+After source review, the synthetic-only desktop launch command is:
+
+```powershell
+Set-Location 'F:\AI\worktrees\ai-trading-bot-portfolio-manager-current'
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B 'src\trading_bot\portfolio_manager\application.py'
+```
+
+It binds synthetic PM state under `F:\AI\portfolio-manager-state\pm1`, starts
+disarmed, and waits for the owner to click Start. It has no live placement
+method. The standalone local host command is not a CI/certification command and
+has not been run as part of source-only implementation.
+
+Focused domain, application, adapter, Arch149 firewall, directory-ownership,
+and checkpoint-route tests have passed, along with focused Ruff checks. No
+local FULL was run. The candidate is not represented here as admitted,
+published, source accepted, CI certified, reviewed, integrated, or
+operationally authorized. Next: complete the combined prepublication authority
+and diff gate and exact-source review, then create one atomic feature
+publication and follow its mapped GitHub source gate and canonical FULL run to
+terminal. GitHub-owned FULL should not be repeated locally after valid
+same-source green evidence. See the validation record for the conditional
+host-only fallback command shape and baseline timing.
+
+### Prior terminal Arch151 evidence
 
 Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at

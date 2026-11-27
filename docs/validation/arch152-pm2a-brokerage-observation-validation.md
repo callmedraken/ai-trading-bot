@@ -2,16 +2,21 @@
 
 ## Status and scope
 
-This is the source-only PM2A checkpoint. It does not contain a real Robinhood
-observation result. The currently authorized provider's actual tool schemas
-have not been observed, so the current order-scope result is
+This record covers the **SOURCE/CERTIFICATION ACCEPTED** source-only PM2A
+checkpoint at C3 HEAD `834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
+`0051affa15e94253a15a47c7d51e6f5b9ca625ec`, based on starting parent
+`6cc6a815325b49165ef5d0f48af744707715dc1f` / tree
+`cb7cd3b5e422b65429782b42f1cfe822082e75cc`. It does not contain a real
+Robinhood observation result. The currently authorized provider's actual tool
+schemas have not been observed, so order scope remains
 `CURRENT_PROVIDER_ORDER_SCOPE_UNQUALIFIED`; the existing read path remains
 `ROBINHOOD_AGENTIC_BOUNDED`. No account-wide open-order completeness is claimed.
 
 PM1 remains closed and disarmed. PM2A does not authorize order review,
 placement, cancellation, transfer, liquidation, or trading. No credentials,
-OAuth, live session/provider request, account read, order read, broker action,
-production mutation, or real financial payload was used during source work.
+OAuth, live provider/session request, account read, order read, broker action,
+production mutation, or real financial payload was used during source work,
+focused tests, or mapped CI.
 
 The architecture and public-reference matrix are in
 [Architecture 152-PM2A](../architecture/152-pm2a-brokerage-observation-and-reconciliation.md).
@@ -105,7 +110,7 @@ New-Item -ItemType Directory -Path $testBaseTemp
   tests/portfolio_manager/test_vertical_slice.py -q
 ```
 
-Latest complete focused result after C2: **90 passed in 2.60s** using external
+Complete focused result at C2: **90 passed in 2.60s** using external
 basetemp `F:\AI\temp\pytest\8955343ba1514e4c85696bb2b421fcc5`. The isolated
 attempt module passed **17 tests in 0.28s** using fresh basetemp
 `F:\AI\temp\pytest\36075fe63b404517bda82ec5ec617270`. An earlier
@@ -128,10 +133,10 @@ New-Item -ItemType Directory -Path $ownerBaseTemp
 
 Whole-repository `ruff check --no-cache .` passed; `ruff format --check
 --no-cache .` reported 1,775 files already formatted; `git diff --check` passed
-with only LF-to-CRLF warnings. Clean-candidate admission remains required on the
-final committed source before publication. No local FULL run is authorized or
-required for this source-only checkpoint; mapped canonical CI owns
-certification if the exact checkpoint profile is registered.
+with only LF-to-CRLF warnings. C3 clean-candidate admission passed with
+`FEATURE=PASS`, `PROSPECTIVE_DEVELOP=PASS`, `IDENTITY_STABLE=True`, and
+`OVERALL=PASS`; its report is recorded below. No local FULL run was performed.
+Mapped GitHub CI owns canonical certification for C2 and C3.
 
 ## Preserved mapped CI failure and C1 correction
 
@@ -176,6 +181,11 @@ C2's attempt module passed 17 tests, and the final formatted-source focused set
 and source-owner/current-authority checks passed 90 and 60 tests respectively,
 as recorded above.
 
+C2 source `f5303eae49df1b431e09be489aa356eb76a81af6` / tree
+`36cab55b80efe275d195ff79c35d1b88fe25e66e` passed mapped run `45981347432`,
+attempt 1: source-static, active-tests, all seven canonical FULL lanes, and
+source-gates passed. This run is preserved as terminal SUCCESS.
+
 C3 accepts the compatible cursor shape used by the static reader: position and
 order calls omit `cursor` on page one, then send a non-null string on later
 pages. Cursor schemas therefore need to admit `string`; they do not need to
@@ -191,10 +201,27 @@ focused set passed **91 tests in 0.73s** using fresh basetemp
 authority checks passed **60 tests in 71.06s** using fresh basetemp
 `F:\AI\temp\pytest\0804b65e9e2f4f12aa8f68721ad4db0a`.
 
+C3 source `834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
+`0051affa15e94253a15a47c7d51e6f5b9ca625ec` passed prepublication admission at
+`F:\AI\temp\ai-trading-bot-checkpoints\arch132-r3n-prepublication-admission\source-gate-20261127T103735.643783Z\report.json`.
+Mapped run `45984464000`, attempt 1, is terminal SUCCESS: source-static,
+active-tests, source-gates, and all seven canonical FULL lanes passed. Lane
+durations were broad-1 5m45s, broad-2 4m29s, broad-3 3m48s, broad-4 3m46s,
+broad-5 3m12s, broad-6 4m37s, and broad-7 5m23s. C3 is the accepted PM2A
+source; `develop` remains at the starting parent. The earlier red run
+`45974606765` and artifact `15185959030` remain unchanged and preserved; neither
+C2 nor C3 reran or overwrote them.
+
+Across implementation, focused tests, admission, and mapped CI, no provider,
+OAuth, credential, account, or order read occurred. Review, placement,
+cancellation, transfer, broker, and production-effect attempts remained zero.
+
 ## Prepared future real-read operation (NOT YET AUTHORIZED)
 
-After source publication, mapped CI completion, and independent exact-source
-acceptance, ChatGPT may separately review one invocation of:
+Source publication, mapped CI completion, and independent exact-source
+acceptance are complete. A real-read invocation still requires a separate
+reviewed authorization; this record does not authorize one. The prepared API
+shape is:
 
 ```python
 run_pm2a_qualification_attempt(

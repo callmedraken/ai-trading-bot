@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - PM1 closed; PM2A source-only checkpoint pending review
+## Current milestone - PM1 closed; PM2A source/certification accepted; integration pending
 
 Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
@@ -26,23 +26,36 @@ planning, durable service and synthetic desktop contracts remain as documented
 in [Architecture 152-PM1](architecture/152-pm1-account-aware-portfolio-manager.md)
 and the [validation record](validation/arch152-pm1-portfolio-manager-foundation.md).
 
-Architecture 152-PM2A is the current source-only checkpoint. Its public-reference
-review, bounded capability matrix, and metadata-only schema qualification path
-are recorded in [Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md)
-and its [validation record](validation/arch152-pm2a-brokerage-observation-validation.md).
-The source also prepares an inert, create-once read qualification operation
-bound to literal expected HEAD/tree and an explicit account fingerprint; no
-attempt/evidence directory was created. It preserves
-`ROBINHOOD_AGENTIC_BOUNDED`; actual provider schemas and account-wide open-order
-semantics remain unobserved. No source acceptance, mapped CI result,
-integration, or real qualification is claimed here. The next safe transition
-after source publication, mapped CI, and independent exact-source acceptance is
-a separately reviewed read-only qualification proposal. It is not authorized or
-performed by this source checkpoint.
+Architecture 152-PM2A's source-only checkpoint is **SOURCE/CERTIFICATION
+ACCEPTED** at C3 HEAD `834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
+`0051affa15e94253a15a47c7d51e6f5b9ca625ec`. C3 mapped run `45984464000`,
+attempt 1, is terminal SUCCESS: source-static, active-tests, all seven mapped
+canonical FULL lanes, and source-gates passed. C2 run `45981347432`, attempt 1,
+also passed those jobs. No local FULL was run. `develop` remains at the PM2A
+starting identity `6cc6a815325b49165ef5d0f48af744707715dc1f` / tree
+`cb7cd3b5e422b65429782b42f1cfe822082e75cc`; PM2A is not integrated.
 
-PM2B remains the separate research milestone for valuation/fundamental and
-technical signal provenance; it is not part of PM2A. Arch149's frozen 2024-2026
-confirmation remains sealed.
+The public-reference review, bounded capability matrix, and metadata-only
+schema qualification path are recorded in
+[Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md)
+and its [validation record](validation/arch152-pm2a-brokerage-observation-validation.md).
+The source prepares an inert, create-once read qualification operation bound to
+literal expected HEAD/tree and an explicit account fingerprint; no
+attempt/evidence directory was created. Actual provider schemas and account-wide
+open-order semantics remain unobserved. Order visibility remains
+`CURRENT_PROVIDER_ORDER_SCOPE_UNQUALIFIED`; `ROBINHOOD_AGENTIC_BOUNDED` is not
+promoted to exhaustive coverage.
+
+No provider, OAuth, credential, account, or order read occurred. No review,
+placement, cancellation, transfer, broker, or production effect occurred.
+Real read-only qualification remains **NOT YET AUTHORIZED** and PM1 remains
+closed and disarmed.
+
+The next milestone is **Architecture 152-PM2B — Research Evidence and Signal
+Catalog**. PM2B must first review Qlib and PyPortfolioOpt before defining
+evidence provenance and the valuation/fundamental, growth, quality, technical,
+volatility, relative-attractiveness, and portfolio-context features. PM2B is
+not implemented here. Arch149's frozen 2024-2026 confirmation remains sealed.
 
 ### Terminal Architecture 151 background
 

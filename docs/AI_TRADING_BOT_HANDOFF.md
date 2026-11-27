@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM1 closed; PM2A source-only checkpoint pending review
+## Current milestone: PM1 closed; PM2A source/certification accepted; integration pending
 
 Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
@@ -37,49 +37,47 @@ It binds synthetic PM state under `F:\AI\portfolio-manager-state\pm1`,
 starts disarmed, and waits for the owner to click Start. It has no live
 placement method.
 
-PM2A source work is scoped to the supplied feature worktree at parent HEAD
+PM2A is **SOURCE/CERTIFICATION ACCEPTED** at C3 HEAD
+`834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
+`0051affa15e94253a15a47c7d51e6f5b9ca625ec`, on
+`feature/robinhood-portfolio-manager-current`. C3 mapped run `45984464000`,
+attempt 1, passed source-static, active-tests, all seven canonical FULL lanes,
+and source-gates. C2 run `45981347432`, attempt 1, passed the same gates. No
+local FULL was run. `develop` remains at the starting identity
 `6cc6a815325b49165ef5d0f48af744707715dc1f` / tree
-`cb7cd3b5e422b65429782b42f1cfe822082e75cc`. The feature ref and canonical
-`develop` were independently verified at that same identity before edits. The
-canonical develop checkout had exactly 17 expected untracked artifacts; they
-were preserved. Pre-existing off-root worktree entries were left untouched.
+`cb7cd3b5e422b65429782b42f1cfe822082e75cc`; PM2A integration is pending.
 
 The public-reference review and complete source capability matrix are in
 [Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md).
-Focused synthetic verification is recorded in the
+Focused synthetic verification and all mapped CI outcomes are recorded in the
 [PM2A validation plan](validation/arch152-pm2a-brokerage-observation-validation.md).
 The current source query remains `ROBINHOOD_AGENTIC_BOUNDED` (selected account,
 `placed_agent=agentic`, seven-day window, bounded pages/rows); account-wide open
-orders and manual/external visibility are not proven. The schema qualifier and
-one-shot PM2A attempt API are source-only and have not contacted the provider.
-The attempt API requires the literal independently accepted HEAD/tree and an
-explicit account fingerprint, reserves immutable attempt metadata before OAuth,
-and refuses repeated IDs, including crash-reserved slots. Current-provider order scope is
-`CURRENT_PROVIDER_ORDER_SCOPE_UNQUALIFIED` because actual schemas were not
-observed; no insufficiency conclusion or speculative endpoint/argument is
-claimed. The explicit stop result after any separately reviewed schema
-qualification is `CURRENT_PROVIDER_ORDER_SCOPE_INSUFFICIENT` if those schemas
-cannot prove exhaustive selected-account open equity orders.
+orders and manual/external visibility are not proven. Actual provider schemas
+remain unobserved, so order scope is
+`CURRENT_PROVIDER_ORDER_SCOPE_UNQUALIFIED`. The prepared schema qualifier and
+one-shot PM2A attempt API have not contacted the provider. The API requires the
+literal accepted HEAD/tree and explicit account fingerprint, reserves immutable
+attempt metadata before OAuth, and refuses repeated IDs, including
+crash-reserved slots. If separately reviewed schemas cannot prove exhaustive
+selected-account open equity orders, the stop classification is
+`CURRENT_PROVIDER_ORDER_SCOPE_INSUFFICIENT`.
 
-The current observer rejects any account discovery with more than one eligible
-account even when the supplied fingerprint matches one of them. The prepared
-attempt records the observed/eligible counts and selected fingerprint, but does
-not proceed to portfolio, positions, quotes, or orders in that case. PM1
-selection behavior is unchanged. No attempt/evidence directory was created and
-the future operation remains **NOT YET AUTHORIZED**.
+The observer rejects discovery with more than one eligible account even if the
+supplied fingerprint matches one of them. The prepared attempt records counts
+and the selected fingerprint, then stops without portfolio, position, quote,
+or order reads. PM1 selection behavior is unchanged. No attempt/evidence
+directory was created. No provider, OAuth, credential, account, or order read,
+review, placement, cancellation, transfer, broker action, or production effect
+occurred. Real read-only qualification remains **NOT YET AUTHORIZED**; PM1
+remains disarmed, preview-only, and unable to dispatch.
 
-PM1 stays disarmed: previews are not dispatch authority, pending-order and
-missing/unknown safety checks remain blocking, and the current read facade still
-exposes only its five explicit read methods. Source publication, mapped CI and
-independent acceptance remain pending in this handoff. No real credentials,
-OAuth, provider requests, account/order reads, review/place/cancel/transfer, or
-production mutation occurred. A real read-only qualification is a separate
-reviewed next operation and is **NOT YET AUTHORIZED**.
-
-After PM2A acceptance, PM2B should separately define evidence provenance and
-the valuation/fundamental/technical signal catalog, with its own review of Qlib
-and PyPortfolioOpt. PM2B is not implemented here. Arch149 confirmation remains
-frozen until its existing calendar-2026 contract permits it.
+The next milestone is **Architecture 152-PM2B — Research Evidence and Signal
+Catalog**. Before implementation, PM2B must review Qlib and PyPortfolioOpt,
+then define evidence provenance and the valuation/fundamental, growth, quality,
+technical, volatility, relative-attractiveness, and portfolio-context catalog.
+PM2B is not implemented here. Arch149 confirmation remains frozen under its
+existing calendar-2026 contract.
 
 ### Prior terminal Arch151 evidence
 

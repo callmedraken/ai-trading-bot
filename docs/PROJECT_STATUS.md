@@ -46,9 +46,9 @@ C5 docs-only closeout HEAD `5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` / tree
 integration identity on `develop`. Develop run `45990688069`, attempt 1, is
 terminal SUCCESS: source-static and source-gates passed after docs-only range
 validation; active, full, and certification jobs were skipped. No local FULL
-was run. The current C6 validation/status correction is a docs-only feature-
-branch descendant, is not integrated into `develop`, and does not change the
-accepted C3 implementation.
+was run. The C6 status correction and this wording correction are docs-only;
+neither changes PM2A implementation source. The accepted C3 implementation and
+its C5 source integration evidence remain unchanged.
 
 The public-reference review, bounded capability matrix, and metadata-only
 schema qualification path are recorded in

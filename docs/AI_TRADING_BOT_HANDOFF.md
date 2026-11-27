@@ -55,8 +55,9 @@ C5 docs-only closeout HEAD `5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` / tree
 `59b065160a33005932fa0c27725b0bd17bd007cb` is the current develop integration
 identity. Develop run `45990688069`, attempt 1, passed source-static and
 source-gates after docs-only range validation; active, full, and certification
-jobs were skipped. C6 is a docs-only feature-branch descendant, is not
-integrated into `develop`, and changes no PM2A implementation source.
+jobs were skipped. The C6 status correction and this wording correction are
+docs-only; neither changes PM2A implementation source. The accepted C3
+implementation and its C5 source integration evidence remain unchanged.
 
 The public-reference review and complete source capability matrix are in
 [Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md).

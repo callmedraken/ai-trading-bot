@@ -259,9 +259,10 @@ source-static and source-gates passed; other profiles were skipped. C5
 by ordinary push. Develop run `45990688069`, attempt 1, is terminal SUCCESS:
 source-static and source-gates passed after docs-only range validation;
 active-tests, full-tests, certification-tests, and certification-full were
-skipped. This is not a new FULL certification. The current C6 status correction
-is a docs-only feature-branch descendant; it changes no PM2A source and is not
-integrated into `develop` here.
+skipped. This is not a new FULL certification. The C6 status correction and
+this wording correction are docs-only; neither changes PM2A implementation
+source. The accepted C3 implementation and its C5 source integration evidence
+remain unchanged.
 
 Across implementation, focused tests, admission, and mapped CI, no provider,
 OAuth, credential, account, or order read occurred. Review, placement,

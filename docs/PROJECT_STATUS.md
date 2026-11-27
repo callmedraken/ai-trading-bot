@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 151 E3-C1 integrated; E4-C1 source review pending
+## Current milestone - Architecture 151 E4-C1 integrated; offline evaluation next
 
 Architecture 151 E1 through E1-C3 is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at `60b5016d960eac6d916080ad298d98945d40358c` /
@@ -43,9 +43,9 @@ with separate smoke-only and complete campaign modes. Smoke covers the fixed
 or attestation. Campaign requires that smoke, then uses the frozen annual
 simulator, complete 480-record composition, canonical report and existing
 source-attestation/evidence gates. Both modes use create-once UUID attempts,
-bounded progress, sanitized failures and partial evidence. Exact source review
-and mapped FULL remain pending; no real E4 CLI operation or accepted-custody
-content read occurred during implementation. Synthetic tests covered CLI
+bounded progress, sanitized failures and partial evidence. E4/E4-C1 are
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED. No real E4 CLI
+operation or accepted-custody content read occurred during implementation. Synthetic tests covered CLI
 argument sanitization, stubbed preflight display and rejection of synthetic
 provenance by the real attestation issuer.
 
@@ -58,9 +58,9 @@ E4-C1 shares one module-scoped generated five-year SPY/QQQ history between the
 480-record annual regression and E4 smoke/partial tests. Its paired five-test
 selection passed and fell from 93.17 to 69.90 local seconds, without changing
 the annual or 1,056-record smoke assertions. This is a test-fixture correction;
-production source and certification timing inputs are unchanged. E4-C1 exact
-review and mapped FULL remain pending; the measured local saving is not hosted
-certification evidence.
+production source and certification timing inputs are unchanged. E4-C1
+passed all seven mapped FULL lanes; exact develop certification reuse passed.
+See the handoff for exact identities and the validation plan for timing evidence.
 
 Architecture 150 remains terminal: 24 evaluated, 0 qualified,
 `NO_HOLDOUT_CANDIDATES`; no rerun or mutation. Arch151 reuses its accepted
@@ -73,10 +73,11 @@ The adjusted-price SPY comparator is not separately reconstructed dividend
 cash-flow total return. Statistical unavailability, incomplete/failed replay,
 and a valid zero-survivor result are distinct outcomes.
 
-Immediate next step: review the exact E4-C1 test-and-documentation diff and
-focused evidence, then complete its one admission, one feature push and mapped
-FULL terminal result before deciding source acceptance. Do not rerun the E4
-candidate unchanged, invoke the real E4 CLI, or read accepted custody content.
+Immediate next step: after this closeout is integrated and certified, run the
+reviewed source-bound read-only E4 preflight. On independent acceptance,
+review one fresh combined smoke/full campaign invocation. The preflight reads
+no custody content and creates no attempt; campaign execution is separately
+reviewed and stops if smoke fails. No new source milestone is required.
 Preserve the E4 and E3 red runs. E1 and E2 public execution routes remain
 retired and fail closed even if the E2 evidence root is missing. E4 is a
 distinct current route; it does not resume, replace, or mutate either consumed

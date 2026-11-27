@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 151 E3-C1 integrated; E4-C1 source review pending
+## Current milestone: Architecture 151 E4-C1 integrated; offline evaluation next
 
 Architecture 150 remains terminal and must not be rerun or mutated. Accepted
 validation evidence remains at
@@ -169,9 +169,20 @@ annual regression and smoke/interruption/partial-year tests. The paired local
 selection passed five tests in 69.90 seconds after fixture sharing versus
 93.17 seconds before; all smoke population, trade, and equity assertions remain
 active. No production source, authority, deterministic identity, timing weight,
-lane membership, or budget changes. Exact C1 review, one general admission,
-one feature push, and its mapped FULL terminal result remain pending. The
-measured local delta is not hosted timing evidence.
+lane membership, or budget changes. E4/E4-C1 are independently SOURCE/
+CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`2a78c986855b6ccdcc13cf7b263977116ad13be7` /
+`dcd3e0d06ebc1ae8cde3d8261163f08fc642e095`. Feature FULL `45919230088`,
+attempt 1, terminal SUCCESS: 18,566 passed, 10 skipped, zero failures/errors;
+broad-1 258.979 s, slowest lane 282.020 s. Develop `45925568595`, attempt 1,
+terminal SUCCESS: `DEVELOP_CERTIFICATION_REUSE=True`,
+`REASON=exact_feature_certification`, `IDENTITY_STABLE=True`, `OVERALL=PASS`.
+No duplicate FULL. Initial local integration stopped before fetch, merge or
+push on Git ls-remote exit 128; exact transport cause unknown. Preserve
+`F:\AI\temp\arch151-e4-c1-integration-6419d7dfd16743e2b8bcfe52f2d7ba6f`.
+Reconciled integration succeeded at
+`F:\AI\temp\arch151-e4-c1-reconciled-integration-b443dc1cb77d47bb890760f06f5fcf92`.
+Both local checkouts reported synchronized; develop inventory preserved.
 
 No E4 CLI operation, accepted-custody content read, or real replay occurred
 during implementation. Synthetic tests called `main` to verify argument
@@ -180,9 +191,18 @@ issuer's synthetic-source rejection; none dispatched current-source preflight,
 loaded accepted history, or evaluated a real candidate.
 The E1 and E2 routes remain permanently retired, and E4 does not resume or alter
 either consumed root. Annual summary artifacts still cannot reconstitute
-qualification authority; no separate persisted replay reader is added. All
-later-period, provider/credential, broker, paper/live and production boundaries
-remain unchanged. No source-only checkpoint grants real replay permission.
+qualification authority; no separate persisted replay reader is added. After
+this closeout is integrated and certified, the next operation is the reviewed
+`--preflight-offline --expected-source-head` invocation on the exact integrated
+checkout. It must report READY, both exact live/tracking refs,
+`CUSTODY_CONTENT_AUTHENTICATED=false` and `ATTEMPT_CREATED=false`.
+Independent preflight review precedes one explicitly reviewed fresh UUID
+`--run-offline-campaign` invocation, with 1,056 fixed smoke records followed
+only on smoke success by the complete 480-record campaign. A failure or
+interruption preserves the consumed attempt; no automatic retry or resume.
+All later-period, provider/credential, broker, paper/live and production
+boundaries remain unchanged. No source-only checkpoint grants real replay
+permission.
 2024-2025 remains sealed until a single authenticated qualifying development
 candidate and separate reviewed later-period authority; Jan-Oct 2026 remains
 sealed until that same candidate's authenticated holdout PASS. Actual later-

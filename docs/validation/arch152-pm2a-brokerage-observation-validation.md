@@ -5,9 +5,10 @@
 This record covers the PM2A source-only implementation accepted at C3 HEAD
 `834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
 `0051affa15e94253a15a47c7d51e6f5b9ca625ec` and fast-forward integrated on
-`develop`, currently at C5 HEAD `5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` /
-tree `59b065160a33005932fa0c27725b0bd17bd007cb`. The C4 integration method and
-C4/C5 feature and develop CI results are recorded in the chronology below.
+`develop`, currently at C6-C1 HEAD `3f4dba96dea1cc7b63c5e4d37b889abeaf2202fa`
+/ tree `0cc85ec06778da6f1433f3788c58d4f78741d754`. The C4 integration method
+deviation and C4-through-C6-C1 feature/develop CI results are recorded in the
+chronology below.
 This record does not contain a real Robinhood observation result. The currently
 authorized provider's actual tool schemas have not been observed, so order
 scope remains
@@ -215,7 +216,7 @@ parent; it was later advanced through C4 to C5 as recorded below. The earlier
 red run `45974606765` and artifact `15185959030` remain unchanged and preserved;
 neither C2 nor C3 reran or overwrote them.
 
-## Post-integration C4-C5 chronology
+## Post-integration C4-C6-C1 chronology
 
 C4 is docs-only HEAD `02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
 `c8f93e5765ea05f12538bcdac455c1879413bcc4`, a descendant of the accepted C3
@@ -255,14 +256,28 @@ thresholds. The earlier C3 feature FULL remains green.
 C5 docs-only feature run `45990380031`, attempt 1, is terminal SUCCESS:
 source-static and source-gates passed; other profiles were skipped. C5
 `5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` / tree
-`59b065160a33005932fa0c27725b0bd17bd007cb` was later integrated on `develop`
-by ordinary push. Develop run `45990688069`, attempt 1, is terminal SUCCESS:
-source-static and source-gates passed after docs-only range validation;
-active-tests, full-tests, certification-tests, and certification-full were
-skipped. This is not a new FULL certification. The C6 status correction and
-this wording correction are docs-only; neither changes PM2A implementation
-source. The accepted C3 implementation and its C5 source integration evidence
-remain unchanged.
+`59b065160a33005932fa0c27725b0bd17bd007cb` was integrated on `develop` by
+ordinary push as a historical docs-only checkpoint. Develop run `45990688069`,
+attempt 1, is terminal SUCCESS: source-static and source-gates passed after
+docs-only range validation; active-tests, full-tests, certification-tests, and
+certification-full were skipped.
+
+The C6 docs-only feature run `45993792476`, attempt 1, on HEAD
+`ea2522cbe1e4d8c12acd1d686ae9ad33fdfb812f` / tree
+`f0a01f7b3f4db4e070efa986093c67e6be505873`, is terminal SUCCESS:
+source-static and source-gates passed; active-tests, full-tests,
+certification-tests, and certification-full were skipped. C6-C1 is docs-only
+HEAD `3f4dba96dea1cc7b63c5e4d37b889abeaf2202fa` / tree
+`0cc85ec06778da6f1433f3788c58d4f78741d754`. Its feature run `45994722624`,
+attempt 1, is terminal SUCCESS with source-static and source-gates passed and
+test/certification jobs skipped. C6-C1 was integrated by local
+`git merge --ff-only`, followed by ordinary `git push origin develop`. Develop
+run `45995025872`, attempt 1, is terminal SUCCESS: source-static and
+source-gates passed; active-tests, full-tests, certification-tests, and
+certification-full were skipped. C5 is a historical docs-only integration;
+C6-C1 is the current develop identity. These documentation checkpoints changed
+no PM2A implementation source. C3 remains the accepted implementation source;
+the docs-only runs do not add a new FULL certification. No local FULL was run.
 
 Across implementation, focused tests, admission, and mapped CI, no provider,
 OAuth, credential, account, or order read occurred. Review, placement,

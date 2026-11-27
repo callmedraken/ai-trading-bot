@@ -42,13 +42,20 @@ other profiles were skipped. ChatGPT classified this as
 `PREPUBLICATION_COVERAGE_DEFECT`; the preserved run was not retried.
 
 C5 docs-only closeout HEAD `5235187cd2e2470dca7d20bd2c1e9fe6acdd4185` / tree
-`59b065160a33005932fa0c27725b0bd17bd007cb` is the current fast-forward
-integration identity on `develop`. Develop run `45990688069`, attempt 1, is
-terminal SUCCESS: source-static and source-gates passed after docs-only range
-validation; active, full, and certification jobs were skipped. No local FULL
-was run. The C6 status correction and this wording correction are docs-only;
-neither changes PM2A implementation source. The accepted C3 implementation and
-its C5 source integration evidence remain unchanged.
+`59b065160a33005932fa0c27725b0bd17bd007cb` is a historical PM2A documentation
+integration. Its feature run `45990380031` and develop run `45990688069` passed
+source-static and source-gates; active, full, and certification jobs were
+skipped. Current develop integration is C6-C1 HEAD
+`3f4dba96dea1cc7b63c5e4d37b889abeaf2202fa` / tree
+`0cc85ec06778da6f1433f3788c58d4f78741d754`. C6 docs-only feature run
+`45993792476` on HEAD `ea2522cbe1e4d8c12acd1d686ae9ad33fdfb812f` / tree
+`f0a01f7b3f4db4e070efa986093c67e6be505873`, and C6-C1 docs-only feature run
+`45994722624`, passed source-static/source-gates; test and certification jobs
+were skipped. C6-C1 was integrated via local `git merge --ff-only`, followed by
+`git push origin develop`. Develop run `45995025872` is terminal SUCCESS:
+source-static and source-gates passed; active, full, and certification jobs
+were skipped. These documentation checkpoints changed no PM2A implementation
+source; C3 remains the accepted implementation source. No local FULL was run.
 
 The public-reference review, bounded capability matrix, and metadata-only
 schema qualification path are recorded in

@@ -2,13 +2,15 @@
 
 ## Status and scope
 
-This record covers the **SOURCE/CERTIFICATION ACCEPTED** source-only PM2A
-checkpoint at C3 HEAD `834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
-`0051affa15e94253a15a47c7d51e6f5b9ca625ec`, based on starting parent
-`6cc6a815325b49165ef5d0f48af744707715dc1f` / tree
-`cb7cd3b5e422b65429782b42f1cfe822082e75cc`. It does not contain a real
-Robinhood observation result. The currently authorized provider's actual tool
-schemas have not been observed, so order scope remains
+This record covers the PM2A source-only implementation accepted at C3 HEAD
+`834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
+`0051affa15e94253a15a47c7d51e6f5b9ca625ec` and fast-forward integrated on
+`develop` at C4 HEAD `02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
+`c8f93e5765ea05f12538bcdac455c1879413bcc4`. The C4 integration method and
+feature docs-only CI result are recorded in the chronology below; no develop CI
+run at C4 is claimed. This record does not contain a real Robinhood observation
+result. The currently authorized provider's actual tool schemas have not been
+observed, so order scope remains
 `CURRENT_PROVIDER_ORDER_SCOPE_UNQUALIFIED`; the existing read path remains
 `ROBINHOOD_AGENTIC_BOUNDED`. No account-wide open-order completeness is claimed.
 
@@ -208,13 +210,41 @@ Mapped run `45984464000`, attempt 1, is terminal SUCCESS: source-static,
 active-tests, source-gates, and all seven canonical FULL lanes passed. Lane
 durations were broad-1 5m45s, broad-2 4m29s, broad-3 3m48s, broad-4 3m46s,
 broad-5 3m12s, broad-6 4m37s, and broad-7 5m23s. C3 is the accepted PM2A
-source; `develop` remains at the starting parent. The earlier red run
+implementation source. At C3 publication, `develop` was still at the starting
+parent; it was later advanced to C4 as recorded below. The earlier red run
 `45974606765` and artifact `15185959030` remain unchanged and preserved; neither
 C2 nor C3 reran or overwrote them.
+
+## Post-integration C4 chronology
+
+C4 is docs-only HEAD `02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
+`c8f93e5765ea05f12538bcdac455c1879413bcc4`, a descendant of the accepted C3
+implementation source. ChatGPT advanced remote `develop` from expected base
+`6cc6a815325b49165ef5d0f48af744707715dc1f` to C4 with the GitHub update-ref
+API, supplying `expected_sha` and `force=false`. This exact-SHA non-force
+fast-forward succeeded; the prescribed local `git merge --ff-only` followed by
+ordinary push was not used for the remote update. No force or history rewrite
+occurred. The canonical local develop checkout was aligned afterward with an
+elevated `git merge --ff-only` and `git fetch`. It was tracked/index-clean with
+the same 17 expected untracked artifacts; all were preserved. The feature ref
+remained at C4 when integration completed.
+
+C4 feature docs-only run `45987424791`, attempt 1, is terminal SUCCESS:
+source-static and source-gates passed. Active-tests, certification-tests,
+certification-full, and full-tests were skipped for that docs-only profile.
+This is a feature-branch CI result; no develop CI run at C4 is claimed. The
+current post-integration C5 closeout is a docs-only feature-branch descendant;
+it changes no PM2A source and does not merge anything into `develop`.
 
 Across implementation, focused tests, admission, and mapped CI, no provider,
 OAuth, credential, account, or order read occurred. Review, placement,
 cancellation, transfer, broker, and production-effect attempts remained zero.
+
+The next milestone is **Architecture 152-PM2B — Research Evidence and Signal
+Catalog**. PM2B must review Qlib and PyPortfolioOpt before defining research
+evidence provenance and the initial valuation/fundamental, growth, quality,
+technical, volatility/downside, relative-attractiveness, and portfolio-context
+features. PM2B is not implemented in this PM2A checkpoint.
 
 ## Prepared future real-read operation (NOT YET AUTHORIZED)
 

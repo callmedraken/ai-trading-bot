@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - PM1 closed; PM2A source/certification accepted; integration pending
+## Current milestone - PM1 closed; PM2A integrated; PM2B next
 
 Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
@@ -26,14 +26,19 @@ planning, durable service and synthetic desktop contracts remain as documented
 in [Architecture 152-PM1](architecture/152-pm1-account-aware-portfolio-manager.md)
 and the [validation record](validation/arch152-pm1-portfolio-manager-foundation.md).
 
-Architecture 152-PM2A's source-only checkpoint is **SOURCE/CERTIFICATION
+Architecture 152-PM2A's source-only implementation is **SOURCE/CERTIFICATION
 ACCEPTED** at C3 HEAD `834ac5b942eb436ab7d06809953f21f7a0f8fcc5` / tree
 `0051affa15e94253a15a47c7d51e6f5b9ca625ec`. C3 mapped run `45984464000`,
 attempt 1, is terminal SUCCESS: source-static, active-tests, all seven mapped
-canonical FULL lanes, and source-gates passed. C2 run `45981347432`, attempt 1,
-also passed those jobs. No local FULL was run. `develop` remains at the PM2A
-starting identity `6cc6a815325b49165ef5d0f48af744707715dc1f` / tree
-`cb7cd3b5e422b65429782b42f1cfe822082e75cc`; PM2A is not integrated.
+canonical FULL lanes, and source-gates passed. No local FULL was run.
+
+C4 docs-only closeout HEAD `02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
+`c8f93e5765ea05f12538bcdac455c1879413bcc4` was fast-forward integrated into
+`develop`; this is the PM2A integration identity. C4 feature docs-only run
+`45987424791`, attempt 1, is terminal SUCCESS: source-static and source-gates
+passed; the other profiles were skipped for the docs-only checkpoint. The
+current post-integration docs closeout is a docs-only feature-branch descendant
+and does not change the accepted C3 implementation or integrated C4 source.
 
 The public-reference review, bounded capability matrix, and metadata-only
 schema qualification path are recorded in

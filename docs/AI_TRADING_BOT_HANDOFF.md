@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM1 closed; PM2A source/certification accepted; integration pending
+## Current milestone: PM1 closed; PM2A integrated; PM2B next
 
 Architecture 152-PM1 is **SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
 INTEGRATED** at HEAD `0fc38b187169ce2322bca108751b4c05fe4078c0` / tree
@@ -42,10 +42,14 @@ PM2A is **SOURCE/CERTIFICATION ACCEPTED** at C3 HEAD
 `0051affa15e94253a15a47c7d51e6f5b9ca625ec`, on
 `feature/robinhood-portfolio-manager-current`. C3 mapped run `45984464000`,
 attempt 1, passed source-static, active-tests, all seven canonical FULL lanes,
-and source-gates. C2 run `45981347432`, attempt 1, passed the same gates. No
-local FULL was run. `develop` remains at the starting identity
-`6cc6a815325b49165ef5d0f48af744707715dc1f` / tree
-`cb7cd3b5e422b65429782b42f1cfe822082e75cc`; PM2A integration is pending.
+and source-gates. No local FULL was run. C4 docs-only closeout HEAD
+`02d38136e741c84222e2da0177fca4a52f5d25bd` / tree
+`c8f93e5765ea05f12538bcdac455c1879413bcc4` was fast-forward integrated into
+`develop`; this is the PM2A integration identity. C4 feature docs-only run
+`45987424791`, attempt 1, passed source-static and source-gates; the other
+profiles were skipped for the docs-only checkpoint. This post-integration
+documentation closeout is a docs-only feature-branch descendant. C3
+implementation source and C4 develop integration are unchanged.
 
 The public-reference review and complete source capability matrix are in
 [Architecture 152-PM2A](architecture/152-pm2a-brokerage-observation-and-reconciliation.md).

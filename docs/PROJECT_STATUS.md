@@ -1,34 +1,41 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - PM2C synthetic research evidence contracts
+## Current milestone - PM2C closed; PM2D next
 
-The current checkpoint is **Architecture 152-PM2C — Synthetic Research
-Evidence Contracts**, an implementation/documentation draft pending exact
-source review, publication, mapped CI, and integration. It implements the
-frozen PM2B chain with three synthetic-only Portfolio Manager modules:
-`research_catalog.py`, `research_evidence.py`, and `research_snapshot.py`.
-Focused verification currently records 15 snapshot tests and 86 combined
-affected tests passing; whole-repository Ruff check/format and `git diff
---check` also pass. No provider, real data, credential, account, AI request,
-broker/order, or production effect is claimed.
+Architecture 152-PM2C — Synthetic Research Evidence Contracts is
+**SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED** at HEAD
+`13e5981548ad3c072ff43f641b5eaa5ed909f0b1` / tree
+`290c3b22e58d75c9c511e27264e5811d245bcc99`, direct parent
+`1cfd1e005f6040187e82ba5bac0650d8a4e68d41`.
 
-PM2B remains the design authority for the nine-family catalog, point-in-time
-semantics, provenance, availability vocabulary, and Qlib/PyPortfolioOpt
-exclusions. PM1 remains synthetic, disarmed, and preview-only; PM2A C3 remains
-the accepted implementation identity. Real PM2A read-only qualification is
-**NOT YET AUTHORIZED**, and Arch149 remains sealed. The local results above are
-implementation evidence only. No PM2C publication SHA, CI run, exact-source
-acceptance, or integration identity is recorded here; ChatGPT owns those later
-decisions.
+Feature mapped FULL run `46087041433`, attempt 1, is terminal SUCCESS:
+source-static, active-tests, source-gates, and all seven canonical FULL lanes
+passed. Generic FULL and unmapped certification jobs were skipped. Independent
+exact-source review accepted the ten-path PM2C implementation and found no
+provider, credential, AI, optimizer, dispatch, or production authority leak.
 
-The next milestone after PM2C source/certification/integration is **PM2D —
-data-source capability and provenance qualification**, separately designed and
-separately authorized. It must not infer provider authority from PM2C.
+Develop run `46088374165`, attempt 1, is terminal SUCCESS at the exact
+accepted source with
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate FULL. Integration was an ordinary
+local fast-forward plus normal develop push. The canonical 17 develop untracked
+artifacts were preserved.
+
+PM2C remains synthetic/in-memory only. PM1 remains disarmed and preview-only.
+PM2A real read-only qualification is **NOT YET AUTHORIZED**. Arch149
+confirmation remains sealed. No real market-data or brokerage read, credential,
+OAuth, AI-provider call, broker/order effect, or production mutation occurred
+as part of PM2C.
+
+The next milestone is **PM2D — data-source capability and provenance
+qualification**. PM2D must begin with public documentation/schema/repository
+review and compare candidate sources against PM2B/PM2C point-in-time,
+revision, basis, coverage, provenance, licensing, cost, and historical
+reconstruction requirements. PM2C grants PM2D no provider-read authority.
 
 See [Architecture 152-PM2C](architecture/152-pm2c-synthetic-research-evidence-contracts.md),
 its [validation record](validation/arch152-pm2c-synthetic-research-evidence-contracts.md),
-and the predecessor [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md)
-and [PM2B validation record](validation/arch152-pm2b-research-evidence-and-signal-catalog.md).
+and the predecessor [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md).
 
 ### Historical PM2B design checkpoint
 

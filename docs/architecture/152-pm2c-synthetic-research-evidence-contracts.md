@@ -1,9 +1,15 @@
 # Architecture 152-PM2C — Synthetic Research Evidence Contracts
 
-**Status:** implementation draft; source publication, mapped CI, exact-source
-acceptance, and integration identities are pending. PM2C is the bounded
-synthetic implementation of the frozen [Architecture 152-PM2B research
-evidence and catalog](152-pm2b-research-evidence-and-signal-catalog.md).
+**Status:** SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED.
+The accepted PM2C implementation is HEAD
+`13e5981548ad3c072ff43f641b5eaa5ed909f0b1` / tree
+`290c3b22e58d75c9c511e27264e5811d245bcc99`. Feature mapped FULL run
+`46087041433`, attempt 1, is terminal SUCCESS with source-static,
+active-tests, source-gates, and all seven canonical FULL lanes green. Develop
+run `46088374165`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`; no
+duplicate FULL ran. PM2C is the bounded synthetic implementation of the frozen
+[Architecture 152-PM2B research evidence and catalog](152-pm2b-research-evidence-and-signal-catalog.md).
 It does not claim that any provider, account, or real market data has been
 read.
 
@@ -187,9 +193,8 @@ close or a difference of returns; and true zero currency/quantity must remain
 distinct from missing currency/quantity. These are test-contract cases only,
 not production feed or computation claims.
 
-After PM2C source, focused verification, mapped certification, exact review,
-and integration are accepted, the next separately designed milestone is
-**PM2D — data-source capability and provenance qualification**. PM2D must
-determine which public or commercial sources can supply the PM2B catalog with
-trustworthy point-in-time versions, timing, basis, coverage, and evidence
-identities. PM2D does not receive provider authorization from this document.
+PM2C is closed. The next separately designed milestone is **PM2D —
+data-source capability and provenance qualification**. PM2D must determine
+which public or commercial sources can supply the PM2B catalog with trustworthy
+point-in-time versions, timing, basis, coverage, and evidence identities.
+PM2D does not receive provider authorization from PM2C or this document.

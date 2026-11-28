@@ -1,10 +1,13 @@
 # Architecture 152-PM2C — Synthetic Research Evidence Contracts validation record
 
-**Validation type:** implementation-validation draft. The contract map below
-is grounded in the current PM2C catalog and evidence source modules, while
-publication SHA, mapped CI, exact-source acceptance, and integration remain
-pending. This record authorizes no provider, account, credential, AI, broker,
-market-data, or production operation.
+**Validation type:** terminal implementation validation. PM2C is
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD
+`13e5981548ad3c072ff43f641b5eaa5ed909f0b1` / tree
+`290c3b22e58d75c9c511e27264e5811d245bcc99`. Feature mapped FULL run
+`46087041433`, attempt 1, is terminal SUCCESS; develop run `46088374165`,
+attempt 1, is terminal SUCCESS with exact feature-certification reuse and no
+duplicate FULL. This record authorizes no provider, account, credential, AI,
+broker, market-data, or production operation.
 
 ## 1. Contract coverage map
 
@@ -97,9 +100,16 @@ Observed result: **86 passed in 0.79s**, exit 0, basetemp
 
 Whole-repository `ruff check .` and `ruff format --check .` both completed
 with exit 0 after scoped formatting of the owned snapshot files; `git diff
---check` also completed with exit 0. These are source hygiene results, not
-local FULL, mapped FULL, source-gate, admission, publication, acceptance, or
-integration evidence.
+--check` also completed with exit 0. These are source hygiene results and were followed by the published
+mapped certification. Feature run `46087041433`, attempt 1, classified the
+change as FULL/ACTIVE with certification profile `full`; source-static,
+active-tests, source-gates, and broad-1 through broad-7 all passed. Generic
+FULL and unmapped certification jobs were skipped. Exact-source review accepted
+HEAD `13e5981548ad3c072ff43f641b5eaa5ed909f0b1` / tree
+`290c3b22e58d75c9c511e27264e5811d245bcc99`. Develop run
+`46088374165`, attempt 1, then passed with
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate FULL.
 
 The checked documentation scope is exactly these four Markdown paths: this
 validation record, its owning [Architecture 152-PM2C](../architecture/152-pm2c-synthetic-research-evidence-contracts.md),
@@ -117,8 +127,8 @@ sealed Arch149 access, market-data acquisition, database storage, scoring,
 ranking, forecasting, covariance, optimizer objectives, allocation, or live
 trading. Qlib and PyPortfolioOpt remain non-dependencies and non-authorities.
 
-After PM2C is source-accepted, certified, reviewed, and integrated, PM2D is
-the next separately designed milestone: qualify public/commercial data-source
-capabilities and provenance methodology against the PM2B catalog. PM2D must
-retain PM2C's fail-closed timing, identity, basis, availability, and authority
-boundaries and does not inherit provider authorization from this draft.
+PM2C is closed. PM2D is the next separately designed milestone: qualify
+public/commercial data-source capabilities and provenance methodology against
+the PM2B catalog. PM2D must retain PM2C's fail-closed timing, identity, basis,
+availability, and authority boundaries and does not inherit provider
+authorization from PM2C.

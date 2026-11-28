@@ -606,10 +606,13 @@ ARCH152_PM2D_B1_BRANCH: Final = ARCH152_PM1_BRANCH
 ARCH152_PM2D_B1_SOURCE_PATHS: Final = (
     "src/trading_bot/portfolio_manager/source_qualification.py",
     "src/trading_bot/portfolio_manager/sec_sharadar_qualification.py",
+    "src/trading_bot/portfolio_manager/sec_native_observation.py",
+    "src/trading_bot/portfolio_manager/sec_real_observation.py",
 )
 ARCH152_PM2D_B1_TEST_PATHS: Final = (
     "tests/portfolio_manager/test_source_qualification.py",
     "tests/portfolio_manager/test_sec_sharadar_qualification.py",
+    "tests/portfolio_manager/test_sec_native_observation.py",
 )
 ARCH152_PM2D_B1_PATHS: Final = (
     *ARCH152_PM2D_B1_SOURCE_PATHS,
@@ -623,6 +626,8 @@ ARCH152_PM2D_B1_PATHS: Final = (
     ".github/workflows/checkpoint-source-gates.yml",
     "docs/architecture/152-pm2d-b1-sec-sharadar-bounded-qualification-source.md",
     "docs/validation/arch152-pm2d-b1-sec-sharadar-bounded-qualification-source.md",
+    "docs/architecture/152-pm2d-b1-r-real-fundamental-observation-readiness.md",
+    "docs/validation/arch152-pm2d-b1-r-real-fundamental-observation-readiness.md",
     "docs/PROJECT_STATUS.md",
     "docs/AI_TRADING_BOT_HANDOFF.md",
 )
@@ -29461,7 +29466,7 @@ def _arch152_pm1_authority_check(repo_root: Path) -> tuple[str, ...]:
 
 
 def _arch152_pm2d_b1_authority_check(repo_root: Path) -> tuple[str, ...]:
-    """Register PM2D-B1 as a fake-only source route with mapped FULL coverage."""
+    """Keep B1 fake-only and B1-R readiness on its mapped FULL source route."""
     from scripts import run_test_certification as certification
 
     specs = _checkpoint_specs()
@@ -29547,6 +29552,56 @@ def _arch152_pm2d_b1_authority_check(repo_root: Path) -> tuple[str, ...]:
     for relative in ARCH152_PM2D_B1_PATHS:
         if not (repo_root / relative).is_file():
             failures.append("Architecture 152-PM2D-B1 route is missing " + relative)
+    real_observer = "trading_bot.portfolio_manager." + "sec_real_observation"
+    native_core = "src/trading_bot/portfolio_manager/sec_native_observation.py"
+    observer_calls = (
+        "observe_sec_" + "once(",
+        "_observe_sec_once" + "_with_transport(",
+        "_SECReadOnly" + "Transport().get(",
+    )
+    for search_root in (repo_root / "src" / "trading_bot", repo_root / "scripts"):
+        for path in search_root.rglob("*.py"):
+            if path.as_posix().endswith(
+                "src/trading_bot/portfolio_manager/sec_real_observation.py"
+            ):
+                continue
+            try:
+                source = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                failures.append("native SEC observer reachability scan failed")
+                break
+            if (
+                real_observer in source
+                or re.search(
+                    r"(?m)^\s*(?:from|import)\s+[\w.]*sec_real_observation\b",
+                    source,
+                )
+                or (
+                    path.relative_to(repo_root).as_posix() != native_core
+                    and any(call in source for call in observer_calls)
+                )
+            ):
+                failures.append(
+                    "native SEC observer is reachable from application "
+                    "or source-admission code"
+                )
+                break
+    for path in (repo_root / "tests").rglob("*.py"):
+        try:
+            test_source = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            failures.append("native SEC pytest reachability scan failed")
+            break
+        if (
+            real_observer in test_source
+            or "sec_real_observation" in test_source
+            or ("observe_sec_" + "once(") in test_source
+            or "_SECReadOnlyTransport" in test_source
+        ):
+            failures.append(
+                "native SEC real-observation entry is reachable from pytest"
+            )
+            break
     workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
         encoding="utf-8"
     )

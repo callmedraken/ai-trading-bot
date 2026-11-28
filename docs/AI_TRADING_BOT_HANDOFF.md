@@ -1,65 +1,58 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM2D-B1 SEC/Sharadar source foundation
+## Current milestone: PM2D-B1-R real fundamental observation readiness
 
-PM2D-A is accepted and integrated at HEAD
-`9b9f5e0c7f0f5ab7addbe2c291c20df4b4d2903b` / tree
-`1b42c70df8a686dcd231b6dd563640ad18f1b200`. Feature documentation run
-`46105978117` and develop documentation run `46106912628` are terminal
-SUCCESS. The persistent Portfolio Manager feature branch is
-`feature/robinhood-portfolio-manager-current`; its worktree is
+The accepted PM2D-B1-C1 parent is HEAD
+`3c9aa6c1dad6db5417bc3622a671906c13731afc` / tree
+`82cd1c2a151ed332e0c898476ddd1686b7ef5729`. Feature mapped FULL run
+`46114211575` and develop acceptance run `46115517155` are terminal SUCCESS;
+develop used `exact_feature_certification`. The persistent feature branch is
+`feature/robinhood-portfolio-manager-current`, worktree
 `F:\AI\worktrees\ai-trading-bot-portfolio-manager-current`, origin
-`https://github.com/callmedraken/ai-trading-bot.git`. The canonical develop
-checkout retained its exact 17 pre-existing untracked artifacts.
+`https://github.com/callmedraken/ai-trading-bot.git`. Canonical develop remains
+at the parent identity and retains all 17 pre-existing untracked artifacts.
 
-PM2C implementation was accepted at HEAD
-`13e5981548ad3c072ff43f641b5eaa5ed909f0b1` / tree
-`290c3b22e58d75c9c511e27264e5811d245bcc99`. Feature mapped FULL run
-`46087041433` and develop exact-certification-reuse run `46088374165` are
-terminal SUCCESS. PM2C closeout docs runs `46088679818` and `46101847732`
-(feature and develop) are terminal SUCCESS.
+PM2D-B1-R adds a separate native SEC plan/parser and synthetic-only
+verification. The SEC result is `SEC_OBSERVATION_BLOCKED`: EDGAR can provide
+accession-bound as-filed bytes, but SEC does not provide a dependable first-
+public timestamp for exact filing content, and CIK does not prove the exact
+PM2C security/share class. Sharadar remains
+`SHARADAR_VERSION_OR_ENTITLEMENT_UNQUALIFIED`: public SF1 ARY/ARQ documentation
+does not establish immutable prior-version retrieval or exact vendor
+availability, and project entitlement/retention rights remain unresolved. No
+SEC filing or Sharadar fact was requested; no provider subscription, login,
+credential, endpoint, or account was accessed.
 
-PM2D-B1 is a source-only/fake-only checkpoint with exact-source acceptance and
-mapped FULL evidence pending. It prepares one bounded comparison between an
-exact SEC accession/fact and one selected Sharadar SF1 As Reported
-revenue/version. The source has no real provider transport or default
-provider, credentials, API key, acquisition, adapter, account/AI/broker effect,
-or Arch149 access. **NO REAL PROVIDER OBSERVATION AUTHORIZED.**
+The parser and synthetic transport harness are in a module separate from the
+real HTTPS transport and manual observation entrypoint. That real entrypoint
+is not imported by application startup, source admission, pytest, or CI; the
+route guard checks this boundary. The plan is one exact accession archive
+request for one original annual 10-K and its named `EX-101.INS` member, with
+one request, 10 MB response, 200 filing
+members, 100,000 XML elements, 10,000 target-concept facts, 10-second request,
+30-second total and no retry. The real issuer/security, CIK, accession, fiscal
+context and independent public-availability witness are not yet selected, so
+the plan template is not executable. A successful synthetic parse remains
+blocked and cannot create a PM2C `SourceFact`. B1’s existing fake-provider type
+restriction remains unchanged.
 
-The narrow candidate is USD revenue on SF1 ARY, plus requested ARQ Q1 only if a
-separate exact grain witness matches the parsed SEC and SF1 facts; an SF1 row
-alone is insufficient. B1 does not implement Q2/Q3/Q4 quarterization, so those
-roles remain unavailable. Any later support requires compatible same-FY YTD
-component lineage for Q2/Q3 and annual minus same-FY Q3 YTD with both exact
-components bound for Q4. ART and MRQ/MRY/MRT are rejected for historical PM2C
-facts. SEC period end/filing date, Sharadar `datekey`, `lastupdated`, and local
-observation time remain distinct; no one inherits another source's
-availability. Amendment and early-8-K lineage require exact fact identity.
+See [Architecture 152-PM2D-B1-R](architecture/152-pm2d-b1-r-real-fundamental-observation-readiness.md),
+its [validation record](validation/arch152-pm2d-b1-r-real-fundamental-observation-readiness.md),
+the accepted [B1 source contract](architecture/152-pm2d-b1-sec-sharadar-bounded-qualification-source.md),
+and the [PM2D-A source assessment](architecture/152-pm2d-data-source-capability-and-provenance-qualification.md).
 
-Still unqualified are regular-session close mapping and immutable corrections,
-complete point-in-time action history, selected SF1 field/grain/YTD/Q4 mappings
-beyond the narrow B1 candidate, fixed NTM and 21-session estimate history,
-exact eligible shares, and historical peer/sector membership. FMP is rejected
-for historical analyst estimates because its internal revision timestamps
-cannot be queried by date. Current provider values, classifications, or index
-membership cannot be projected backward.
-
-See [Architecture 152-PM2D-A](architecture/152-pm2d-data-source-capability-and-provenance-qualification.md)
-and its [validation record](validation/arch152-pm2d-data-source-capability-and-provenance-qualification.md),
-the [PM2D-B1 source contract](architecture/152-pm2d-b1-sec-sharadar-bounded-qualification-source.md),
-and its [validation record](validation/arch152-pm2d-b1-sec-sharadar-bounded-qualification-source.md).
-
-PM1 remains disarmed and preview-only; PM2A real read-only qualification is
-**NOT YET AUTHORIZED**; Arch149 remains sealed. **Next step:** complete the
-exact-source review and terminal mapped feature FULL. Return the exact feature
-HEAD/tree, workflow run ID and attempt, source-static/active-tests results,
-all seven lane results, and any authority or source-contract failure. If
-accepted, ChatGPT reviews exact-source integration readiness. Only after
-acceptance and develop integration, plus separately reviewed real-observation
-wiring, may ChatGPT consider a bounded one-attempt PM2D-B1-O observation. The
-B1 operator accepts only exact offline fake providers and is not a real
-transport. No automatic retry or expanded search is allowed. Alpaca
-price/corporate-action qualification remains separate PM2D-B2.
+PM1 remains disarmed and preview-only; PM2A real account reads remain
+unauthorized; Arch149 remains sealed. **Next step:** ChatGPT independently
+reviews the exact B1-R published diff, successful FEATURE and
+PROSPECTIVE_DEVELOP admission, and terminal mapped feature FULL evidence. No
+develop integration or real observation is part of this transition. The
+future observation gate requires selecting an independent real subject and
+original annual accession, proving security identity and public availability,
+then obtaining a new exact-plan review and separate effect authorization.
+Return the published HEAD/tree, exact staged/published paths, admission
+evidence, terminal workflow run ID/attempt and seven lane results, focused test
+and Ruff results, and the zero-real-effect counter ledger. No local FULL should
+be run for this mapped checkpoint.
 
 ### Historical PM2B design checkpoint
 

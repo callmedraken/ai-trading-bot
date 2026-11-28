@@ -341,6 +341,40 @@ def test_exact_fake_match_builds_only_synthetic_pm2c_candidate() -> None:
     assert source_fact.as_of_witness.proves(source_fact, case[0].availability_cutoff)
 
 
+def test_direct_q1_comparison_requires_exact_independent_grain_witness() -> None:
+    plan = _plan(role=PeriodRole.DIRECT_Q1)
+    case = _case(plan=plan)
+    result = _compare(case)
+    assert result.outcome is QualificationOutcome.QUALIFIED_CANDIDATE
+
+    plan, sec, sf1, sec_witness, _ = case
+    without_witness = compare_candidate(
+        plan, (sec,), (sf1,), (sec_witness,), (), OBSERVED
+    )
+    assert without_witness.outcome is QualificationOutcome.SOURCE_VERSION_UNPROVEN
+
+
+@pytest.mark.parametrize(
+    "witness_changes",
+    [
+        {"period_role": PeriodRole.ANNUAL},
+        {"period_start": date(2024, 1, 2)},
+        {"period_end": date(2024, 3, 30)},
+    ],
+)
+def test_direct_q1_rejects_incompatible_witness_grain_or_period(
+    witness_changes: dict[str, object],
+) -> None:
+    plan, sec, sf1, sec_witness, sf1_witness = _case(
+        plan=_plan(role=PeriodRole.DIRECT_Q1)
+    )
+    incompatible = replace(sf1_witness, **witness_changes)
+    result = compare_candidate(
+        plan, (sec,), (sf1,), (sec_witness,), (incompatible,), OBSERVED
+    )
+    assert result.outcome is QualificationOutcome.SHARADAR_FIELD_UNSUPPORTED
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

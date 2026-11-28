@@ -554,6 +554,22 @@ def test_arch152_pm2d_b1_is_source_only_and_diff_selected_on_pm_branch():
     assert "scripts/current_source_authority.py" in spec.ruff_paths
     assert set(runner.ARCH152_PM2D_B1_SOURCE_PATHS) <= set(spec.ruff_paths)
     assert set(runner.ARCH152_PM2D_B1_TEST_PATHS) <= set(spec.tests)
+    assert (
+        "src/trading_bot/portfolio_manager/sec_native_observation.py"
+        in runner.ARCH152_PM2D_B1_SOURCE_PATHS
+    )
+    assert (
+        "src/trading_bot/portfolio_manager/sec_" + "real_observation.py"
+        in runner.ARCH152_PM2D_B1_SOURCE_PATHS
+    )
+    assert (
+        "tests/portfolio_manager/test_sec_native_observation.py"
+        in runner.ARCH152_PM2D_B1_TEST_PATHS
+    )
+    assert (
+        "docs/architecture/152-pm2d-b1-r-real-fundamental-observation-readiness.md"
+        in runner.ARCH152_PM2D_B1_PATHS
+    )
     assert "tests/portfolio_manager" in certification.FULL_DIRECTORIES
     assert spec.authority_check is runner._arch152_pm2d_b1_authority_check
     assert spec.preflight is spec.execute is spec.remote_head_env is None

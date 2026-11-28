@@ -1,6 +1,73 @@
 # AI Trading Bot - Project Status
 
-## Current milestone — PM2D-B1-R-C1-C2 SEC observation boundary
+## Current milestone — PM2D-B1-N reusable SEC financial statement ingestion
+
+The accepted PM2D-B1-R-C2 parent is HEAD
+`85d2cc1aec12d172d0225eac61bda770becdbbc7` / tree
+`acf07f52d33f15fad7e391329076c015b844ce77`. Feature mapped FULL run
+`46130743708`, attempt 1, completed SUCCESS across all seven lanes. Develop
+acceptance run `46131689560`, attempt 1, completed SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`; all test
+and certification jobs were skipped. This is the current B1-N base; older C1
+parent references below remain historical chronology.
+
+B1-N extends the existing source-only B1 route with reusable financial
+statement extraction from an already-held, exact-digest SEC instance. The
+public-library review selected no dependency: EdgarTools' numeric and
+standardization conveniences do not establish the exact decimal and accounting
+basis required here, while Arelle would add a broader taxonomy/runtime
+dependency closure and needs an explicit offline taxonomy package. The
+checkpoint retains the existing B1 mapped FULL route and does not change B1's
+fake-provider boundary or B1-R's real transport.
+
+The offline discovery artifact is the 1,350,303-byte Old Dominion Freight Line
+instance with SHA-256
+`96437a6d33f26d4f559afcd7e7b14ebafd9f84fcee909520c16f11467f0a06b0`, original
+10-K accession `0001564590-19-004755`, `odfl-20181231.xml`, sequence 11, annual
+context `C_0000878927_20180101_20181231`. The initial hypothesis of
+`RevenueFromContractWithCustomerExcludingAssessedTax` found zero facts; the
+consolidated fact uses the distinct
+`RevenueFromContractWithCustomerIncludingAssessedTax` concept and is
+`4043695000` USD, without dimensions. Separate dimensional LTL and other-
+service facts are `3982658000` USD and `61037000` USD. This is discovery
+evidence, not production observation or current investment research. No
+additional SEC request is authorized, and the canonical real-observation
+attempt remains unconsumed.
+
+The frozen B1-R `SECObservationPlan` requires
+`RevenueFromContractWithCustomerExcludingAssessedTax`; this ODFL
+IncludingAssessedTax fact cannot use that plan. B1-N does not retarget B1-R.
+Any future acquisition must match the frozen concept or use a separately
+reviewed successor plan/source.
+
+Offline extraction also identifies exact mapped operating income, diluted EPS,
+operating cash flow, cash, assets, liabilities, stockholders' equity, and
+standalone productive-asset-payment and debt concepts. Generic `NetIncomeLoss`
+does not establish PM2B attributable-to-common income. PPE-specific capital
+expenditure is missing; `PaymentsToAcquireProductiveAssets` remains its own
+field. Debt concepts remain separate and are not combined into a synthetic
+total. Value-level contexts, precision, unsupported concepts, and exact
+outcomes are in the B1-N validation record.
+
+ODFL operational admission remains blocked. The discovery file is not a B1-R
+consumed response and has no trusted response-receipt record, independent
+issuer-to-security/share-class mapping, or exact PM2C membership binding. No
+PM2C SourceFact or operational snapshot is emitted. No timestamp may be
+inferred from filing metadata or file modification time. Historical
+reconstruction remains blocked without a witness for public availability of
+the exact source version at the requested cutoff.
+
+See the [B1-N architecture](architecture/152-pm2d-b1-n-reusable-sec-financial-statement-ingestion.md)
+and [validation record](validation/arch152-pm2d-b1-n-reusable-sec-financial-statement-ingestion.md)
+for the extraction contract, pinned public-library review, exact offline
+results, supported/unavailable fields, bridge readiness, and prerequisites.
+Next, finish the narrow custody-bridge correction, focused verification, and
+combined Ruff/diff checks, then complete exact-source review,
+FEATURE and PROSPECTIVE_DEVELOP admission, one ordinary feature push, and the
+terminal mapped GitHub FULL. Do not run local FULL, integrate `develop`, or
+make a real provider request in this checkpoint.
+
+### Historical predecessor — PM2D-B1-R-C1-C2 SEC observation boundary
 
 The accepted PM2D-B1-C1 parent is HEAD
 `3c9aa6c1dad6db5417bc3622a671906c13731afc` / tree

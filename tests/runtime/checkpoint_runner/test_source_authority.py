@@ -534,7 +534,18 @@ def _contexts(monkeypatch, *, develop_red=False):
     return state
 
 
-def test_feature_authority_reads_b1_path_diff_at_shared_pm_source_owner(monkeypatch):
+@pytest.mark.parametrize(
+    "changed_path",
+    (
+        "src/trading_bot/portfolio_manager/sec_financial_evidence.py",
+        "src/trading_bot/portfolio_manager/sec_financial_statements.py",
+        "tests/portfolio_manager/test_sec_financial_evidence.py",
+        "tests/portfolio_manager/test_sec_financial_statements.py",
+    ),
+)
+def test_feature_authority_reads_each_b1_owned_path_at_shared_pm_source_owner(
+    monkeypatch, changed_path: str
+):
     state = {
         "head": "a" * 40,
         "tree": "b" * 40,
@@ -556,7 +567,7 @@ def test_feature_authority_reads_b1_path_diff_at_shared_pm_source_owner(monkeypa
     monkeypatch.setattr(
         current, "develop_static_checkpoints", lambda _: tuple(selected_specs)
     )
-    changed_paths = runner.ARCH152_PM2D_B1_SOURCE_PATHS
+    changed_paths = (changed_path,)
     path_reads = []
 
     def read_paths(repo):

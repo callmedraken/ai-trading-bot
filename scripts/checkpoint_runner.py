@@ -608,11 +608,15 @@ ARCH152_PM2D_B1_SOURCE_PATHS: Final = (
     "src/trading_bot/portfolio_manager/sec_sharadar_qualification.py",
     "src/trading_bot/portfolio_manager/sec_native_observation.py",
     "src/trading_bot/portfolio_manager/sec_real_observation.py",
+    "src/trading_bot/portfolio_manager/sec_financial_evidence.py",
+    "src/trading_bot/portfolio_manager/sec_financial_statements.py",
 )
 ARCH152_PM2D_B1_TEST_PATHS: Final = (
     "tests/portfolio_manager/test_source_qualification.py",
     "tests/portfolio_manager/test_sec_sharadar_qualification.py",
     "tests/portfolio_manager/test_sec_native_observation.py",
+    "tests/portfolio_manager/test_sec_financial_evidence.py",
+    "tests/portfolio_manager/test_sec_financial_statements.py",
 )
 ARCH152_PM2D_B1_PATHS: Final = (
     *ARCH152_PM2D_B1_SOURCE_PATHS,
@@ -628,6 +632,8 @@ ARCH152_PM2D_B1_PATHS: Final = (
     "docs/validation/arch152-pm2d-b1-sec-sharadar-bounded-qualification-source.md",
     "docs/architecture/152-pm2d-b1-r-real-fundamental-observation-readiness.md",
     "docs/validation/arch152-pm2d-b1-r-real-fundamental-observation-readiness.md",
+    "docs/architecture/152-pm2d-b1-n-reusable-sec-financial-statement-ingestion.md",
+    "docs/validation/arch152-pm2d-b1-n-reusable-sec-financial-statement-ingestion.md",
     "docs/PROJECT_STATUS.md",
     "docs/AI_TRADING_BOT_HANDOFF.md",
 )

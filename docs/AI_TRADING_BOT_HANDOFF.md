@@ -1,6 +1,86 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM2D-B1-R-C1-C2 SEC response accounting
+## Current milestone — PM2D-B1-N reusable SEC financial statement ingestion
+
+The exact accepted base is PM2D-B1-R-C2 HEAD
+`85d2cc1aec12d172d0225eac61bda770becdbbc7` / tree
+`acf07f52d33f15fad7e391329076c015b844ce77`. Feature mapped FULL run
+`46130743708`, attempt 1, passed all seven lanes. Develop acceptance run
+`46131689560`, attempt 1, passed source-static and source-gates with
+`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`; all
+test/certification jobs were skipped. The canonical develop worktree retains
+its 17 pre-existing untracked artifacts. This newer exact source/CI evidence
+corrects the older C1 parent still recorded in the B1-R history below.
+
+B1-N adds a reusable offline financial statement extractor for the
+already-held, digest-verified SEC native instance. The existing B1 checkpoint
+slug, source routing, and seven-lane mapped FULL remain in use. B1's fake
+provider contract and B1-R's one-shot real transport are unchanged. No filing
+request, new provider access, or taxonomy download is authorized.
+
+The pinned library review found no adoption appropriate for this bounded task.
+EdgarTools at
+[`31371d4`](https://github.com/dgunning/edgartools/tree/31371d457ee4c95d9f397a07fa3fc60a3b7b4492)
+offers local-file XBRL parsing, presentation roles, and standardization, but
+the reviewed fact parser uses floating-point numeric values and its mapping
+helpers do not prove the exact accounting basis. Its high-level filing path can
+retrieve attachments and may use a network fallback for older missing
+instances; this does not imply its explicit local-file parser itself makes a
+request. Arelle at
+[`1a82e97`](https://github.com/Arelle/Arelle/tree/1a82e9731e70bdb3cb9721a5e6ad812507f470e4)
+provides fuller native/inline XBRL, taxonomy package, presentation, and
+duplicate-fact support, but requires broader dependencies and an explicit
+offline package/cache configuration. The one-document boundary uses the
+standard-library XML path and existing PM2C models; no dependency is added.
+See the [B1-N architecture](architecture/152-pm2d-b1-n-reusable-sec-financial-statement-ingestion.md)
+and [validation record](validation/arch152-pm2d-b1-n-reusable-sec-financial-statement-ingestion.md)
+for source links and value-level results.
+
+The owner-held ODFL instance is 1,350,303 bytes, SHA-256
+`96437a6d33f26d4f559afcd7e7b14ebafd9f84fcee909520c16f11467f0a06b0`, from
+original 10-K accession `0001564590-19-004755`, instance
+`odfl-20181231.xml`, sequence 11. It has annual context
+`C_0000878927_20180101_20181231` and namespace
+`http://fasb.org/us-gaap/2018-01-31`. The original ExcludingAssessedTax
+hypothesis has zero facts; consolidated revenue is the separate
+IncludingAssessedTax concept at `4043695000` USD, with no dimensions. LTL and
+other-service dimensional facts are `3982658000` USD and `61037000` USD.
+These are discovery facts from existing bytes, not a real production
+observation or current investment signal. The canonical B1-O attempt remains
+unconsumed; do not obtain another SEC copy.
+
+The frozen B1-R `SECObservationPlan` requires
+`RevenueFromContractWithCustomerExcludingAssessedTax`; the ODFL
+IncludingAssessedTax fact cannot use that plan. Do not retarget B1-R. A future
+request must use a filing matching the frozen plan or a separately reviewed
+successor plan/source.
+
+Offline extraction also produced exact operating income, diluted EPS,
+operating cash flow, cash, assets, liabilities, stockholders' equity, and
+separately named productive-asset-payment and long-term-debt facts. The generic
+`NetIncomeLoss` fact is not a PM2B attributable-to-common net-income mapping.
+The PPE-specific acquisition concept is missing, and `PaymentsToAcquireProductiveAssets`
+remains a separate field. Debt facts are not aggregated. The validation record
+contains each value, original context, unit, decimals, dimension, and typed
+unsupported concept.
+
+Operational admission for this ODFL discovery remains blocked. The file is not
+a consumed B1-R response with trusted response receipt; an independent
+issuer-to-security/share-class mapping, exact membership binding, and exact
+catalog entry are also required. Filing date, acceptance metadata, file
+modification time, or current execution time cannot stand in for receipt or
+historical public availability. No PM2C SourceFact or operational snapshot is
+emitted from these discovery bytes.
+
+PM1 remains disarmed and preview-only; PM2A real account reads remain
+unauthorized; Sharadar remains unqualified for exact version/entitlement and
+retention; Arch149 remains sealed. Next, finish the narrow custody-bridge
+correction and focused verification, then complete combined Ruff and diff
+checks. The source-publication owner then completes FEATURE and
+PROSPECTIVE_DEVELOP admission and the single mapped CI run under the reviewed
+scope. Do not run local FULL, integrate `develop`, or make a real SEC request.
+
+### Historical predecessor — PM2D-B1-R-C1-C2 SEC response accounting
 
 The accepted PM2D-B1-C1 parent is HEAD
 `3c9aa6c1dad6db5417bc3622a671906c13731afc` / tree

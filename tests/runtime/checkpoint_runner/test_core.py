@@ -570,6 +570,14 @@ def test_arch152_pm2d_b1_is_source_only_and_diff_selected_on_pm_branch():
         "docs/architecture/152-pm2d-b1-r-real-fundamental-observation-readiness.md"
         in runner.ARCH152_PM2D_B1_PATHS
     )
+    assert (
+        "docs/architecture/152-pm2d-b1-n-reusable-sec-financial-statement-ingestion.md"
+        in runner.ARCH152_PM2D_B1_PATHS
+    )
+    assert (
+        "docs/validation/arch152-pm2d-b1-n-reusable-sec-financial-statement-ingestion.md"
+        in runner.ARCH152_PM2D_B1_PATHS
+    )
     assert "tests/portfolio_manager" in certification.FULL_DIRECTORIES
     assert spec.authority_check is runner._arch152_pm2d_b1_authority_check
     assert spec.preflight is spec.execute is spec.remote_head_env is None

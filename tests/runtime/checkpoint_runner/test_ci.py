@@ -2887,10 +2887,9 @@ def _docs_admission_execution_fixture(monkeypatch):
             _outcome(step.name, context.get("range_exit", 0)), argv=step.argv
         )
 
-    def evaluate(repo, *, publication_context, changed_paths=None):
+    def evaluate(repo, *, publication_context):
         assert repo == root
         contexts.append(publication_context)
-        assert changed_paths is None
         return AuthorityResult(
             publication_context,
             "a" * 40,
@@ -3040,7 +3039,7 @@ def test_full_admission_executes_combined_checks_both_authorities_and_test_bundl
     contexts = []
     commands = []
 
-    def evaluate(repo, *, publication_context, checkpoints=None, changed_paths=None):
+    def evaluate(repo, *, publication_context, checkpoints=None):
         if checkpoints is not None:
             assert len(checkpoints) == 1
             failures = checkpoints[0].authority_check(repo)
@@ -3117,9 +3116,8 @@ def test_docs_only_admission_real_git_range_never_launches_python(
     )
     contexts = []
 
-    def evaluate(repo, *, publication_context, changed_paths=None):
+    def evaluate(repo, *, publication_context):
         contexts.append(publication_context)
-        assert changed_paths is None
         return AuthorityResult(publication_context, head, tree, ("current",), ())
 
     monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)

@@ -355,6 +355,41 @@ def test_source_mismatch_stops_before_provider_attempts(monkeypatch, tmp_path) -
     assert result.terminal_manifest is not None
 
 
+@pytest.mark.parametrize(
+    "rejected_context",
+    [PublicationContext.FEATURE, PublicationContext.PROSPECTIVE_DEVELOP],
+)
+def test_b1_checkpoint_must_be_named_in_each_context_before_fake_providers(
+    monkeypatch, tmp_path, rejected_context
+) -> None:
+    plan = _plan()
+    sec, sharadar, _, _ = _providers(plan)
+    admission = _admission(plan)
+    rejected = AuthorityResult(
+        rejected_context,
+        plan.expected_source_head,
+        plan.expected_source_tree,
+        ("arch152-portfolio-manager-foundation",),
+        (),
+    )
+    if rejected_context is PublicationContext.FEATURE:
+        admission = replace(admission, feature=rejected)
+    else:
+        admission = replace(admission, prospective_develop=rejected)
+
+    result = _run(monkeypatch, tmp_path, plan, sec, sharadar, admission=admission)
+
+    assert result.status is operator.OperatorStatus.SOURCE_ADMISSION_FAILED
+    assert result.counters.source_admission_attempts == 1
+    assert result.counters.provider_attempts == 0
+    assert result.counters.sec_provider_attempts == 0
+    assert result.counters.sharadar_provider_attempts == 0
+    assert result.counters.credential_read_attempts == 0
+    assert result.attempt_directory is not None
+    assert list((result.attempt_directory / "calls").iterdir()) == []
+    assert result.terminal_manifest is not None
+
+
 def test_provider_exception_is_counted_and_raw_exception_text_is_discarded(
     monkeypatch, tmp_path
 ) -> None:

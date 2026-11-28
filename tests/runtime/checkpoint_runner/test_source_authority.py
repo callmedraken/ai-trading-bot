@@ -534,9 +534,59 @@ def _contexts(monkeypatch, *, develop_red=False):
     return state
 
 
-def test_feature_authority_selects_b1_from_exact_changed_paths_and_keeps_pm1_fallback(
-    monkeypatch,
-):
+def test_feature_authority_reads_b1_path_diff_at_shared_pm_source_owner(monkeypatch):
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": runner.ARCH152_PM2D_B1_BRANCH,
+        "porcelain": "",
+    }
+    monkeypatch.setattr(runner, "_git_state", lambda _: state.copy())
+    monkeypatch.setattr(current, "current_authority_check", lambda _: ())
+    registered = runner._checkpoint_specs()
+
+    def inert(_repo):
+        return ()
+
+    selected_specs = {
+        name: replace(registered[name], authority_check=inert)
+        for name in (runner.ARCH152_PM1_NAME, runner.ARCH152_PM2D_B1_NAME)
+    }
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: selected_specs)
+    monkeypatch.setattr(
+        current, "develop_static_checkpoints", lambda _: tuple(selected_specs)
+    )
+    changed_paths = runner.ARCH152_PM2D_B1_SOURCE_PATHS
+    path_reads = []
+
+    def read_paths(repo):
+        path_reads.append(repo)
+        return changed_paths
+
+    monkeypatch.setattr(runner, "_current_commit_changed_paths", read_paths)
+
+    selected = current.evaluate_source_authority(
+        ROOT, publication_context=current.PublicationContext.FEATURE
+    )
+    fallback = current.evaluate_source_authority(
+        ROOT,
+        publication_context=current.PublicationContext.FEATURE,
+        changed_paths=("README.md",),
+    )
+    prospective = current.evaluate_source_authority(
+        ROOT, publication_context=current.PublicationContext.PROSPECTIVE_DEVELOP
+    )
+
+    assert selected.passed
+    assert selected.checkpoints == (runner.ARCH152_PM2D_B1_NAME,)
+    assert fallback.passed
+    assert fallback.checkpoints == (runner.ARCH152_PM1_NAME,)
+    assert prospective.passed
+    assert prospective.checkpoints == tuple(selected_specs)
+    assert path_reads == [ROOT]
+
+
+def test_feature_authority_fails_closed_when_shared_pm_diff_is_unavailable(monkeypatch):
     state = {
         "head": "a" * 40,
         "tree": "b" * 40,
@@ -556,47 +606,42 @@ def test_feature_authority_selects_b1_from_exact_changed_paths_and_keeps_pm1_fal
     }
     monkeypatch.setattr(runner, "_checkpoint_specs", lambda: selected_specs)
 
-    selected = current.evaluate_source_authority(
-        ROOT,
-        publication_context=current.PublicationContext.FEATURE,
-        changed_paths=runner.ARCH152_PM2D_B1_SOURCE_PATHS,
-    )
-    fallback = current.evaluate_source_authority(
+    def unavailable(_repo):
+        raise RuntimeError("path diff unavailable")
+
+    monkeypatch.setattr(runner, "_current_commit_changed_paths", unavailable)
+    result = current.evaluate_source_authority(
         ROOT, publication_context=current.PublicationContext.FEATURE
     )
 
-    assert selected.passed
-    assert selected.checkpoints == (runner.ARCH152_PM2D_B1_NAME,)
-    assert fallback.passed
-    assert fallback.checkpoints == (runner.ARCH152_PM1_NAME,)
-
-
-def test_prepublication_authority_results_uses_last_commit_paths_only_for_pm_branch(
-    monkeypatch,
-):
-    state = {
-        "head": "a" * 40,
-        "tree": "b" * 40,
-        "branch": runner.ARCH152_PM2D_B1_BRANCH,
-        "porcelain": "",
-    }
-    changed_paths = runner.ARCH152_PM2D_B1_SOURCE_PATHS
-    seen = []
-    monkeypatch.setattr(runner, "_git_state", lambda _: state.copy())
-    monkeypatch.setattr(
-        runner, "_current_commit_changed_paths", lambda _: changed_paths
+    assert not result.passed
+    assert result.checkpoints == ()
+    assert (
+        "shared Portfolio Manager checkpoint path diff unavailable" in result.failures
     )
 
-    def evaluate(_root, *, publication_context, changed_paths=None):
-        seen.append((publication_context, changed_paths))
+
+def test_prepublication_authority_results_preserves_generic_evaluator_boundary(
+    monkeypatch,
+):
+    seen = []
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("shared-branch route selection belongs in the source evaluator")
+
+    monkeypatch.setattr(runner, "_git_state", forbidden)
+    monkeypatch.setattr(runner, "_current_commit_changed_paths", forbidden)
+
+    def evaluate(_root, *, publication_context):
+        seen.append(publication_context)
         return current.AuthorityResult(publication_context, "a" * 40, "b" * 40, (), ())
 
     monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)
     results = runner._prepublication_authority_results(ROOT)
     assert len(results) == 2
     assert seen == [
-        (current.PublicationContext.FEATURE, changed_paths),
-        (current.PublicationContext.PROSPECTIVE_DEVELOP, None),
+        current.PublicationContext.FEATURE,
+        current.PublicationContext.PROSPECTIVE_DEVELOP,
     ]
 
 
@@ -617,15 +662,15 @@ def test_prepublication_authority_results_preserves_other_branch_fallbacks(
 
     monkeypatch.setattr(runner, "_current_commit_changed_paths", forbidden)
 
-    def evaluate(_root, *, publication_context, changed_paths=None):
-        seen.append((publication_context, changed_paths))
+    def evaluate(_root, *, publication_context):
+        seen.append(publication_context)
         return current.AuthorityResult(publication_context, "a" * 40, "b" * 40, (), ())
 
     monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)
     runner._prepublication_authority_results(ROOT)
     assert seen == [
-        (current.PublicationContext.FEATURE, None),
-        (current.PublicationContext.PROSPECTIVE_DEVELOP, None),
+        current.PublicationContext.FEATURE,
+        current.PublicationContext.PROSPECTIVE_DEVELOP,
     ]
 
 

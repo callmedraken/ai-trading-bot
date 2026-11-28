@@ -334,17 +334,33 @@ def evaluate_source_authority(
     specs = runner._checkpoint_specs()
     if checkpoints is None:
         if context is PublicationContext.FEATURE:
-            checkpoint = runner.resolve_ci_checkpoint(
-                specs,
-                str(before["branch"]),
-                "push",
-                changed_paths=changed_paths,
-            )
-            names = (
-                (checkpoint,)
-                if checkpoint is not None
-                else develop_static_checkpoints(candidate_source)
-            )
+            route_paths = changed_paths
+            route_unavailable = False
+            if (
+                route_paths is None
+                and before["branch"] == runner.ARCH152_PM2D_B1_BRANCH
+            ):
+                try:
+                    route_paths = runner._current_commit_changed_paths(candidate_source)
+                except (OSError, RuntimeError):
+                    failures.append(
+                        "shared Portfolio Manager checkpoint path diff unavailable"
+                    )
+                    route_unavailable = True
+            if route_unavailable:
+                names = ()
+            else:
+                checkpoint = runner.resolve_ci_checkpoint(
+                    specs,
+                    str(before["branch"]),
+                    "push",
+                    changed_paths=route_paths,
+                )
+                names = (
+                    (checkpoint,)
+                    if checkpoint is not None
+                    else develop_static_checkpoints(candidate_source)
+                )
         else:
             names = develop_static_checkpoints(candidate_source)
         checks = tuple(specs[name] for name in names)

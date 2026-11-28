@@ -28220,24 +28220,10 @@ def _arch134_r3n_prepublication_authority_check(repo_root: Path) -> tuple[str, .
 
 
 def _prepublication_authority_results(repo_root: Path) -> tuple[AuthorityResult, ...]:
-    branch = _git_state(repo_root)["branch"]
-    if branch == ARCH152_PM2D_B1_BRANCH:
-        changed_paths = _current_commit_changed_paths(repo_root)
-        results = tuple(
-            evaluate_source_authority(
-                repo_root,
-                publication_context=context,
-                changed_paths=(
-                    changed_paths if context is PublicationContext.FEATURE else None
-                ),
-            )
-            for context in PublicationContext
-        )
-    else:
-        results = tuple(
-            evaluate_source_authority(repo_root, publication_context=context)
-            for context in PublicationContext
-        )
+    results = tuple(
+        evaluate_source_authority(repo_root, publication_context=context)
+        for context in PublicationContext
+    )
     for result in results:
         print(
             f"{result.context.value}_AUTHORITY={'PASS' if result.passed else 'FAIL'} "

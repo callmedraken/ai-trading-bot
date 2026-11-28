@@ -18,14 +18,14 @@ import subprocess
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 from urllib.parse import urlsplit
-from uuid import UUID
+from uuid import UUID, uuid5
 
 from trading_bot.domain._validation import normalize_utc
 
@@ -50,6 +50,11 @@ _MAX_REVENUE_FACT_CANDIDATES = 10_000
 _MAX_REQUEST_TIMEOUT = 10
 _MAX_TOTAL_SECONDS = 30
 _EVIDENCE_ROOT = r"F:\AI\temp"
+_SEC_OBSERVATION_DIRECTORY = "pm2d-b1-sec-observations"
+_SEC_ATTEMPT_NAMESPACE = UUID("d4b3de7a-3bd5-5b21-b96d-0ae85d0f5584")
+_MAX_AUTHORITY_RECORD_BYTES = 128_000
+_PREPUBLICATION_ADMISSION_SCHEMA = "ai-trading-bot-checkpoint-runner/v1"
+_PREPUBLICATION_ADMISSION_NAME = "arch132-r3n-prepublication-admission"
 _EXPECTED_WORKTREE = Path(r"F:\AI\worktrees\ai-trading-bot-portfolio-manager-current")
 _EXPECTED_BRANCH = "feature/robinhood-portfolio-manager-current"
 _EXPECTED_ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
@@ -233,7 +238,7 @@ class SECObservationPlan:
 
     @property
     def submission_url(self) -> str:
-        return f"{self.base_url}/{self.accession_compact}.txt"
+        return f"{self.base_url}/{self.accession}.txt"
 
     @property
     def plan_id(self) -> str:
@@ -298,6 +303,40 @@ class SECObservationPlan:
         }
 
 
+def sec_observation_evidence_root() -> Path:
+    """Return the one production custody root below the external temp root."""
+
+    return Path(_EVIDENCE_ROOT) / _SEC_OBSERVATION_DIRECTORY
+
+
+def canonical_sec_attempt_id(plan: SECObservationPlan) -> UUID:
+    """Bind one non-reusable attempt ID to source and selected fact identity.
+
+    Evidence paths, request limits, and presentation details are intentionally
+    excluded so they cannot create a new attempt for the same source fact.
+    """
+
+    material = {
+        "schema": "pm2d-b1-r-sec-attempt/v1",
+        "source_head": plan.expected_source_head,
+        "source_tree": plan.expected_source_tree,
+        "issuer_cik": plan.issuer_cik,
+        "accession": plan.accession,
+        "filing_form": plan.filing_form,
+        "document_name": plan.document_name,
+        "document_sequence": plan.document_sequence,
+        "fiscal_year": plan.fiscal_year,
+        "period_start": plan.period_start.isoformat(),
+        "period_end": plan.period_end.isoformat(),
+        "concept_namespace": plan.concept_namespace,
+        "concept_local_name": plan.concept_local_name,
+        "unit_namespace": plan.unit_namespace,
+        "unit_local_name": plan.unit_local_name,
+    }
+    canonical = json.dumps(material, sort_keys=True, separators=(",", ":"))
+    return uuid5(_SEC_ATTEMPT_NAMESPACE, canonical)
+
+
 @dataclass(frozen=True, slots=True)
 class SECSourceAdmission:
     """Recorded general admission result for the exact plan source."""
@@ -307,6 +346,8 @@ class SECSourceAdmission:
     feature: str
     prospective_develop: str
     evidence_sha256: str
+    evidence_path: str | None = None
+    evidence_bytes: bytes | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not _GIT_ID.fullmatch(self.source_head) or not _GIT_ID.fullmatch(
@@ -317,6 +358,13 @@ class SECSourceAdmission:
             raise ValueError("both FEATURE and PROSPECTIVE_DEVELOP must pass")
         if not re.fullmatch(r"[0-9a-f]{64}", self.evidence_sha256):
             raise ValueError("admission evidence must be SHA-256 bound")
+        if self.evidence_path is not None and not isinstance(self.evidence_path, str):
+            raise TypeError("evidence_path must be a string when present")
+        if self.evidence_bytes is not None and (
+            not isinstance(self.evidence_bytes, bytes)
+            or hashlib.sha256(self.evidence_bytes).hexdigest() != self.evidence_sha256
+        ):
+            raise ValueError("admission bytes must match their exact SHA-256")
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,6 +380,9 @@ class SECObservationAuthorization:
     issued_at: datetime
     expires_at: datetime
     max_request_attempts: int = 1
+    source_admission_sha256: str | None = None
+    authorization_record_path: str | None = None
+    authorization_record_bytes: bytes | None = field(default=None, repr=False)
 
     def __post_init__(self) -> None:
         for name in ("authorization_id",):
@@ -347,6 +398,20 @@ class SECObservationAuthorization:
             raise TypeError("approved_attempt_id must be UUID")
         if not re.fullmatch(r"[0-9a-f]{64}", self.review_record_sha256):
             raise ValueError("review_record_sha256 must be SHA-256")
+        if self.source_admission_sha256 is not None and not re.fullmatch(
+            r"[0-9a-f]{64}", self.source_admission_sha256
+        ):
+            raise ValueError("source_admission_sha256 must be SHA-256")
+        if self.authorization_record_path is not None and not isinstance(
+            self.authorization_record_path, str
+        ):
+            raise TypeError("authorization_record_path must be a string when present")
+        if self.authorization_record_bytes is not None and (
+            not isinstance(self.authorization_record_bytes, bytes)
+            or hashlib.sha256(self.authorization_record_bytes).hexdigest()
+            != self.review_record_sha256
+        ):
+            raise ValueError("authorization bytes must match their exact SHA-256")
         issued = normalize_utc(self.issued_at, "issued_at")
         expires = normalize_utc(self.expires_at, "expires_at")
         if expires <= issued or expires - issued > timedelta(hours=1):
@@ -415,6 +480,7 @@ class SECTransportResponse:
     content_type: str
     body: bytes
     final_url: str
+    received_at: datetime | None = None
 
 
 @runtime_checkable
@@ -425,7 +491,7 @@ class SECTransport(Protocol):
         *,
         user_agent: str,
         timeout_seconds: int,
-        total_time_limit_seconds: int,
+        total_time_limit_seconds: float,
         max_bytes: int,
     ) -> SECTransportResponse: ...
 
@@ -439,7 +505,13 @@ class SECEvidenceStore(Protocol):
     ) -> None: ...
 
     def write_response(
-        self, ordinal: int, label: str, body: bytes, content_type: str
+        self,
+        ordinal: int,
+        label: str,
+        body: bytes,
+        content_type: str,
+        *,
+        received_at: datetime | None = None,
     ) -> str: ...
 
     def write_terminal(self, material: Mapping[str, object]) -> None: ...
@@ -451,6 +523,7 @@ class SECObservationCounters:
     request_intents: int = 0
     response_documents: int = 0
     response_bytes: int = 0
+    response_bytes_received: int = 0
     xbrl_records: int = 0
     credential_reads: int = 0
     account_reads: int = 0
@@ -546,13 +619,19 @@ def parse_sec_submission(
             SECObservationOutcome.NATIVE_DOCUMENT_UNSUPPORTED,
             "SEC_FILING_MEMBER_LIMIT_OR_SHAPE",
         )
-    filename_marker = b"<FILENAME>" + plan.document_name.encode("ascii")
-    if raw_bytes.count(filename_marker) != 1:
+    filename_entries = tuple(
+        re.finditer(rb"(?m)^<FILENAME>[ \t]*([^\r\n]*)\r?$", raw_bytes)
+    )
+    expected_name = plan.document_name.encode("ascii")
+    exact_filename_entries = tuple(
+        item for item in filename_entries if item.group(1).strip() == expected_name
+    )
+    if len(exact_filename_entries) != 1:
         raise SECNativeInputError(
             SECObservationOutcome.SEC_FACT_CONTEXT_MISMATCH,
             "SEC_DOCUMENT_NAME_MISSING_OR_DUPLICATE",
         )
-    filename_at = raw_bytes.find(filename_marker)
+    filename_at = exact_filename_entries[0].start()
     document_start = raw_bytes.rfind(b"<DOCUMENT>", 0, filename_at)
     text_start = raw_bytes.find(b"<TEXT>", filename_at)
     next_document = raw_bytes.find(b"<DOCUMENT>", filename_at)
@@ -625,6 +704,39 @@ def parse_sec_submission(
         embedded_document_length=len(embedded),
         observed_at=normalize_utc(observed_at, "observed_at"),
     )
+
+
+def extract_sec_submission_member(raw_bytes: bytes, submission: SECSubmission) -> bytes:
+    """Verify and extract the exact embedded document recorded by its parent."""
+
+    if not isinstance(raw_bytes, bytes) or type(submission) is not SECSubmission:
+        raise TypeError("exact submission bytes and SECSubmission are required")
+    start, end = submission.embedded_document_range
+    if (
+        submission.content_length != len(raw_bytes)
+        or submission.content_sha256 != hashlib.sha256(raw_bytes).hexdigest()
+        or isinstance(start, bool)
+        or isinstance(end, bool)
+        or not isinstance(start, int)
+        or not isinstance(end, int)
+        or start < 0
+        or end <= start
+        or end > len(raw_bytes)
+    ):
+        raise SECNativeInputError(
+            SECObservationOutcome.SEC_FACT_CONTEXT_MISMATCH,
+            "SEC_PARENT_SUBMISSION_IDENTITY_MISMATCH",
+        )
+    embedded = raw_bytes[start:end]
+    if (
+        len(embedded) != submission.embedded_document_length
+        or hashlib.sha256(embedded).hexdigest() != submission.embedded_document_sha256
+    ):
+        raise SECNativeInputError(
+            SECObservationOutcome.SEC_FACT_CONTEXT_MISMATCH,
+            "SEC_EMBEDDED_DOCUMENT_DIGEST_OR_RANGE_MISMATCH",
+        )
+    return embedded
 
 
 def parse_native_xbrl_revenue(
@@ -836,6 +948,261 @@ def parse_native_xbrl_revenue(
     )
 
 
+def load_sec_source_admission_record(
+    path: str | Path, plan: SECObservationPlan
+) -> SECSourceAdmission:
+    """Load and validate the actual successful prepublication admission report."""
+
+    report, raw, digest, record_path = _read_external_json_record(path)
+    if (
+        report.get("schema") != _PREPUBLICATION_ADMISSION_SCHEMA
+        or report.get("kind") != "source_gate"
+        or report.get("checkpoint") != _PREPUBLICATION_ADMISSION_NAME
+        or report.get("mode") != "FULL"
+        or report.get("phase") != "all"
+        or report.get("status") != "PASS"
+        or report.get("authority_checked") is not True
+        or report.get("authority_failures") != []
+        or report.get("identity_stable") is not True
+    ):
+        raise SECObservationError(
+            "actual successful FEATURE/PROSPECTIVE admission required"
+        )
+    started = report.get("started_from")
+    finished = report.get("finished_at")
+    if not isinstance(started, dict) or not isinstance(finished, dict):
+        raise SECObservationError("admission source identity is missing")
+    for state in (started, finished):
+        if (
+            state.get("head") != plan.expected_source_head
+            or state.get("tree") != plan.expected_source_tree
+            or state.get("branch") != _EXPECTED_BRANCH
+            or state.get("porcelain") != ""
+        ):
+            raise SECObservationError(
+                "admission report is not bound to the exact clean source"
+            )
+    commands = report.get("commands")
+    if not isinstance(commands, list):
+        raise SECObservationError("admission command evidence is missing")
+    command_codes: dict[str, int] = {}
+    for item in commands:
+        if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+            raise SECObservationError("admission command evidence is malformed")
+        name = item["name"]
+        if name in command_codes:
+            raise SECObservationError("admission command evidence is duplicated")
+        code = item.get("exit_code")
+        if type(code) is not int:
+            raise SECObservationError("admission command result is malformed")
+        command_codes[name] = code
+    if set(command_codes) != {
+        "git_diff_check",
+        "ruff_check",
+        "ruff_format",
+        "pytest",
+    }:
+        raise SECObservationError("admission command evidence is incomplete or extra")
+    if not all(
+        command_codes.get(name) == 0
+        for name in ("git_diff_check", "ruff_check", "ruff_format", "pytest")
+    ):
+        raise SECObservationError("admission verification commands did not all pass")
+    for effect_name in (
+        "production_effects",
+        "provider_effects",
+        "scheduler_mutation",
+        "broker_live_effects",
+    ):
+        if report.get(effect_name) != "NOT_RUN":
+            raise SECObservationError("admission report records a non-source effect")
+    return SECSourceAdmission(
+        source_head=plan.expected_source_head,
+        source_tree=plan.expected_source_tree,
+        feature="PASS",
+        prospective_develop="PASS",
+        evidence_sha256=digest,
+        evidence_path=str(record_path),
+        evidence_bytes=raw,
+    )
+
+
+def load_sec_effect_authorization_record(
+    path: str | Path,
+    plan: SECObservationPlan,
+    admission: SECSourceAdmission,
+    now: datetime,
+) -> SECObservationAuthorization:
+    """Load the actual separate reviewed effect grant and bind its exact bytes."""
+
+    record, raw, digest, record_path = _read_external_json_record(path)
+    required = {
+        "schema",
+        "decision",
+        "authorization_id",
+        "plan_id",
+        "approved_source_head",
+        "approved_source_tree",
+        "approved_attempt_id",
+        "source_admission_sha256",
+        "reviewed_by",
+        "issued_at",
+        "expires_at",
+        "max_request_attempts",
+    }
+    if set(record) != required:
+        raise SECObservationError(
+            "effect authorization record has an unsupported shape"
+        )
+    if (
+        record["schema"] != "pm2d-b1-r-sec-effect-authorization/v1"
+        or record["decision"] != "APPROVED"
+        or not isinstance(record["reviewed_by"], str)
+        or not _TOKEN.fullmatch(record["reviewed_by"])
+        or record["plan_id"] != plan.plan_id
+        or record["approved_source_head"] != plan.expected_source_head
+        or record["approved_source_tree"] != plan.expected_source_tree
+        or record["approved_attempt_id"] != str(plan.attempt_id)
+        or record["source_admission_sha256"] != admission.evidence_sha256
+        or type(record["max_request_attempts"]) is not int
+        or record["max_request_attempts"] != 1
+    ):
+        raise SECObservationError(
+            "effect authorization does not bind reviewed evidence and plan"
+        )
+    if not isinstance(record["issued_at"], str) or not isinstance(
+        record["expires_at"], str
+    ):
+        raise SECObservationError("effect authorization window is malformed")
+    try:
+        issued_at = datetime.fromisoformat(record["issued_at"])
+        expires_at = datetime.fromisoformat(record["expires_at"])
+    except ValueError:
+        raise SECObservationError("effect authorization window is malformed") from None
+    authorization = SECObservationAuthorization(
+        authorization_id=record["authorization_id"],
+        approved_plan_id=record["plan_id"],
+        approved_source_head=record["approved_source_head"],
+        approved_source_tree=record["approved_source_tree"],
+        approved_attempt_id=plan.attempt_id,
+        review_record_sha256=digest,
+        issued_at=issued_at,
+        expires_at=expires_at,
+        max_request_attempts=record["max_request_attempts"],
+        source_admission_sha256=admission.evidence_sha256,
+        authorization_record_path=str(record_path),
+        authorization_record_bytes=raw,
+    )
+    if not authorization.matches(plan, now):
+        raise SECObservationError("effect authorization is expired or not yet valid")
+    return authorization
+
+
+def _read_external_json_record(
+    path: str | Path,
+) -> tuple[dict[str, object], bytes, str, Path]:
+    candidate = Path(path)
+    if not candidate.is_absolute() or ".." in candidate.parts:
+        raise SECObservationError("evidence record path must be absolute and contained")
+    if not _under_external_evidence_root(str(candidate)):
+        raise SECObservationError("evidence record must be below F:\\AI\\temp")
+    _reject_reparse_ancestors(Path(_EVIDENCE_ROOT).parent, candidate)
+    if not candidate.is_file():
+        raise SECObservationError("evidence record file is missing")
+    try:
+        with candidate.open("rb") as handle:
+            raw = handle.read(_MAX_AUTHORITY_RECORD_BYTES + 1)
+    except OSError as error:
+        raise SECObservationError("evidence record could not be read") from error
+    if not raw or len(raw) > _MAX_AUTHORITY_RECORD_BYTES:
+        raise SECObservationError("evidence record exceeds its fixed byte bound")
+    try:
+        value = json.loads(
+            raw.decode("utf-8", errors="strict"),
+            object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeError, ValueError, json.JSONDecodeError):
+        raise SECObservationError("evidence record JSON is invalid") from None
+    if not isinstance(value, dict):
+        raise SECObservationError("evidence record root must be an object")
+    return value, raw, hashlib.sha256(raw).hexdigest(), candidate
+
+
+def _unique_json_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> object:
+    raise ValueError(f"unsupported JSON constant: {value}")
+
+
+def _read_sec_response_bounded(
+    response: object,
+    max_bytes: int,
+    timeout_seconds: int,
+    deadline: float,
+    *,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> bytes:
+    """Bound body bytes and each socket read by the remaining request budget.
+
+    The standard-library opener also bounds its blocking socket operations.
+    DNS resolution, runtime scheduling, and urllib's connection/header setup do
+    not provide a hard end-to-end wall-clock guarantee; callers check elapsed
+    time after the request returns and report that limitation accurately.
+    """
+
+    http_response = getattr(response, "fp", None)
+    buffer = getattr(http_response, "fp", None)
+    raw = getattr(buffer, "raw", None)
+    sock = getattr(raw, "_sock", None)
+    if sock is None:
+        raise SECObservationError("bounded SEC response socket is unavailable")
+    body = bytearray()
+    while len(body) <= max_bytes:
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise TimeoutError("SEC total observation time limit reached")
+        sock.settimeout(min(timeout_seconds, remaining))
+        chunk = response.read(min(64 * 1024, max_bytes + 1 - len(body)))
+        if not chunk:
+            break
+        body.extend(chunk)
+    return bytes(body)
+
+
+def _authorization_is_current(
+    plan: SECObservationPlan,
+    admission: SECSourceAdmission,
+    authorization: SECObservationAuthorization,
+    *,
+    now: Callable[[], datetime],
+    authorization_recheck: Callable[[], bool] | None,
+) -> bool:
+    try:
+        current = normalize_utc(now(), "authorization recheck time")
+        if not authorization.matches(plan, current):
+            return False
+        if (
+            authorization.source_admission_sha256 is not None
+            and authorization.source_admission_sha256 != admission.evidence_sha256
+        ):
+            return False
+        if authorization_recheck is not None and not authorization_recheck():
+            return False
+        return authorization.matches(
+            plan, normalize_utc(now(), "final authorization recheck time")
+        )
+    except (OSError, ValueError, RuntimeError, TypeError):
+        return False
+
+
 def _observe_sec_once_with_transport(
     plan: SECObservationPlan,
     admission: SECSourceAdmission,
@@ -845,14 +1212,17 @@ def _observe_sec_once_with_transport(
     *,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     monotonic: Callable[[], float] = time.monotonic,
+    authorization_recheck: Callable[[], bool] | None = None,
+    require_response_receipt_timestamp: bool = False,
 ) -> SECObservationResult:
     """Run one exact SEC GET after independent source/effect gates.
 
     Tests may provide synthetic bytes through an exact fake transport. No
     default call is made by import, application startup, source admission, or
-    pytest. A successful parse still returns ``SEC_OBSERVATION_BLOCKED`` until
-    separately reviewed public-availability and security-identity witnesses
-    exist; this function does not create a PM2C SourceFact.
+    pytest. A successful parse still returns ``SEC_OBSERVATION_BLOCKED`` and
+    does not create a PM2C SourceFact. An operational bridge may use the
+    preserved local receipt only after independent security mapping; historical
+    reconstruction separately requires an exact version/availability witness.
     """
 
     counters = SECObservationCounters()
@@ -866,9 +1236,14 @@ def _observe_sec_once_with_transport(
             "EXACT_FEATURE_AND_PROSPECTIVE_DEVELOP_ADMISSION_REQUIRED",
             counters,
         )
-    if not isinstance(
-        authorization, SECObservationAuthorization
-    ) or not authorization.matches(plan, current):
+    if (
+        not isinstance(authorization, SECObservationAuthorization)
+        or not authorization.matches(plan, current)
+        or (
+            authorization.source_admission_sha256 is not None
+            and authorization.source_admission_sha256 != admission.evidence_sha256
+        )
+    ):
         return _result(
             plan,
             SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED,
@@ -891,6 +1266,19 @@ def _observe_sec_once_with_transport(
             "CURRENT_FEATURE_AND_PROSPECTIVE_DEVELOP_ADMISSION_FAILED",
             counters,
         )
+    if not _authorization_is_current(
+        plan,
+        admission,
+        authorization,
+        now=now,
+        authorization_recheck=authorization_recheck,
+    ):
+        return _result(
+            plan,
+            SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED,
+            "EFFECT_AUTHORIZATION_EXPIRED_OR_EVIDENCE_CHANGED_AFTER_ADMISSION",
+            counters,
+        )
     try:
         if not evidence_store.reserve_attempt(plan):
             return _result(
@@ -909,15 +1297,27 @@ def _observe_sec_once_with_transport(
 
     started = monotonic()
     response_hashes: list[str] = []
-    stored_responses: list[tuple[bytes, str]] = []
+    stored_responses: list[tuple[bytes, str, datetime]] = []
     response_bytes = 0
+    response_bytes_received = 0
     request_intents = 0
     provider_invocations = 0
+    if type(evidence_store) is SECFileEvidenceStore:
+        try:
+            evidence_store.write_authority_evidence(admission, authorization)
+        except (OSError, ValueError, RuntimeError, TypeError):
+            return _finish_result(
+                plan,
+                evidence_store,
+                SECObservationOutcome.EVIDENCE_WRITE_FAILED,
+                "REVIEWED_AUTHORITY_EVIDENCE_CUSTODY_FAILED",
+                _counters(0, 0, 0, 0, 0),
+            )
     request_specs = ((plan.submission_url, "submission"),)
     try:
         for ordinal, (url, label) in enumerate(request_specs, start=1):
             elapsed = monotonic() - started
-            if elapsed > plan.total_time_limit_seconds:
+            if elapsed >= plan.total_time_limit_seconds:
                 return _finish_result(
                     plan,
                     evidence_store,
@@ -944,6 +1344,7 @@ def _observe_sec_once_with_transport(
                     "approved_source_tree": authorization.approved_source_tree,
                     "approved_attempt_id": str(authorization.approved_attempt_id),
                     "review_record_sha256": authorization.review_record_sha256,
+                    "source_admission_sha256": admission.evidence_sha256,
                     "issued_at": authorization.issued_at.isoformat(),
                     "expires_at": authorization.expires_at.isoformat(),
                     "max_request_attempts": authorization.max_request_attempts,
@@ -960,7 +1361,12 @@ def _observe_sec_once_with_transport(
                 "total_time_limit_seconds": plan.total_time_limit_seconds,
                 "automatic_retry": False,
                 "intent_recorded_at": normalize_utc(now(), "intent time").isoformat(),
+                "source_admission_evidence_path": admission.evidence_path,
+                "effect_authorization_record_path": (
+                    authorization.authorization_record_path
+                ),
             }
+            intent_recorded_at = datetime.fromisoformat(intent["intent_recorded_at"])
             request_intents += 1
             try:
                 evidence_store.write_request_intent(ordinal, intent)
@@ -981,13 +1387,87 @@ def _observe_sec_once_with_transport(
                 )
             # The durable intent is the persisted attempt-accounting increment
             # and is written before the transport call below.
+            if not _current_source_is_admitted(plan):
+                return _finish_result(
+                    plan,
+                    evidence_store,
+                    SECObservationOutcome.SOURCE_ADMISSION_FAILED,
+                    "CURRENT_FEATURE_AND_PROSPECTIVE_DEVELOP_ADMISSION_CHANGED_BEFORE_REQUEST",
+                    _counters(
+                        provider_invocations,
+                        request_intents,
+                        len(stored_responses),
+                        response_bytes,
+                        0,
+                        response_bytes_received=response_bytes_received,
+                    ),
+                    hashes=tuple(response_hashes),
+                )
+            if not _authorization_is_current(
+                plan,
+                admission,
+                authorization,
+                now=now,
+                authorization_recheck=authorization_recheck,
+            ):
+                return _finish_result(
+                    plan,
+                    evidence_store,
+                    SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED,
+                    "EFFECT_AUTHORIZATION_EXPIRED_OR_EVIDENCE_CHANGED_BEFORE_REQUEST",
+                    _counters(
+                        provider_invocations,
+                        request_intents,
+                        len(stored_responses),
+                        response_bytes,
+                        0,
+                        response_bytes_received=response_bytes_received,
+                    ),
+                    hashes=tuple(response_hashes),
+                )
+            elapsed = monotonic() - started
+            if elapsed >= plan.total_time_limit_seconds:
+                return _finish_result(
+                    plan,
+                    evidence_store,
+                    SECObservationOutcome.PROVIDER_FAILED,
+                    "TOTAL_TIME_LIMIT_REACHED_BEFORE_REQUEST",
+                    _counters(
+                        provider_invocations,
+                        request_intents,
+                        len(stored_responses),
+                        response_bytes,
+                        0,
+                        response_bytes_received=response_bytes_received,
+                    ),
+                    hashes=tuple(response_hashes),
+                )
+            if not authorization.matches(
+                plan, normalize_utc(now(), "immediate pre-request authorization time")
+            ):
+                return _finish_result(
+                    plan,
+                    evidence_store,
+                    SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED,
+                    "EFFECT_AUTHORIZATION_EXPIRED_IMMEDIATELY_BEFORE_REQUEST",
+                    _counters(
+                        provider_invocations,
+                        request_intents,
+                        len(stored_responses),
+                        response_bytes,
+                        0,
+                        response_bytes_received=response_bytes_received,
+                    ),
+                    hashes=tuple(response_hashes),
+                )
+            remaining_time_limit = plan.total_time_limit_seconds - elapsed
             provider_invocations += 1
             try:
                 response = transport.get(
                     url,
                     user_agent=plan.user_agent,
                     timeout_seconds=plan.request_timeout_seconds,
-                    total_time_limit_seconds=plan.total_time_limit_seconds,
+                    total_time_limit_seconds=remaining_time_limit,
                     max_bytes=plan.max_response_bytes,
                 )
             except (TimeoutError, OSError, SECObservationError):
@@ -1060,6 +1540,8 @@ def _observe_sec_once_with_transport(
                 not isinstance(response.body, bytes)
                 or len(response.body) > plan.max_response_bytes
             ):
+                if isinstance(response.body, bytes):
+                    response_bytes_received += len(response.body)
                 return _finish_result(
                     plan,
                     evidence_store,
@@ -1071,12 +1553,75 @@ def _observe_sec_once_with_transport(
                         len(stored_responses),
                         response_bytes,
                         0,
+                        response_bytes_received=response_bytes_received,
+                    ),
+                    hashes=tuple(response_hashes),
+                )
+            response_bytes_received += len(response.body)
+            if response.received_at is None:
+                if require_response_receipt_timestamp:
+                    return _finish_result(
+                        plan,
+                        evidence_store,
+                        SECObservationOutcome.RESPONSE_REJECTED,
+                        "LOCAL_RESPONSE_RECEIPT_TIMESTAMP_REQUIRED",
+                        _counters(
+                            provider_invocations,
+                            request_intents,
+                            len(stored_responses),
+                            response_bytes,
+                            0,
+                            response_bytes_received=response_bytes_received,
+                        ),
+                        hashes=tuple(response_hashes),
+                    )
+                received_at = normalize_utc(now(), "synthetic response receipt time")
+            else:
+                try:
+                    received_at = normalize_utc(
+                        response.received_at, "local response receipt time"
+                    )
+                except (TypeError, ValueError):
+                    return _finish_result(
+                        plan,
+                        evidence_store,
+                        SECObservationOutcome.RESPONSE_REJECTED,
+                        "LOCAL_RESPONSE_RECEIPT_TIMESTAMP_INVALID",
+                        _counters(
+                            provider_invocations,
+                            request_intents,
+                            len(stored_responses),
+                            response_bytes,
+                            0,
+                            response_bytes_received=response_bytes_received,
+                        ),
+                        hashes=tuple(response_hashes),
+                    )
+            if received_at < intent_recorded_at or received_at > normalize_utc(
+                now(), "post-response local time"
+            ):
+                return _finish_result(
+                    plan,
+                    evidence_store,
+                    SECObservationOutcome.RESPONSE_REJECTED,
+                    "LOCAL_RESPONSE_RECEIPT_TIMESTAMP_OUTSIDE_REQUEST_WINDOW",
+                    _counters(
+                        provider_invocations,
+                        request_intents,
+                        len(stored_responses),
+                        response_bytes,
+                        0,
+                        response_bytes_received=response_bytes_received,
                     ),
                     hashes=tuple(response_hashes),
                 )
             try:
                 digest = evidence_store.write_response(
-                    ordinal, label, response.body, response.content_type
+                    ordinal,
+                    label,
+                    response.body,
+                    response.content_type,
+                    received_at=received_at,
                 )
             except (OSError, ValueError, RuntimeError):
                 return _finish_result(
@@ -1090,12 +1635,30 @@ def _observe_sec_once_with_transport(
                         len(stored_responses),
                         response_bytes,
                         0,
+                        response_bytes_received=response_bytes_received,
                     ),
                     hashes=tuple(response_hashes),
                 )
-            response_hashes.append(digest)
+            expected_digest = hashlib.sha256(response.body).hexdigest()
+            if digest != expected_digest:
+                return _finish_result(
+                    plan,
+                    evidence_store,
+                    SECObservationOutcome.EVIDENCE_WRITE_FAILED,
+                    "RESPONSE_CUSTODY_DIGEST_MISMATCH",
+                    _counters(
+                        provider_invocations,
+                        request_intents,
+                        len(stored_responses),
+                        response_bytes,
+                        0,
+                        response_bytes_received=response_bytes_received,
+                    ),
+                    hashes=tuple(response_hashes),
+                )
+            response_hashes.append(expected_digest)
             response_bytes += len(response.body)
-            stored_responses.append((response.body, response.content_type))
+            stored_responses.append((response.body, response.content_type, received_at))
             if response.final_url != url:
                 return _finish_result(
                     plan,
@@ -1175,11 +1738,9 @@ def _observe_sec_once_with_transport(
 
     try:
         raw_submission = stored_responses[0][0]
-        submission = parse_sec_submission(
-            raw_submission, plan, normalize_utc(now(), "submission observation")
-        )
-        start, end = submission.embedded_document_range
-        fact = parse_native_xbrl_revenue(raw_submission[start:end], plan, submission)
+        submission = parse_sec_submission(raw_submission, plan, stored_responses[0][2])
+        embedded_document = extract_sec_submission_member(raw_submission, submission)
+        fact = parse_native_xbrl_revenue(embedded_document, plan, submission)
     except SECNativeInputError as error:
         return _finish_result(
             plan,
@@ -1199,7 +1760,7 @@ def _observe_sec_once_with_transport(
         plan,
         evidence_store,
         SECObservationOutcome.SEC_OBSERVATION_BLOCKED,
-        "SEC_PUBLIC_AVAILABILITY_AND_SECURITY_IDENTITY_WITNESSES_UNPROVEN",
+        "SEC_HISTORICAL_VERSION_WITNESS_AND_SECURITY_MAPPING_UNPROVEN",
         _counters(
             provider_invocations,
             request_intents,
@@ -1217,19 +1778,33 @@ class SECFileEvidenceStore:
     """Create-once, external-root custody for a future separately authorized run."""
 
     def __init__(self, plan: SECObservationPlan) -> None:
-        if not _under_external_evidence_root(plan.evidence_root):
-            raise ValueError("evidence root must remain below F:\\AI\\temp")
-        self._root = Path(plan.evidence_root) / str(plan.attempt_id)
+        if type(plan) is not SECObservationPlan:
+            raise TypeError("SECFileEvidenceStore requires the exact SEC plan type")
+        if Path(os.path.abspath(plan.evidence_root)) != Path(
+            os.path.abspath(sec_observation_evidence_root())
+        ):
+            raise ValueError("plan must bind the canonical SEC evidence root")
+        if plan.attempt_id != canonical_sec_attempt_id(plan):
+            raise ValueError("plan attempt ID is not canonical for this source fact")
+        self._root = sec_observation_evidence_root() / str(plan.attempt_id)
         self._plan = plan
 
+    def is_bound_to(self, plan: SECObservationPlan) -> bool:
+        return (
+            type(plan) is SECObservationPlan
+            and self._plan.plan_id == plan.plan_id
+            and self._root == sec_observation_evidence_root() / str(plan.attempt_id)
+        )
+
     def reserve_attempt(self, plan: SECObservationPlan) -> bool:
-        if plan.plan_id != self._plan.plan_id:
+        if not self.is_bound_to(plan):
             raise ValueError("evidence store is bound to a different exact plan")
-        _reject_reparse_ancestors(Path(r"F:\AI"), self._root.parent)
+        _reject_reparse_ancestors(Path(_EVIDENCE_ROOT), self._root.parent)
         try:
             self._root.mkdir(parents=True, exist_ok=False)
         except FileExistsError:
             return False
+        _reject_reparse_ancestors(Path(_EVIDENCE_ROOT), self._root)
         _write_once(self._root / "plan.json", _canonical_json_bytes(plan.to_manifest()))
         return True
 
@@ -1240,24 +1815,88 @@ class SECFileEvidenceStore:
             raise ValueError("request ordinal is outside the fixed single-request plan")
         folder = self._root / "requests"
         folder.mkdir(exist_ok=True)
-        _reject_reparse_ancestors(self._root, folder)
+        _reject_reparse_ancestors(Path(_EVIDENCE_ROOT), folder)
         _write_once(
             folder / f"{ordinal:02d}.intent.json", _canonical_json_bytes(dict(material))
         )
 
+    def write_authority_evidence(
+        self,
+        admission: SECSourceAdmission,
+        authorization: SECObservationAuthorization,
+    ) -> None:
+        if (
+            type(admission) is not SECSourceAdmission
+            or type(authorization) is not SECObservationAuthorization
+            or not self._plan.source_matches(
+                admission.source_head, admission.source_tree
+            )
+            or not authorization.matches(self._plan, authorization.issued_at)
+            or authorization.source_admission_sha256 != admission.evidence_sha256
+            or admission.evidence_bytes is None
+            or authorization.authorization_record_bytes is None
+        ):
+            raise ValueError("actual exact-bound authority records are required")
+        if (
+            hashlib.sha256(admission.evidence_bytes).hexdigest()
+            != admission.evidence_sha256
+            or hashlib.sha256(authorization.authorization_record_bytes).hexdigest()
+            != authorization.review_record_sha256
+        ):
+            raise ValueError("authority record bytes do not match reviewed digests")
+        folder = self._root / "authorities"
+        folder.mkdir(exist_ok=True)
+        _reject_reparse_ancestors(Path(_EVIDENCE_ROOT), folder)
+        _write_once(folder / "source-admission.json", admission.evidence_bytes)
+        _write_once(
+            folder / "effect-authorization.json",
+            authorization.authorization_record_bytes,
+        )
+        self._authority_evidence = {
+            "source_admission_evidence": {
+                "path": admission.evidence_path,
+                "sha256": admission.evidence_sha256,
+            },
+            "effect_authorization_evidence": {
+                "authorization_id": authorization.authorization_id,
+                "path": authorization.authorization_record_path,
+                "sha256": authorization.review_record_sha256,
+            },
+        }
+
+    def authority_evidence_manifest(self) -> dict[str, object]:
+        return dict(getattr(self, "_authority_evidence", {}))
+
     def write_response(
-        self, ordinal: int, label: str, body: bytes, content_type: str
+        self,
+        ordinal: int,
+        label: str,
+        body: bytes,
+        content_type: str,
+        *,
+        received_at: datetime | None = None,
     ) -> str:
         if ordinal != 1 or label != "submission":
             raise ValueError("response label is outside the fixed plan")
         if not isinstance(body, bytes):
             raise TypeError("raw response must be exact bytes")
+        if len(body) > self._plan.max_response_bytes:
+            raise ValueError("raw response exceeds the plan byte limit")
+        if received_at is None:
+            raise ValueError("local response receipt time is required for custody")
+        received_at = normalize_utc(received_at, "local response receipt time")
         folder = self._root / "responses"
         folder.mkdir(exist_ok=True)
-        _reject_reparse_ancestors(self._root, folder)
+        _reject_reparse_ancestors(Path(_EVIDENCE_ROOT), folder)
         path = folder / f"{ordinal:02d}-{label}.bin"
         _write_once(path, body)
         digest = hashlib.sha256(body).hexdigest()
+        try:
+            preserved = path.read_bytes()
+        except OSError as error:
+            raise OSError("preserved response could not be verified") from error
+        if preserved != body or hashlib.sha256(preserved).hexdigest() != digest:
+            raise OSError("preserved response bytes differ from provider bytes")
         _write_once(
             folder / f"{ordinal:02d}-{label}.meta.json",
             _canonical_json_bytes(
@@ -1265,13 +1904,31 @@ class SECFileEvidenceStore:
                     "content_type": content_type,
                     "content_length": len(body),
                     "content_sha256": digest,
+                    "received_at": received_at.isoformat(),
+                    "receipt_semantics": "LOCAL_FIRST_RECEIPT_NOT_PUBLICATION_TIME",
                 }
             ),
         )
         return digest
 
     def write_terminal(self, material: Mapping[str, object]) -> None:
+        _reject_reparse_ancestors(Path(_EVIDENCE_ROOT), self._root)
         _write_once(self._root / "terminal.json", _canonical_json_bytes(dict(material)))
+
+
+def is_valid_sec_production_boundary(
+    plan: SECObservationPlan, evidence_store: object
+) -> bool:
+    """Pure exact-type guard used only by the real SEC entry boundary."""
+
+    return (
+        type(plan) is SECObservationPlan
+        and type(evidence_store) is SECFileEvidenceStore
+        and Path(os.path.abspath(plan.evidence_root))
+        == Path(os.path.abspath(sec_observation_evidence_root()))
+        and plan.attempt_id == canonical_sec_attempt_id(plan)
+        and evidence_store.is_bound_to(plan)
+    )
 
 
 def _current_source_is_admitted(plan: SECObservationPlan) -> bool:
@@ -1376,7 +2033,11 @@ def _submission_manifest(value: SECSubmission | None) -> dict[str, object] | Non
         "document_sequence": value.document_sequence,
         "content_sha256": value.content_sha256,
         "content_length": value.content_length,
+        "embedded_document_range": list(value.embedded_document_range),
+        "embedded_document_sha256": value.embedded_document_sha256,
+        "embedded_document_length": value.embedded_document_length,
         "observed_at": value.observed_at.isoformat(),
+        "observation_time_semantics": "LOCAL_FIRST_RECEIPT_NOT_PUBLICATION_TIME",
     }
 
 
@@ -1624,6 +2285,10 @@ def _reject_reparse_ancestors(root: Path, target: Path) -> None:
         raise ValueError("evidence path escapes the external root")
     cursor = resolved_root
     reparse_flag = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    if cursor.exists() or cursor.is_symlink():
+        info = cursor.lstat()
+        if cursor.is_symlink() or getattr(info, "st_file_attributes", 0) & reparse_flag:
+            raise ValueError("evidence root contains a reparse point")
     for component in resolved_target.relative_to(resolved_root).parts:
         cursor = cursor / component
         if cursor.exists() or cursor.is_symlink():
@@ -1654,12 +2319,19 @@ def _counters(
     response_documents: int,
     response_bytes: int,
     xbrl_records: int,
+    *,
+    response_bytes_received: int | None = None,
 ) -> SECObservationCounters:
     return SECObservationCounters(
         provider_invocations=provider_invocations,
         request_intents=request_intents,
         response_documents=response_documents,
         response_bytes=response_bytes,
+        response_bytes_received=(
+            response_bytes
+            if response_bytes_received is None
+            else response_bytes_received
+        ),
         xbrl_records=xbrl_records,
     )
 
@@ -1705,6 +2377,11 @@ def _finish_result(
         fact=fact,
         response_sha256=hashes,
     )
+    authority_evidence = (
+        store.authority_evidence_manifest()
+        if type(store) is SECFileEvidenceStore
+        else {}
+    )
     terminal = {
         "schema": "pm2d-b1-r-sec-observation-terminal/v1",
         "plan_id": plan.plan_id,
@@ -1717,7 +2394,15 @@ def _finish_result(
         "request_intents": counters.request_intents,
         "response_documents": counters.response_documents,
         "response_bytes": counters.response_bytes,
+        "response_bytes_received": counters.response_bytes_received,
         "xbrl_records": counters.xbrl_records,
+        "source_admission_evidence": authority_evidence.get(
+            "source_admission_evidence", {"path": None, "sha256": None}
+        ),
+        "effect_authorization_evidence": authority_evidence.get(
+            "effect_authorization_evidence",
+            {"authorization_id": None, "path": None, "sha256": None},
+        ),
         "response_sha256": list(hashes),
         "normalized_submission": _submission_manifest(submission),
         "normalized_fact": _fact_manifest(fact),

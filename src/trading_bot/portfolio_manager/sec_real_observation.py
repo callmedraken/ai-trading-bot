@@ -12,31 +12,91 @@ import ssl
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from trading_bot.portfolio_manager.sec_native_observation import (
-    SECEvidenceStore,
-    SECObservationAuthorization,
+    SECFileEvidenceStore,
+    SECObservationCounters,
     SECObservationError,
+    SECObservationOutcome,
     SECObservationPlan,
     SECObservationResult,
-    SECSourceAdmission,
     SECTransportResponse,
     _observe_sec_once_with_transport,
+    _read_sec_response_bounded,
+    _result,
+    is_valid_sec_production_boundary,
+    load_sec_effect_authorization_record,
+    load_sec_source_admission_record,
 )
 
 
 def observe_sec_once(
     plan: SECObservationPlan,
-    admission: SECSourceAdmission,
-    authorization: SECObservationAuthorization,
-    evidence_store: SECEvidenceStore,
-    *,
-    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+    admission_evidence_path: str | Path,
+    effect_authorization_path: str | Path,
 ) -> SECObservationResult:
-    """Attempt one SEC archive GET after the separate source/effect gates."""
+    """Attempt one SEC GET after loading actual admission and review records.
+
+    The operator cannot inject a transport, evidence store, clock, or typed
+    authorization value into this production boundary.
+    """
+
+    if type(plan) is not SECObservationPlan:
+        raise TypeError("the exact immutable SEC observation plan is required")
+    checked_at = datetime.now(UTC)
+    try:
+        admission = load_sec_source_admission_record(admission_evidence_path, plan)
+    except (OSError, ValueError, RuntimeError, TypeError):
+        return _result(
+            plan,
+            SECObservationOutcome.SOURCE_ADMISSION_FAILED,
+            "ACTUAL_SUCCESSFUL_PREPUBLICATION_ADMISSION_RECORD_REQUIRED",
+            SECObservationCounters(),
+        )
+    try:
+        authorization = load_sec_effect_authorization_record(
+            effect_authorization_path, plan, admission, checked_at
+        )
+    except (OSError, ValueError, RuntimeError, TypeError):
+        return _result(
+            plan,
+            SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED,
+            "ACTUAL_CURRENT_PLAN_BOUND_EFFECT_AUTHORIZATION_RECORD_REQUIRED",
+            SECObservationCounters(),
+        )
+    try:
+        evidence_store = SECFileEvidenceStore(plan)
+    except (OSError, ValueError, RuntimeError, TypeError):
+        return _result(
+            plan,
+            SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED,
+            "CANONICAL_ONE_SHOT_EVIDENCE_STORE_REQUIRED",
+            SECObservationCounters(),
+        )
+    if not is_valid_sec_production_boundary(plan, evidence_store):
+        return _result(
+            plan,
+            SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED,
+            "PRODUCTION_BOUNDARY_STORE_OR_ATTEMPT_ID_MISMATCH",
+            SECObservationCounters(),
+        )
+
+    def recheck_authorization_evidence() -> bool:
+        current_admission = load_sec_source_admission_record(
+            admission_evidence_path, plan
+        )
+        if current_admission != admission:
+            return False
+        current_authorization = load_sec_effect_authorization_record(
+            effect_authorization_path,
+            plan,
+            current_admission,
+            datetime.now(UTC),
+        )
+        return current_authorization == authorization
 
     return _observe_sec_once_with_transport(
         plan,
@@ -44,7 +104,8 @@ def observe_sec_once(
         authorization,
         _SECReadOnlyTransport(),
         evidence_store,
-        now=now,
+        authorization_recheck=recheck_authorization_evidence,
+        require_response_receipt_timestamp=True,
     )
 
 
@@ -62,13 +123,14 @@ class _SECReadOnlyTransport:
         *,
         user_agent: str,
         timeout_seconds: int,
-        total_time_limit_seconds: int,
+        total_time_limit_seconds: float,
         max_bytes: int,
     ) -> SECTransportResponse:
+        deadline = time.monotonic() + total_time_limit_seconds
         parsed = urlsplit(url)
         if (
             parsed.scheme != "https"
-            or parsed.hostname != "www.sec.gov"
+            or parsed.netloc != "www.sec.gov"
             or parsed.query
             or parsed.fragment
         ):
@@ -86,51 +148,34 @@ class _SECReadOnlyTransport:
             urllib.request.HTTPSHandler(context=ssl.create_default_context()),
             _NoRedirect(),
         )
-        deadline = time.monotonic() + total_time_limit_seconds
         try:
             response = opener.open(
                 request, timeout=min(timeout_seconds, total_time_limit_seconds)
             )
         except urllib.error.HTTPError as error:
             try:
-                body = _read_bounded(error, max_bytes, timeout_seconds, deadline)
+                body = _read_sec_response_bounded(
+                    error, max_bytes, timeout_seconds, deadline
+                )
+                received_at = datetime.now(UTC)
                 return SECTransportResponse(
                     error.code,
                     error.headers.get("Content-Type", ""),
                     body,
                     url,
+                    received_at,
                 )
             finally:
                 error.close()
         with response:
-            body = _read_bounded(response, max_bytes, timeout_seconds, deadline)
+            body = _read_sec_response_bounded(
+                response, max_bytes, timeout_seconds, deadline
+            )
+            received_at = datetime.now(UTC)
             return SECTransportResponse(
                 response.status,
                 response.headers.get("Content-Type", ""),
                 body,
                 response.geturl(),
+                received_at,
             )
-
-
-def _read_bounded(
-    response, max_bytes: int, timeout_seconds: int, deadline: float
-) -> bytes:
-    """Read bounded chunks while tightening socket timeout to the total deadline."""
-
-    http_response = getattr(response, "fp", None)
-    buffer = getattr(http_response, "fp", None)
-    raw = getattr(buffer, "raw", None)
-    sock = getattr(raw, "_sock", None)
-    if sock is None:
-        raise SECObservationError("bounded SEC response socket is unavailable")
-    body = bytearray()
-    while len(body) <= max_bytes:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            raise TimeoutError("SEC total observation time limit reached")
-        sock.settimeout(min(timeout_seconds, remaining))
-        chunk = response.read(min(64 * 1024, max_bytes + 1 - len(body)))
-        if not chunk:
-            break
-        body.extend(chunk)
-    return bytes(body)

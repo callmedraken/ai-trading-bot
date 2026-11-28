@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone — PM2D-B1-R real fundamental observation readiness
+## Current milestone — PM2D-B1-R-C1 native SEC boundary correction
 
 The accepted PM2D-B1-C1 parent is HEAD
 `3c9aa6c1dad6db5417bc3622a671906c13731afc` / tree
@@ -9,34 +9,50 @@ The accepted PM2D-B1-C1 parent is HEAD
 develop reused `exact_feature_certification`. B1-C1 remains the accepted
 source-only/fake-only SEC/Sharadar comparison foundation.
 
-PM2D-B1-R establishes a separate bounded native SEC annual-revenue parser and
-one-shot plan contract. Its current source-feasibility result is
-`SEC_OBSERVATION_BLOCKED`: SEC can supply accession-bound filing bytes, but
-does not provide a dependable first-public timestamp for the exact content,
-and CIK alone does not prove PM2C security/share-class identity. Sharadar stays
+PM2D-B1-R was published at HEAD
+`91aa3119ed4f594f624b14e989982ec5cc496594` / tree
+`1fb4cb0a917ee1c80b89b84c5278fde6dea27c4d`; feature FULL run
+`46123188954`, attempt 1, was terminal SUCCESS. C1 preserves this parent and
+corrects the native SEC endpoint, exact member extraction, production evidence
+store, authorization rechecks, and timeout claims without changing the seven-
+lane mapped FULL route.
+
+The SEC operational route is
+`SEC_OPERATIONAL_FIRST_OBSERVED_PATH_READY_PENDING_EXACT_SUBJECT_AND_REVIEW`:
+after an independently established issuer-to-security/share-class mapping, an
+exact annual 10-K observation can support a PM2C operational fact with
+`available_at` and `observed_at` no earlier than trusted local receipt and a
+snapshot cutoff at or after receipt. Historical reconstruction remains
+`SEC_HISTORICAL_RECONSTRUCTION_BLOCKED`: SEC acceptance time, filing date, a
+fixed delay, and current receipt do not prove historical public availability
+of the exact version. SEC Feed and Oldloads are potential later witness
+research routes, not admitted sources. Sharadar stays
 `SHARADAR_VERSION_OR_ENTITLEMENT_UNQUALIFIED`: public ARY/ARQ documentation
 does not prove immutable historical version retrieval or exact vendor
 availability, and the project’s entitlement/retention terms remain unresolved.
 No comparison is claimed, no real observation is authorized, and no SEC or
-Sharadar filing/fact endpoint was contacted.
+Sharadar filing/fact endpoint was contacted in this checkpoint.
 
 The SEC parser and synthetic fake-transport harness are separate from the
-manual real transport entrypoint. The real entrypoint is not imported by
+manual real transport entrypoint. The production entry takes actual admission
+and effect-authorization record paths, enforces the exact file store and
+canonical one-shot attempt, rechecks authority immediately before its single
+GET, and preserves original bytes separately from parsed records. Local
+response receipt is not publication time. The entrypoint is not imported by
 application startup, source-admission code, pytest, or CI; routing checks guard
-that boundary. Synthetic tests cover parsing, custody, limits, no-retry
-accounting, and pre-invocation gates. The successful synthetic parse still
-returns a blocked result and cannot create a PM2C `SourceFact`. The proposed
-finite plan is not executable until a real issuer/security, CIK, accession,
-fiscal context, and independent availability witness are selected and
-reviewed.
+that boundary. Synthetic tests use private fakes only, and a successful
+synthetic parse creates no PM2C `SourceFact`. The finite plan remains
+non-executable until the real issuer/security, CIK, accession, fiscal context,
+concept, and document are selected and reviewed.
 
 PM2C remains closed. PM1 remains disarmed and preview-only; PM2A real account
 reads remain unauthorized; Arch149 remains sealed. **Next step:** ChatGPT
-reviews the exact B1-R published diff, source admission and terminal mapped
-feature FULL evidence. Do not integrate `develop` or execute the proposed
-observation plan in this checkpoint. Any later request needs a new exact plan,
-current FEATURE and PROSPECTIVE_DEVELOP admission, and separate plan-bound
-effect authorization. PM2D-B2 price/action qualification remains separate.
+reviews the exact C1 corrective diff, FEATURE and PROSPECTIVE_DEVELOP
+prepublication admission, and terminal mapped feature FULL evidence. Do not
+integrate `develop` or execute the proposed observation plan in this
+checkpoint. Any later request needs an exact reviewed plan, current successful
+source admission, and separate short-lived plan-bound effect authorization.
+PM2D-B2 price/action qualification remains separate.
 
 See [Architecture 152-PM2D-B1-R](architecture/152-pm2d-b1-r-real-fundamental-observation-readiness.md),
 its [validation record](validation/arch152-pm2d-b1-r-real-fundamental-observation-readiness.md),

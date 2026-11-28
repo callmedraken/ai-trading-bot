@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 from uuid import UUID, uuid5
 
 import pytest
@@ -153,6 +156,7 @@ class MemoryEvidenceStore:
         self.fail_intent = fail_intent
         self.intents: list[dict[str, object]] = []
         self.responses: list[tuple[int, str, bytes, str]] = []
+        self.response_received_at: list[datetime | None] = []
         self.terminal: dict[str, object] | None = None
 
     def reserve_attempt(self, plan: sec.SECObservationPlan) -> bool:
@@ -165,9 +169,16 @@ class MemoryEvidenceStore:
         self.intents.append(dict(material))
 
     def write_response(
-        self, ordinal: int, label: str, body: bytes, content_type: str
+        self,
+        ordinal: int,
+        label: str,
+        body: bytes,
+        content_type: str,
+        *,
+        received_at: datetime | None = None,
     ) -> str:
         self.responses.append((ordinal, label, body, content_type))
+        self.response_received_at.append(received_at)
         return hashlib.sha256(body).hexdigest()
 
     def write_terminal(self, material: dict[str, object]) -> None:
@@ -195,7 +206,7 @@ class FakeTransport:
         *,
         user_agent: str,
         timeout_seconds: int,
-        total_time_limit_seconds: int,
+        total_time_limit_seconds: float,
         max_bytes: int,
     ) -> sec.SECTransportResponse:
         ordinal = len(self.calls) + 1
@@ -210,7 +221,7 @@ class FakeTransport:
         assert intent["total_time_limit_seconds"] == self.plan.total_time_limit_seconds
         assert user_agent == self.plan.user_agent
         assert timeout_seconds == self.plan.request_timeout_seconds
-        assert total_time_limit_seconds == self.plan.total_time_limit_seconds
+        assert 0 < total_time_limit_seconds <= self.plan.total_time_limit_seconds
         self.calls.append(url)
         if ordinal == self.fail_at:
             raise TimeoutError("synthetic timeout")
@@ -218,7 +229,7 @@ class FakeTransport:
         content_type = "text/plain"
         if ordinal == self.over_limit_at:
             body = b"x" * (max_bytes + 1)
-        return sec.SECTransportResponse(200, content_type, body, url)
+        return sec.SECTransportResponse(200, content_type, body, url, NOW)
 
 
 def _run(
@@ -284,6 +295,41 @@ def test_native_submission_binds_accession_document_cik_and_acceptance() -> None
     assert _submission(plan)[start:end] == _instance(plan)
     assert submission.accepted_timestamp_raw == "20250215175500"
     assert submission.observed_at == NOW
+
+
+def test_native_submission_requires_exact_filename_not_a_prefix() -> None:
+    plan = _plan()
+    raw = _submission(plan).replace(
+        f"<FILENAME>{plan.document_name}".encode(),
+        f"<FILENAME>{plan.document_name}.unexpected".encode(),
+    )
+    with pytest.raises(sec.SECNativeInputError) as caught:
+        sec.parse_sec_submission(raw, plan, NOW)
+    assert caught.value.reason_code == "SEC_DOCUMENT_NAME_MISSING_OR_DUPLICATE"
+
+
+def test_embedded_document_must_match_parent_digest_length_and_byte_range() -> None:
+    plan = _plan()
+    raw = _submission(plan)
+    submission = sec.parse_sec_submission(raw, plan, NOW)
+    assert sec.extract_sec_submission_member(raw, submission) == _instance(plan)
+
+    changed_digest = replace(submission, embedded_document_sha256="0" * 64)
+    with pytest.raises(sec.SECNativeInputError) as caught:
+        sec.extract_sec_submission_member(raw, changed_digest)
+    assert caught.value.reason_code == "SEC_EMBEDDED_DOCUMENT_DIGEST_OR_RANGE_MISMATCH"
+
+    changed_parent = replace(submission, content_sha256="0" * 64)
+    with pytest.raises(sec.SECNativeInputError) as caught:
+        sec.extract_sec_submission_member(raw, changed_parent)
+    assert caught.value.reason_code == "SEC_PARENT_SUBMISSION_IDENTITY_MISMATCH"
+
+    changed_range = replace(
+        submission,
+        embedded_document_range=(0, submission.embedded_document_length),
+    )
+    with pytest.raises(sec.SECNativeInputError):
+        sec.extract_sec_submission_member(raw, changed_range)
 
 
 def test_native_submission_accepts_utf8_filing_bytes_without_losing_raw_identity() -> (
@@ -540,6 +586,60 @@ def test_source_and_effect_authorization_fail_before_any_transport_call() -> Non
     assert not transport.calls
 
 
+def test_authorization_expiry_during_source_admission_stops_before_reservation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = _plan()
+    store = MemoryEvidenceStore()
+    transport = FakeTransport(plan, store)
+    moments = iter((NOW, NOW + timedelta(minutes=11)))
+    monkeypatch.setattr(sec, "_current_source_is_admitted", lambda _: True)
+    result = sec._observe_sec_once_with_transport(
+        plan,
+        sec.SECSourceAdmission(HEAD, TREE, "PASS", "PASS", "d" * 64),
+        _authorization(plan),
+        transport,
+        store,
+        now=lambda: next(moments),
+    )
+    assert result.outcome is sec.SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED
+    assert (
+        result.reason_code
+        == "EFFECT_AUTHORIZATION_EXPIRED_OR_EVIDENCE_CHANGED_AFTER_ADMISSION"
+    )
+    assert result.counters.provider_invocations == 0
+    assert not store.consumed
+    assert not transport.calls
+
+
+def test_authorization_evidence_change_after_intent_stops_before_provider_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = _plan()
+    store = MemoryEvidenceStore()
+    transport = FakeTransport(plan, store)
+    monkeypatch.setattr(sec, "_current_source_is_admitted", lambda _: True)
+    rechecks = iter((True, False))
+    authorization = replace(_authorization(plan), source_admission_sha256="d" * 64)
+    result = sec._observe_sec_once_with_transport(
+        plan,
+        sec.SECSourceAdmission(HEAD, TREE, "PASS", "PASS", "d" * 64),
+        authorization,
+        transport,
+        store,
+        now=lambda: NOW,
+        authorization_recheck=lambda: next(rechecks),
+    )
+    assert result.outcome is sec.SECObservationOutcome.EFFECT_AUTHORIZATION_FAILED
+    assert (
+        result.reason_code
+        == "EFFECT_AUTHORIZATION_EXPIRED_OR_EVIDENCE_CHANGED_BEFORE_REQUEST"
+    )
+    assert result.counters.request_intents == 1
+    assert result.counters.provider_invocations == 0
+    assert not transport.calls
+
+
 def test_current_source_admission_failure_precedes_attempt_reservation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -572,11 +672,13 @@ def test_successful_synthetic_transport_keeps_raw_bytes_separate_and_still_block
     assert result.outcome is sec.SECObservationOutcome.SEC_OBSERVATION_BLOCKED
     assert (
         result.reason_code
-        == "SEC_PUBLIC_AVAILABILITY_AND_SECURITY_IDENTITY_WITNESSES_UNPROVEN"
+        == "SEC_HISTORICAL_VERSION_WITNESS_AND_SECURITY_MAPPING_UNPROVEN"
     )
     assert result.counters.provider_invocations == 1
     assert result.counters.request_intents == 1
     assert result.counters.response_documents == 1
+    assert result.counters.response_bytes == len(_submission(plan))
+    assert result.counters.response_bytes_received == len(_submission(plan))
     assert result.counters.xbrl_records == 1
     assert result.fact is not None
     assert result.fact.signed_decimal_value == Decimal("123456789.125")
@@ -588,6 +690,9 @@ def test_successful_synthetic_transport_keeps_raw_bytes_separate_and_still_block
     assert result.counters.production_mutations == 0
     assert len(store.responses) == 1
     assert store.responses[0][2] == _submission(plan)
+    assert store.response_received_at == [NOW]
+    assert result.submission is not None
+    assert result.submission.observed_at == NOW
     assert store.intents[0]["effect_authorization"] == {
         "authorization_id": authorization.authorization_id,
         "approved_plan_id": plan.plan_id,
@@ -595,6 +700,7 @@ def test_successful_synthetic_transport_keeps_raw_bytes_separate_and_still_block
         "approved_source_tree": TREE,
         "approved_attempt_id": str(plan.attempt_id),
         "review_record_sha256": authorization.review_record_sha256,
+        "source_admission_sha256": "d" * 64,
         "issued_at": authorization.issued_at.isoformat(),
         "expires_at": authorization.expires_at.isoformat(),
         "max_request_attempts": 1,
@@ -651,6 +757,8 @@ def test_response_and_total_time_limits_stop_without_retry(
     assert oversized.outcome is sec.SECObservationOutcome.RESPONSE_REJECTED
     assert oversized.counters.provider_invocations == 1
     assert oversized.counters.response_documents == 0
+    assert oversized.counters.response_bytes == 0
+    assert oversized.counters.response_bytes_received == 101
     assert len(transport.calls) == 1
 
     plan = _plan()
@@ -668,9 +776,402 @@ def test_response_and_total_time_limits_stop_without_retry(
     assert not transport.calls
 
 
+def test_elapsed_limit_after_transport_preserves_truthful_response_accounting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = _plan()
+    store = MemoryEvidenceStore()
+    transport = FakeTransport(plan, store)
+    result = _run(
+        monkeypatch,
+        plan,
+        transport,
+        store,
+        monotonic_values=(0.0, 0.0, 0.0, 31.0),
+    )
+    assert result.outcome is sec.SECObservationOutcome.PROVIDER_FAILED
+    assert result.reason_code == "TOTAL_TIME_LIMIT_REACHED"
+    assert result.counters.provider_invocations == 1
+    assert result.counters.response_documents == 1
+    assert result.counters.response_bytes == len(_submission(plan))
+    assert result.counters.response_bytes_received == len(_submission(plan))
+
+
+def test_response_custody_digest_mismatch_is_rejected_and_counted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class WrongDigestStore(MemoryEvidenceStore):
+        def write_response(
+            self,
+            ordinal: int,
+            label: str,
+            body: bytes,
+            content_type: str,
+            *,
+            received_at: datetime | None = None,
+        ) -> str:
+            super().write_response(
+                ordinal,
+                label,
+                body,
+                content_type,
+                received_at=received_at,
+            )
+            return "0" * 64
+
+    plan = _plan()
+    store = WrongDigestStore()
+    transport = FakeTransport(plan, store)
+    monkeypatch.setattr(sec, "_current_source_is_admitted", lambda _: True)
+    result = sec._observe_sec_once_with_transport(
+        plan,
+        sec.SECSourceAdmission(HEAD, TREE, "PASS", "PASS", "d" * 64),
+        _authorization(plan),
+        transport,
+        store,
+        now=lambda: NOW,
+    )
+    assert result.outcome is sec.SECObservationOutcome.EVIDENCE_WRITE_FAILED
+    assert result.reason_code == "RESPONSE_CUSTODY_DIGEST_MISMATCH"
+    assert result.counters.provider_invocations == 1
+    assert result.counters.response_documents == 0
+    assert result.counters.response_bytes == 0
+    assert result.counters.response_bytes_received == len(_submission(plan))
+
+
+def test_real_path_requires_receipt_timestamp_before_response_custody(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class MissingReceiptTransport(FakeTransport):
+        def get(
+            self,
+            url: str,
+            *,
+            user_agent: str,
+            timeout_seconds: int,
+            total_time_limit_seconds: float,
+            max_bytes: int,
+        ) -> sec.SECTransportResponse:
+            response = super().get(
+                url,
+                user_agent=user_agent,
+                timeout_seconds=timeout_seconds,
+                total_time_limit_seconds=total_time_limit_seconds,
+                max_bytes=max_bytes,
+            )
+            return replace(response, received_at=None)
+
+    plan = _plan()
+    store = MemoryEvidenceStore()
+    transport = MissingReceiptTransport(plan, store)
+    monkeypatch.setattr(sec, "_current_source_is_admitted", lambda _: True)
+    result = sec._observe_sec_once_with_transport(
+        plan,
+        sec.SECSourceAdmission(HEAD, TREE, "PASS", "PASS", "d" * 64),
+        _authorization(plan),
+        transport,
+        store,
+        now=lambda: NOW,
+        require_response_receipt_timestamp=True,
+    )
+    assert result.outcome is sec.SECObservationOutcome.RESPONSE_REJECTED
+    assert result.reason_code == "LOCAL_RESPONSE_RECEIPT_TIMESTAMP_REQUIRED"
+    assert result.counters.provider_invocations == 1
+    assert result.counters.response_documents == 0
+    assert result.counters.response_bytes_received == len(_submission(plan))
+    assert not store.responses
+
+
+def test_real_path_rejects_receipt_outside_the_local_request_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FutureReceiptTransport(FakeTransport):
+        def get(
+            self,
+            url: str,
+            *,
+            user_agent: str,
+            timeout_seconds: int,
+            total_time_limit_seconds: float,
+            max_bytes: int,
+        ) -> sec.SECTransportResponse:
+            response = super().get(
+                url,
+                user_agent=user_agent,
+                timeout_seconds=timeout_seconds,
+                total_time_limit_seconds=total_time_limit_seconds,
+                max_bytes=max_bytes,
+            )
+            return replace(response, received_at=NOW + timedelta(seconds=1))
+
+    plan = _plan()
+    store = MemoryEvidenceStore()
+    transport = FutureReceiptTransport(plan, store)
+    monkeypatch.setattr(sec, "_current_source_is_admitted", lambda _: True)
+    result = sec._observe_sec_once_with_transport(
+        plan,
+        sec.SECSourceAdmission(HEAD, TREE, "PASS", "PASS", "d" * 64),
+        _authorization(plan),
+        transport,
+        store,
+        now=lambda: NOW,
+        require_response_receipt_timestamp=True,
+    )
+    assert result.outcome is sec.SECObservationOutcome.RESPONSE_REJECTED
+    assert (
+        result.reason_code == "LOCAL_RESPONSE_RECEIPT_TIMESTAMP_OUTSIDE_REQUEST_WINDOW"
+    )
+    assert result.counters.provider_invocations == 1
+    assert result.counters.response_bytes_received == len(_submission(plan))
+    assert not store.responses
+
+
 def test_plan_uses_only_the_exact_planned_sec_archive_endpoint() -> None:
     plan = _plan()
     assert plan.submission_url == (
         "https://www.sec.gov/Archives/edgar/data/1/"
-        "000000000124000001/000000000124000001.txt"
+        "000000000124000001/0000000001-24-000001.txt"
     )
+
+
+def _admission_report(plan: sec.SECObservationPlan) -> dict[str, object]:
+    state = {
+        "head": plan.expected_source_head,
+        "tree": plan.expected_source_tree,
+        "branch": sec._EXPECTED_BRANCH,
+        "porcelain": "",
+    }
+    return {
+        "schema": "ai-trading-bot-checkpoint-runner/v1",
+        "kind": "source_gate",
+        "checkpoint": "arch132-r3n-prepublication-admission",
+        "mode": "FULL",
+        "phase": "all",
+        "status": "PASS",
+        "authority_checked": True,
+        "authority_failures": [],
+        "identity_stable": True,
+        "started_from": state,
+        "finished_at": state,
+        "commands": [
+            {"name": name, "exit_code": 0}
+            for name in ("git_diff_check", "ruff_check", "ruff_format", "pytest")
+        ],
+        "production_effects": "NOT_RUN",
+        "provider_effects": "NOT_RUN",
+        "scheduler_mutation": "NOT_RUN",
+        "broker_live_effects": "NOT_RUN",
+    }
+
+
+def _write_json(path, material: dict[str, object]) -> bytes:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
+    path.write_bytes(raw)
+    return raw
+
+
+def test_actual_admission_and_effect_authorization_records_are_bound(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    external_root = tmp_path / "external-temp"
+    external_root.mkdir()
+    monkeypatch.setattr(sec, "_EVIDENCE_ROOT", str(external_root))
+    plan = _plan(
+        evidence_root=str(sec.sec_observation_evidence_root()),
+    )
+    plan = replace(plan, attempt_id=sec.canonical_sec_attempt_id(plan))
+    admission_path = external_root / "admission" / "report.json"
+    admission_bytes = _write_json(admission_path, _admission_report(plan))
+    admission = sec.load_sec_source_admission_record(admission_path, plan)
+    assert admission.evidence_sha256 == hashlib.sha256(admission_bytes).hexdigest()
+
+    authorization_path = external_root / "authorization" / "review.json"
+    authorization_record: dict[str, object] = {
+        "schema": "pm2d-b1-r-sec-effect-authorization/v1",
+        "decision": "APPROVED",
+        "authorization_id": "review-2026-11-28",
+        "plan_id": plan.plan_id,
+        "approved_source_head": plan.expected_source_head,
+        "approved_source_tree": plan.expected_source_tree,
+        "approved_attempt_id": str(plan.attempt_id),
+        "source_admission_sha256": admission.evidence_sha256,
+        "reviewed_by": "owner-review-1",
+        "issued_at": (NOW - timedelta(minutes=1)).isoformat(),
+        "expires_at": (NOW + timedelta(minutes=10)).isoformat(),
+        "max_request_attempts": 1,
+    }
+    authorization_bytes = _write_json(authorization_path, authorization_record)
+    authorization = sec.load_sec_effect_authorization_record(
+        authorization_path, plan, admission, NOW
+    )
+    assert (
+        authorization.review_record_sha256
+        == hashlib.sha256(authorization_bytes).hexdigest()
+    )
+    assert authorization.source_admission_sha256 == admission.evidence_sha256
+
+    evidence_store = sec.SECFileEvidenceStore(plan)
+    assert evidence_store.reserve_attempt(plan)
+    evidence_store.write_authority_evidence(admission, authorization)
+    attempt_root = sec.sec_observation_evidence_root() / str(plan.attempt_id)
+    assert (
+        attempt_root / "authorities" / "source-admission.json"
+    ).read_bytes() == admission_bytes
+    assert (
+        attempt_root / "authorities" / "effect-authorization.json"
+    ).read_bytes() == authorization_bytes
+    assert evidence_store.authority_evidence_manifest() == {
+        "source_admission_evidence": {
+            "path": str(admission_path),
+            "sha256": admission.evidence_sha256,
+        },
+        "effect_authorization_evidence": {
+            "authorization_id": authorization.authorization_id,
+            "path": str(authorization_path),
+            "sha256": authorization.review_record_sha256,
+        },
+    }
+
+    authorization_record["source_admission_sha256"] = "f" * 64
+    _write_json(authorization_path, authorization_record)
+    with pytest.raises(sec.SECObservationError, match="does not bind"):
+        sec.load_sec_effect_authorization_record(
+            authorization_path, plan, admission, NOW
+        )
+
+
+def test_admission_record_rejects_incompatible_source_or_missing_context(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    external_root = tmp_path / "external-temp"
+    external_root.mkdir()
+    monkeypatch.setattr(sec, "_EVIDENCE_ROOT", str(external_root))
+    plan = _plan(evidence_root=str(sec.sec_observation_evidence_root()))
+    report = _admission_report(plan)
+    report["started_from"] = {
+        "head": "c" * 40,
+        "tree": plan.expected_source_tree,
+        "branch": sec._EXPECTED_BRANCH,
+        "porcelain": "",
+    }
+    report_path = external_root / "admission" / "report.json"
+    _write_json(report_path, report)
+    with pytest.raises(sec.SECObservationError, match="exact clean source"):
+        sec.load_sec_source_admission_record(report_path, plan)
+
+    report = _admission_report(plan)
+    del report["provider_effects"]
+    _write_json(report_path, report)
+    with pytest.raises(sec.SECObservationError, match="non-source effect"):
+        sec.load_sec_source_admission_record(report_path, plan)
+
+
+def test_production_boundary_rejects_structural_store_and_attempt_path_replay(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    external_root = tmp_path / "external-temp"
+    external_root.mkdir()
+    monkeypatch.setattr(sec, "_EVIDENCE_ROOT", str(external_root))
+    evidence_root = str(sec.sec_observation_evidence_root())
+    provisional = _plan(evidence_root=evidence_root)
+    plan = replace(
+        provisional,
+        attempt_id=sec.canonical_sec_attempt_id(provisional),
+    )
+    store = sec.SECFileEvidenceStore(plan)
+    assert sec.is_valid_sec_production_boundary(plan, store)
+    assert not sec.is_valid_sec_production_boundary(plan, MemoryEvidenceStore())
+
+    changed_path = replace(plan, evidence_root=str(external_root / "alternate"))
+    assert sec.canonical_sec_attempt_id(changed_path) == plan.attempt_id
+    with pytest.raises(ValueError, match="canonical SEC evidence root"):
+        sec.SECFileEvidenceStore(changed_path)
+
+    assert store.reserve_attempt(plan)
+    assert not store.reserve_attempt(plan)
+    store.write_request_intent(1, {"request": "synthetic"})
+    body = _submission(plan)
+    assert (
+        store.write_response(1, "submission", body, "text/plain", received_at=NOW)
+        == hashlib.sha256(body).hexdigest()
+    )
+    stored_path = (
+        sec.sec_observation_evidence_root()
+        / str(plan.attempt_id)
+        / "responses"
+        / "01-submission.bin"
+    )
+    assert stored_path.read_bytes() == body
+    response_meta = json.loads(stored_path.with_suffix(".meta.json").read_text())
+    assert response_meta["received_at"] == NOW.isoformat()
+    assert (
+        response_meta["receipt_semantics"] == "LOCAL_FIRST_RECEIPT_NOT_PUBLICATION_TIME"
+    )
+
+
+def test_external_record_path_containment_and_reparse_guards(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    external_root = tmp_path / "external-temp"
+    external_root.mkdir()
+    monkeypatch.setattr(sec, "_EVIDENCE_ROOT", str(external_root))
+    plan = _plan(evidence_root=str(sec.sec_observation_evidence_root()))
+    outside = tmp_path / "outside.json"
+    _write_json(outside, _admission_report(plan))
+    with pytest.raises(sec.SECObservationError, match="below F"):
+        sec.load_sec_source_admission_record(outside, plan)
+
+    reparse = external_root / "link"
+    reparse.mkdir()
+    original_is_symlink = sec.Path.is_symlink
+    monkeypatch.setattr(
+        sec.Path,
+        "is_symlink",
+        lambda value: value == reparse or original_is_symlink(value),
+    )
+    with pytest.raises(ValueError, match="reparse point"):
+        sec._reject_reparse_ancestors(external_root, reparse)
+
+
+def test_standard_library_read_loop_enforces_byte_and_per_read_deadline_bounds() -> (
+    None
+):
+    class FakeSocket:
+        def __init__(self) -> None:
+            self.timeouts: list[float] = []
+
+        def settimeout(self, value: float) -> None:
+            self.timeouts.append(value)
+
+    class FakeResponse:
+        def __init__(self, chunks: list[bytes]) -> None:
+            self.socket = FakeSocket()
+            self.fp = SimpleNamespace(
+                fp=SimpleNamespace(raw=SimpleNamespace(_sock=self.socket))
+            )
+            self.chunks = list(chunks)
+            self.requested_sizes: list[int] = []
+
+        def read(self, size: int) -> bytes:
+            self.requested_sizes.append(size)
+            return self.chunks.pop(0) if self.chunks else b""
+
+    oversized = FakeResponse([b"abcd"])
+    body = sec._read_sec_response_bounded(oversized, 3, 2, 5.0, monotonic=lambda: 0.0)
+    assert body == b"abcd"
+    assert oversized.requested_sizes == [4]
+    assert oversized.socket.timeouts == [2]
+
+    deadline_response = FakeResponse([b"a", b"b"])
+    moments = iter((0.0, 2.0))
+    with pytest.raises(TimeoutError):
+        sec._read_sec_response_bounded(
+            deadline_response,
+            10,
+            8,
+            1.0,
+            monotonic=lambda: next(moments),
+        )
+    assert deadline_response.socket.timeouts == [1.0]
+    assert len(deadline_response.requested_sizes) == 1

@@ -1,43 +1,57 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM2C closed; PM2D next
+## Current milestone: PM2D-A design checkpoint; source acceptance/integration pending
 
-Architecture 152-PM2C — Synthetic Research Evidence Contracts is
-**SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED**.
+Architecture 152-PM2D-A is a documentation-only source-capability and
+provenance design checkpoint. Independent exact-source acceptance and develop
+integration are pending. The predecessor `develop` and persistent Portfolio
+Manager feature branch were HEAD
+`facc9efb9ecfcf5b5177a21e7e5cf73551e4b449` / tree
+`4c8c393c69321b0c250b2ad53fbf412d93b549ae`. The feature worktree is
+`F:\AI\worktrees\ai-trading-bot-portfolio-manager-current`, origin
+`https://github.com/callmedraken/ai-trading-bot.git`. The canonical develop
+checkout retained its exact 17 pre-existing untracked artifacts.
 
-Accepted implementation identity:
+PM2C implementation was accepted at HEAD
+`13e5981548ad3c072ff43f641b5eaa5ed909f0b1` / tree
+`290c3b22e58d75c9c511e27264e5811d245bcc99`. Feature mapped FULL run
+`46087041433` and develop exact-certification-reuse run `46088374165` are
+terminal SUCCESS. PM2C closeout docs runs `46088679818` and `46101847732`
+(feature and develop) are terminal SUCCESS.
 
-- HEAD: `13e5981548ad3c072ff43f641b5eaa5ed909f0b1`
-- tree: `290c3b22e58d75c9c511e27264e5811d245bcc99`
-- direct parent: `1cfd1e005f6040187e82ba5bac0650d8a4e68d41`
-- feature mapped FULL: `46087041433`, attempt 1, terminal SUCCESS
-- develop source gate: `46088374165`, attempt 1, terminal SUCCESS
-- develop reuse: `DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`
-- develop identity: `IDENTITY_STABLE=True`
-- duplicate develop FULL: NO
-- integration: local `merge --ff-only` plus ordinary push
-- canonical develop untracked inventory: 17 preserved
+The PM2D-A design identifies SEC EDGAR as a raw filing/provenance witness;
+existing Alpaca as the first price candidate and its separate Corporate Actions
+REST + Market Data SSE as the first action candidate; and Sharadar SF1 ARQ/ARY
+as a conditional normalized-fundamentals candidate. Sharadar TICKERS+ACTIONS
+and SP500 plus S&P DJI announcements are separate identity/ticker and
+benchmark-membership references. No source is accepted for implementation.
 
-The exact PM2C source implements only synthetic typed research catalog,
-point-in-time evidence, dependency/provenance DAG, and immutable research
-snapshot contracts. It adds no real provider or storage adapter, no scoring or
-ranking, no expected-return/covariance/optimizer policy, no AI request, and no
-execution/dispatch path. PM1 remains disarmed and preview-only. PM2A real
-read-only qualification remains **NOT YET AUTHORIZED**. Arch149 confirmation
-remains sealed.
+The four intended documentation paths are:
 
-No real market-data or brokerage read, credential, OAuth, AI-provider call,
-broker/order effect, sealed Arch149 access, or production mutation occurred
-during PM2C implementation, certification, review, or integration.
+1. `docs/architecture/152-pm2d-data-source-capability-and-provenance-qualification.md`
+2. `docs/validation/arch152-pm2d-data-source-capability-and-provenance-qualification.md`
+3. `docs/PROJECT_STATUS.md`
+4. `docs/AI_TRADING_BOT_HANDOFF.md`
 
-The next bounded milestone is **PM2D — data-source capability and provenance
-qualification**. Start with public documentation, public schemas, and working
-public repository/reference review. Compare candidate providers against the
-PM2B/PM2C requirements before building adapters or authorizing reads. PM2D does
-not inherit provider authority from PM2C.
+Still unqualified are regular-session close mapping and immutable corrections,
+complete point-in-time action history, selected SF1 field/grain/YTD/Q4 mappings,
+fixed NTM and 21-session estimate history, exact eligible shares, and historical
+peer/sector membership. FMP is rejected for historical analyst estimates because
+its internal revision timestamps cannot be queried by date. Current provider
+values, classifications, or index membership cannot be projected backward.
 
-See [Architecture 152-PM2C](architecture/152-pm2c-synthetic-research-evidence-contracts.md)
-and its [validation record](validation/arch152-pm2c-synthetic-research-evidence-contracts.md).
+See [Architecture 152-PM2D-A](architecture/152-pm2d-data-source-capability-and-provenance-qualification.md)
+and its [validation record](validation/arch152-pm2d-data-source-capability-and-provenance-qualification.md).
+
+This checkpoint added no code, tests, dependency, workflow, secret/config file,
+credential, subscription, provider/API call, bulk data, account read, AI call,
+broker/order effect, or Arch149 access. PM1 remains disarmed and preview-only;
+PM2A real read-only qualification is **NOT YET AUTHORIZED**; Arch149 remains
+sealed. **Next step:** independently review the exact feature source and its
+terminal CI result. If accepted, ChatGPT determines integration readiness and
+the next transition. PM2D-B follows only after PM2D-A source acceptance and
+develop integration, with separate bounds for each finite schema/sample
+observation. A real provider adapter is a later milestone.
 
 ### Historical PM2B design checkpoint
 

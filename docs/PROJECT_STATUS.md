@@ -1,41 +1,47 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - PM2C closed; PM2D next
+## Current milestone - PM2D-A data-source qualification; PM2C closed
 
-Architecture 152-PM2C — Synthetic Research Evidence Contracts is
-**SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED** at HEAD
+Architecture 152-PM2D-A — Data-Source Capability and Provenance Qualification
+is the current documentation-only design checkpoint. Independent source
+acceptance and develop integration are pending. Its predecessor is HEAD
+`facc9efb9ecfcf5b5177a21e7e5cf73551e4b449` / tree
+`4c8c393c69321b0c250b2ad53fbf412d93b549ae` on both `develop` and the persistent
+Portfolio Manager feature branch.
+
+PM2C implementation was accepted at HEAD
 `13e5981548ad3c072ff43f641b5eaa5ed909f0b1` / tree
-`290c3b22e58d75c9c511e27264e5811d245bcc99`, direct parent
-`1cfd1e005f6040187e82ba5bac0650d8a4e68d41`.
+`290c3b22e58d75c9c511e27264e5811d245bcc99`. Feature mapped FULL run
+`46087041433` and develop exact-certification-reuse run `46088374165` are
+terminal SUCCESS. PM2C closeout docs runs `46088679818` (feature) and
+`46101847732` (develop) are terminal SUCCESS.
 
-Feature mapped FULL run `46087041433`, attempt 1, is terminal SUCCESS:
-source-static, active-tests, source-gates, and all seven canonical FULL lanes
-passed. Generic FULL and unmapped certification jobs were skipped. Independent
-exact-source review accepted the ten-path PM2C implementation and found no
-provider, credential, AI, optimizer, dispatch, or production authority leak.
+The minimal PM2D-A candidate composition is SEC EDGAR as a raw filing and
+provenance witness; the existing Alpaca path as the first price candidate and
+its separate Corporate Actions REST plus Market Data SSE as the first action
+candidate; and Sharadar SF1 ARQ/ARY as a conditional normalized-fundamentals
+candidate. Sharadar TICKERS+ACTIONS and SP500 plus S&P DJI public announcements
+are identity/ticker and benchmark-membership references. No provider is
+qualified for implementation yet.
 
-Develop run `46088374165`, attempt 1, is terminal SUCCESS at the exact
-accepted source with
-`DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`,
-`IDENTITY_STABLE=True`, and no duplicate FULL. Integration was an ordinary
-local fast-forward plus normal develop push. The canonical 17 develop untracked
-artifacts were preserved.
+Unqualified PM2B evidence includes the exact regular-session close mapping and
+immutable price corrections, complete PIT corporate-action history, selected
+SF1 field/YTD/Q4 mappings, fixed-interval NTM consensus, exact 21-session
+analyst revisions, eligible share-count lineage, and historical peer/sector
+membership. Portfolio observations and fills/orders remain PM2A/runtime-owned.
+FMP is rejected for historical estimate PIT. PM1 remains disarmed and
+preview-only; PM2A real read-only qualification is **NOT YET AUTHORIZED**;
+Arch149 remains sealed.
 
-PM2C remains synthetic/in-memory only. PM1 remains disarmed and preview-only.
-PM2A real read-only qualification is **NOT YET AUTHORIZED**. Arch149
-confirmation remains sealed. No real market-data or brokerage read, credential,
-OAuth, AI-provider call, broker/order effect, or production mutation occurred
-as part of PM2C.
+PM2D-A caused no credential, subscription, provider call, data acquisition,
+account read, AI call, broker effect, or sealed-data access. **Next milestone:**
+after independent PM2D-A source acceptance and integration, PM2D-B may perform
+only separately reviewed finite schema/sample qualifications. No bulk
+acquisition or adapter implementation is included in that milestone.
 
-The next milestone is **PM2D — data-source capability and provenance
-qualification**. PM2D must begin with public documentation/schema/repository
-review and compare candidate sources against PM2B/PM2C point-in-time,
-revision, basis, coverage, provenance, licensing, cost, and historical
-reconstruction requirements. PM2C grants PM2D no provider-read authority.
-
-See [Architecture 152-PM2C](architecture/152-pm2c-synthetic-research-evidence-contracts.md),
-its [validation record](validation/arch152-pm2c-synthetic-research-evidence-contracts.md),
-and the predecessor [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md).
+See [Architecture 152-PM2D-A](architecture/152-pm2d-data-source-capability-and-provenance-qualification.md),
+its [validation record](validation/arch152-pm2d-data-source-capability-and-provenance-qualification.md),
+and the predecessor [PM2C contract](architecture/152-pm2c-synthetic-research-evidence-contracts.md).
 
 ### Historical PM2B design checkpoint
 

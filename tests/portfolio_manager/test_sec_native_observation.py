@@ -722,6 +722,7 @@ def test_provider_timeout_is_counted_once_and_never_retried(
     assert result.outcome is sec.SECObservationOutcome.PROVIDER_FAILED
     assert result.counters.provider_invocations == 1
     assert result.counters.request_intents == 1
+    assert result.counters.response_bytes_received == 0
     assert len(transport.calls) == 1
     assert len(store.responses) == 0
     assert store.terminal is not None
@@ -1165,7 +1166,7 @@ def test_standard_library_read_loop_enforces_byte_and_per_read_deadline_bounds()
 
     deadline_response = FakeResponse([b"a", b"b"])
     moments = iter((0.0, 2.0))
-    with pytest.raises(TimeoutError):
+    with pytest.raises(sec.SECResponseReadTimeout) as caught:
         sec._read_sec_response_bounded(
             deadline_response,
             10,
@@ -1173,5 +1174,95 @@ def test_standard_library_read_loop_enforces_byte_and_per_read_deadline_bounds()
             1.0,
             monotonic=lambda: next(moments),
         )
+    assert caught.value.received_bytes == 1
     assert deadline_response.socket.timeouts == [1.0]
     assert len(deadline_response.requested_sizes) == 1
+
+    class ReadTimeoutResponse(FakeResponse):
+        def read(self, size: int) -> bytes:
+            self.requested_sizes.append(size)
+            if len(self.requested_sizes) == 1:
+                return b"a"
+            raise TimeoutError("synthetic socket read timeout")
+
+    socket_timeout_response = ReadTimeoutResponse([])
+    with pytest.raises(sec.SECResponseReadTimeout) as caught:
+        sec._read_sec_response_bounded(
+            socket_timeout_response,
+            10,
+            8,
+            5.0,
+            monotonic=lambda: 0.0,
+        )
+    assert caught.value.received_bytes == 1
+    assert socket_timeout_response.socket.timeouts == [5.0, 5.0]
+
+    class ReadFailureResponse(FakeResponse):
+        def read(self, size: int) -> bytes:
+            self.requested_sizes.append(size)
+            if len(self.requested_sizes) == 1:
+                return b"a"
+            raise OSError("synthetic response read failure")
+
+    read_failure_response = ReadFailureResponse([])
+    with pytest.raises(sec.SECResponseReadFailure) as caught:
+        sec._read_sec_response_bounded(
+            read_failure_response,
+            10,
+            8,
+            5.0,
+            monotonic=lambda: 0.0,
+        )
+    assert caught.value.received_bytes == 1
+    assert read_failure_response.socket.timeouts == [5.0, 5.0]
+
+
+@pytest.mark.parametrize(
+    ("failure_type", "reason_code"),
+    [
+        (sec.SECResponseReadTimeout, "SEC_RESPONSE_READ_TIMEOUT"),
+        (sec.SECResponseReadFailure, "SEC_RESPONSE_READ_FAILURE"),
+    ],
+)
+def test_partial_response_read_failure_bytes_are_counted(
+    monkeypatch: pytest.MonkeyPatch,
+    failure_type: type[Exception],
+    reason_code: str,
+) -> None:
+    plan = _plan()
+    store = MemoryEvidenceStore()
+
+    class PartialReadFailureTransport(FakeTransport):
+        def get(
+            self,
+            url: str,
+            *,
+            user_agent: str,
+            timeout_seconds: int,
+            total_time_limit_seconds: float,
+            max_bytes: int,
+        ) -> sec.SECTransportResponse:
+            assert len(self.store.intents) == 1
+            assert url == self.plan.submission_url
+            assert user_agent == self.plan.user_agent
+            assert timeout_seconds == self.plan.request_timeout_seconds
+            assert 0 < total_time_limit_seconds <= self.plan.total_time_limit_seconds
+            assert max_bytes == self.plan.max_response_bytes
+            self.calls.append(url)
+            raise failure_type(7)
+
+    transport = PartialReadFailureTransport(plan, store)
+    result = _run(monkeypatch, plan, transport, store)
+
+    assert result.outcome is sec.SECObservationOutcome.PROVIDER_FAILED
+    assert result.reason_code == reason_code
+    assert result.counters.request_intents == 1
+    assert result.counters.provider_invocations == 1
+    assert result.counters.response_bytes_received == 7
+    assert result.counters.response_bytes == 0
+    assert result.counters.response_documents == 0
+    assert result.counters.xbrl_records == 0
+    assert len(transport.calls) == 1
+    assert len(store.intents) == 1
+    assert store.terminal is not None
+    assert store.terminal["response_bytes_received"] == 7

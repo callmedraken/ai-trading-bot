@@ -123,7 +123,10 @@ decimal value. The local UTC receipt time is captured when the response body
 finishes, stored beside the raw bytes, and carried as the submission's
 `observed_at`. It is explicitly first local receipt, not SEC publication time.
 The embedded document range and digest are reverified against its parent
-submission before parsing.
+submission before parsing. A socket timeout after partial body reads records
+the bytes already yielded as `response_bytes_received`; incomplete response
+bytes are not counted as successfully custodied `response_bytes` and are not
+retried.
 
 Production observation accepts paths to the actual prepublication admission
 report and separate reviewed effect-authorization record. It verifies their

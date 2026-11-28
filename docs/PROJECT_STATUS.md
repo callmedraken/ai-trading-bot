@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone — PM2D-B1-R-C1 native SEC boundary correction
+## Current milestone — PM2D-B1-R-C1-C2 SEC observation boundary
 
 The accepted PM2D-B1-C1 parent is HEAD
 `3c9aa6c1dad6db5417bc3622a671906c13731afc` / tree
@@ -16,6 +16,14 @@ PM2D-B1-R was published at HEAD
 corrects the native SEC endpoint, exact member extraction, production evidence
 store, authorization rechecks, and timeout claims without changing the seven-
 lane mapped FULL route.
+
+C1 correction HEAD `edbf2df90791d735de6a3f409f7ce0d2de7cd056` / tree
+`757e6383c73f4757d319f3f861a5af2b793149b2`; feature FULL run
+`46128814136`, attempt 1, was terminal SUCCESS across all seven lanes. C2
+closes a remaining timeout-accounting gap: partial bytes yielded before a
+socket read timeout are recorded in `response_bytes_received`, while
+`response_bytes` counts only fully preserved responses. No partial read is
+retried or treated as a complete filing.
 
 The SEC operational route is
 `SEC_OPERATIONAL_FIRST_OBSERVED_PATH_READY_PENDING_EXACT_SUBJECT_AND_REVIEW`:

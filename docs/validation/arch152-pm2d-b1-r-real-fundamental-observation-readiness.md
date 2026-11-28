@@ -119,8 +119,9 @@ Synthetic tests verify the SEC URL, exact member filename and embedded-byte
 identity, exact decimal preservation, namespace/context/issuer/period/dimension/
 unit mismatches, missing versus true zero, duplicate/conflicting facts,
 DTD/entity rejection, XML and response bounds, per-read deadline behavior,
-elapsed-limit accounting, provider timeout accounting, no retry, consumed
-attempt rejection, evidence-path/store substitution rejection, actual
+elapsed-limit and partial-read byte accounting, provider timeout accounting,
+no retry or consumed-attempt re-entry, evidence-path/store substitution,
+actual
 admission and authorization record binding, expiry/evidence change before the
 provider call, request-intent failure, response digest/custody failure, and
 receipt-time custody. Tests use only explicitly synthetic fixtures and private
@@ -138,11 +139,14 @@ included in that route. No local FULL is run for this checkpoint.
 
 ## 4. Pending publication evidence
 
-The exact C1 candidate HEAD/tree, FEATURE and PROSPECTIVE_DEVELOP admission
-output, mapped feature FULL run and all seven lane results, and zero real-effect
-counters are reported with this source handoff after the single ordinary push.
-Preserve any failed run; do not retry unchanged CI or integrate `develop` from
-this checkpoint.
+C1 HEAD `edbf2df90791d735de6a3f409f7ce0d2de7cd056` / tree
+`757e6383c73f4757d319f3f861a5af2b793149b2` has terminal mapped FULL run
+`46128814136`, attempt 1, with all seven lanes successful. The C1-C2 follow-up
+adds a focused partial-read timeout regression. Its exact candidate
+HEAD/tree, FEATURE and PROSPECTIVE_DEVELOP admission output, mapped feature FULL
+run and all seven lanes, and zero real-effect counters are reported with this
+source handoff. Preserve any failed run; do not retry unchanged CI or integrate
+`develop` from this checkpoint.
 
 ## 5. Exact next observation gate
 

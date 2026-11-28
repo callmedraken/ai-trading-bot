@@ -64,6 +64,26 @@ class SECObservationError(ValueError):
     """A fixed, non-provider-specific native-input or plan error."""
 
 
+class SECResponseReadTimeout(TimeoutError):
+    """A bounded response-read timeout with its already-yielded byte count."""
+
+    def __init__(self, received_bytes: int) -> None:
+        if type(received_bytes) is not int or received_bytes < 0:
+            raise ValueError("received_bytes must be a nonnegative integer")
+        self.received_bytes = received_bytes
+        super().__init__("SEC response read exceeded its remaining deadline")
+
+
+class SECResponseReadFailure(SECObservationError):
+    """A response-read failure with its already-yielded byte count."""
+
+    def __init__(self, received_bytes: int) -> None:
+        if type(received_bytes) is not int or received_bytes < 0:
+            raise ValueError("received_bytes must be a nonnegative integer")
+        self.received_bytes = received_bytes
+        super().__init__("SEC response body read failed")
+
+
 class SECObservationOutcome(StrEnum):
     SOURCE_ADMISSION_FAILED = "SOURCE_ADMISSION_FAILED"
     EFFECT_AUTHORIZATION_FAILED = "EFFECT_AUTHORIZATION_FAILED"
@@ -1168,11 +1188,21 @@ def _read_sec_response_bounded(
     while len(body) <= max_bytes:
         remaining = deadline - monotonic()
         if remaining <= 0:
-            raise TimeoutError("SEC total observation time limit reached")
+            raise SECResponseReadTimeout(len(body))
         sock.settimeout(min(timeout_seconds, remaining))
-        chunk = response.read(min(64 * 1024, max_bytes + 1 - len(body)))
+        try:
+            chunk = response.read(min(64 * 1024, max_bytes + 1 - len(body)))
+        except Exception as error:
+            partial = getattr(error, "partial", b"")
+            partial_bytes = len(partial) if isinstance(partial, bytes) else 0
+            received_bytes = len(body) + partial_bytes
+            if isinstance(error, TimeoutError):
+                raise SECResponseReadTimeout(received_bytes) from error
+            raise SECResponseReadFailure(received_bytes) from error
         if not chunk:
             break
+        if not isinstance(chunk, bytes):
+            raise SECResponseReadFailure(len(body))
         body.extend(chunk)
     return bytes(body)
 
@@ -1469,6 +1499,40 @@ def _observe_sec_once_with_transport(
                     timeout_seconds=plan.request_timeout_seconds,
                     total_time_limit_seconds=remaining_time_limit,
                     max_bytes=plan.max_response_bytes,
+                )
+            except SECResponseReadTimeout as error:
+                response_bytes_received += error.received_bytes
+                return _finish_result(
+                    plan,
+                    evidence_store,
+                    SECObservationOutcome.PROVIDER_FAILED,
+                    "SEC_RESPONSE_READ_TIMEOUT",
+                    _counters(
+                        provider_invocations,
+                        request_intents,
+                        len(stored_responses),
+                        response_bytes,
+                        0,
+                        response_bytes_received=response_bytes_received,
+                    ),
+                    hashes=tuple(response_hashes),
+                )
+            except SECResponseReadFailure as error:
+                response_bytes_received += error.received_bytes
+                return _finish_result(
+                    plan,
+                    evidence_store,
+                    SECObservationOutcome.PROVIDER_FAILED,
+                    "SEC_RESPONSE_READ_FAILURE",
+                    _counters(
+                        provider_invocations,
+                        request_intents,
+                        len(stored_responses),
+                        response_bytes,
+                        0,
+                        response_bytes_received=response_bytes_received,
+                    ),
+                    hashes=tuple(response_hashes),
                 )
             except (TimeoutError, OSError, SECObservationError):
                 return _finish_result(

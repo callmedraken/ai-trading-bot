@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM2D-B1-R-C1 native SEC boundary correction
+## Current milestone: PM2D-B1-R-C1-C2 SEC response accounting
 
 The accepted PM2D-B1-C1 parent is HEAD
 `3c9aa6c1dad6db5417bc3622a671906c13731afc` / tree
@@ -18,6 +18,13 @@ attempt 1, was terminal SUCCESS. C1 preserves that parent and corrects the SEC
 complete-submission filename, exact embedded-document identity, production
 store and attempt boundary, evidence-backed authorization rechecks, and
 bounded-time claims. The seven-lane FULL topology is unchanged.
+
+C1 HEAD `edbf2df90791d735de6a3f409f7ce0d2de7cd056` / tree
+`757e6383c73f4757d319f3f861a5af2b793149b2` passed feature FULL run
+`46128814136`, attempt 1, including all seven broad lanes. C2 adds partial
+socket-read byte accounting on timeout. It records yielded bytes in
+`response_bytes_received`, leaves `response_bytes` at zero until complete raw
+response custody succeeds, and performs no retry.
 
 The SEC operational path is classified
 `SEC_OPERATIONAL_FIRST_OBSERVED_PATH_READY_PENDING_EXACT_SUBJECT_AND_REVIEW`.

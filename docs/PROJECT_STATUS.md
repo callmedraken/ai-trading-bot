@@ -1,28 +1,45 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - PM1 closed; PM2A integrated; PM2B design checkpoint
+## Current milestone - PM2C synthetic research evidence contracts
 
-The current checkpoint is **Architecture 152-PM2B — Research Evidence and
-Signal Catalog**, design-only. Its architecture and validation records define
-the source-observation -> point-in-time fact -> validated/derived feature ->
-research snapshot -> later policy chain, V1 family formulas, provenance,
-availability statuses, Qlib/PyPortfolioOpt review, and AI/optimizer firewalls.
-No Python, tests, dependencies, provider, real data, AI request, or execution
-path is introduced.
-PM1 remains synthetic, disarmed, and preview-only; PM2A C3 remains the accepted
-implementation identity. The PM2A documentation lineage terminates at the
-historical C6-C3 predecessor; C4/C5/C6/C6-C1/C6-C2 entries below are retained
-as historical documentation corrections and do not replace C3. Real PM2A read-only qualification
-is **NOT YET AUTHORIZED** and no provider, credential, account, order, broker,
-or production effect occurred.
-The next milestone is **PM2C — synthetic typed evidence/catalog/snapshot
-implementation**, limited to the frozen PM2B contracts and adversarial
-synthetic fixtures. Real provider qualification, signal-policy calibration,
-AI-provider qualification, optimization policy, and execution authority remain
-later separately reviewed milestones. Arch149 remains sealed.
+The current checkpoint is **Architecture 152-PM2C — Synthetic Research
+Evidence Contracts**, an implementation/documentation draft pending exact
+source review, publication, mapped CI, and integration. It implements the
+frozen PM2B chain with three synthetic-only Portfolio Manager modules:
+`research_catalog.py`, `research_evidence.py`, and `research_snapshot.py`.
+Focused verification currently records 15 snapshot tests and 86 combined
+affected tests passing; whole-repository Ruff check/format and `git diff
+--check` also pass. No provider, real data, credential, account, AI request,
+broker/order, or production effect is claimed.
 
-See [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md)
-and its [validation record](validation/arch152-pm2b-research-evidence-and-signal-catalog.md).
+PM2B remains the design authority for the nine-family catalog, point-in-time
+semantics, provenance, availability vocabulary, and Qlib/PyPortfolioOpt
+exclusions. PM1 remains synthetic, disarmed, and preview-only; PM2A C3 remains
+the accepted implementation identity. Real PM2A read-only qualification is
+**NOT YET AUTHORIZED**, and Arch149 remains sealed. The local results above are
+implementation evidence only. No PM2C publication SHA, CI run, exact-source
+acceptance, or integration identity is recorded here; ChatGPT owns those later
+decisions.
+
+The next milestone after PM2C source/certification/integration is **PM2D —
+data-source capability and provenance qualification**, separately designed and
+separately authorized. It must not infer provider authority from PM2C.
+
+See [Architecture 152-PM2C](architecture/152-pm2c-synthetic-research-evidence-contracts.md),
+its [validation record](validation/arch152-pm2c-synthetic-research-evidence-contracts.md),
+and the predecessor [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md)
+and [PM2B validation record](validation/arch152-pm2b-research-evidence-and-signal-catalog.md).
+
+### Historical PM2B design checkpoint
+
+PM2B was the preceding design-only checkpoint. Its architecture and validation
+records froze the source-observation -> point-in-time fact -> validated/derived
+feature -> research snapshot -> later policy chain, V1 family formulas,
+provenance, seven availability states, Qlib/PyPortfolioOpt review, and
+AI/optimizer firewalls. PM2B introduced no Python, tests, dependencies,
+provider, real data, AI request, or execution path. Its records remain
+historical design authority for PM2C and do not constitute PM2C publication or
+acceptance evidence.
 
 ### Historical PM1/PM2A checkpoint chronology
 

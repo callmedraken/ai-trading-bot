@@ -1,42 +1,50 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM1 closed; PM2A integrated; PM2B design checkpoint
+## Current milestone: PM2C synthetic research evidence contracts
 
-The active checkpoint is **Architecture 152-PM2B — Research Evidence and
-Signal Catalog**, design-only. The new architecture and validation records
-freeze the source-observation -> point-in-time fact -> validated/derived
-feature -> research snapshot -> later policy chain, V1 catalog formulas,
-provenance and availability contracts, Qlib/PyPortfolioOpt findings, and
-AI/optimizer firewalls. The prepared candidate is based on parent HEAD
-verified at checkpoint start. No Python, tests, dependencies, provider, real
-data, AI request, or execution path is introduced.
+The active checkpoint is **Architecture 152-PM2C — Synthetic Research
+Evidence Contracts**, an implementation/documentation draft pending exact
+source review, focused verification, publication, mapped CI, and integration.
+It implements only the frozen PM2B contracts through three synthetic-only
+Portfolio Manager modules: `research_catalog.py`, `research_evidence.py`, and
+`research_snapshot.py`. No provider, real data, credential, account, AI
+request, broker/order, or production effect is claimed.
 
 PM1 remains synthetic, disarmed, and preview-only. PM2A C3 remains the accepted
-implementation identity. The PM2A documentation lineage terminates at the
-historical C6-C3 predecessor; earlier C4/C5/C6/C6-C1/C6-C2 entries below are
-historical documentation corrections, not a replacement implementation. Real
-PM2A read-only qualification remains **NOT YET AUTHORIZED**. The next bounded
-milestone is **PM2C — synthetic typed evidence/catalog/snapshot
-implementation**; real provider qualification, policy calibration, AI provider,
-optimization, and execution authority remain later separately reviewed work.
-Arch149 remains sealed.
+implementation identity. Real PM2A read-only qualification remains **NOT YET
+AUTHORIZED**, and Arch149 remains sealed. Local PM2C verification records 15
+snapshot tests and 86 combined affected tests passing, with whole-repository
+Ruff check/format and `git diff --check` passing. These are implementation
+results only; this handoff records no PM2C created SHA, CI run, exact-source
+acceptance, or integration identity. The next milestone after accepted PM2C is
+**PM2D — data-source capability and provenance qualification**, separately
+designed and separately authorized.
 
-See [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md)
-and its [validation record](validation/arch152-pm2b-research-evidence-and-signal-catalog.md).
-At checkpoint start, the implementation checkout was
+See [Architecture 152-PM2C](architecture/152-pm2c-synthetic-research-evidence-contracts.md),
+its [validation record](validation/arch152-pm2c-synthetic-research-evidence-contracts.md),
+and the predecessor [Architecture 152-PM2B](architecture/152-pm2b-research-evidence-and-signal-catalog.md)
+and [PM2B validation record](validation/arch152-pm2b-research-evidence-and-signal-catalog.md).
+
+At PM2C checkpoint start, the canonical accepted PM2B base was HEAD
+`1cfd1e005f6040187e82ba5bac0650d8a4e68d41` / tree
+`72b361ea3085927fe1f3e7320da962c18533a0eb`. At checkpoint start, the
+implementation checkout was
 `F:\AI\worktrees\ai-trading-bot-portfolio-manager-current` on
-`feature/robinhood-portfolio-manager-current`, at the exact PM2B parent
-`b43cf021b11b55db1a1b10e3f8f28def0e23e355` / tree
-`5231db460aad500f7c09771d3ff5744f57864b53`. The predecessor C6-C3 branch-gate
-runs `46064363946` (feature) and `46064367880` (develop) are terminal
-docs-only SUCCESS evidence; they are historical predecessor evidence, not PM2B
-publication identities. PM2B publication evidence (final SHA and mapped run)
-is reported after its one ordinary push. Exact-source acceptance and any
-integration remain ChatGPT-owned. Continuation is docs-only: exact
-review, four-path staging, one commit, docs-only admission, one ordinary push,
-remote verification, and terminal mapped CI. No merge, rebase, amend,
-force-push, PR mutation, provider read, real-data acquisition, or protected
-effect is in scope.
+`feature/robinhood-portfolio-manager-current`. Predecessor persistent-feature
+run `46079920316` and develop run `46080259188` are terminal docs-only SUCCESS
+evidence for the prior boundary, not PM2C publication identities. PM2C's exact
+created SHA and mapped CI evidence will be external after the reviewed
+publication step; ChatGPT owns exact-source acceptance and integration. No
+merge, rebase, amend, force-push, PR mutation, provider read, real-data
+acquisition, or protected effect is in scope for this draft.
+
+### Historical PM2B design checkpoint
+
+PM2B remains the design authority for catalog families, point-in-time
+semantics, provenance, availability, and AI/optimizer firewalls. It was
+design-only and introduced no Python, tests, dependencies, provider, real
+data, AI request, or execution path. Its records are retained as historical
+predecessor design evidence rather than PM2C publication or acceptance.
 
 ### Historical PM1/PM2A checkpoint chronology
 

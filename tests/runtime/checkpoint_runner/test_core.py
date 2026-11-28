@@ -539,6 +539,152 @@ def test_arch152_pm1_is_source_only_and_mapped_to_full():
     assert runner._arch152_pm1_authority_check(repo) == ()
 
 
+def test_arch152_pm2d_b1_is_source_only_and_diff_selected_on_pm_branch():
+    from scripts import run_test_certification as certification
+
+    repo = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    name = runner.ARCH152_PM2D_B1_NAME
+    spec = specs[name]
+
+    assert name == "arch152-pm2d-b1-sec-sharadar-bounded-qualification-source"
+    assert runner.ARCH152_PM2D_B1_BRANCH == runner.ARCH152_PM1_BRANCH
+    assert spec.tests == runner.ARCH152_PM2D_B1_TESTS
+    assert spec.ruff_paths == runner.ARCH152_PM2D_B1_RUFF
+    assert "scripts/current_source_authority.py" in spec.ruff_paths
+    assert set(runner.ARCH152_PM2D_B1_SOURCE_PATHS) <= set(spec.ruff_paths)
+    assert set(runner.ARCH152_PM2D_B1_TEST_PATHS) <= set(spec.tests)
+    assert "tests/portfolio_manager" in certification.FULL_DIRECTORIES
+    assert spec.authority_check is runner._arch152_pm2d_b1_authority_check
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert name in current_source_authority.develop_static_checkpoints(repo)
+    assert name not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CERTIFICATION_PROFILES[name] == "full"
+    assert (
+        runner.resolve_ci_checkpoint(specs, runner.ARCH152_PM2D_B1_BRANCH, "push")
+        == runner.ARCH152_PM1_NAME
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=runner.ARCH152_PM2D_B1_SOURCE_PATHS,
+        )
+        == name
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=runner.ARCH152_PM2D_B1_TEST_PATHS,
+        )
+        == name
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=runner.ARCH152_PM1_SOURCE_PATHS,
+        )
+        == runner.ARCH152_PM1_NAME
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=("README.md",),
+        )
+        == runner.ARCH152_PM1_NAME
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=("src/trading_bot/portfolio_manager/research_snapshot.py",),
+        )
+        == runner.ARCH152_PM1_NAME
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs,
+            runner.ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=(
+                runner.ARCH152_PM1_SOURCE_PATHS[0],
+                runner.ARCH152_PM2D_B1_SOURCE_PATHS[0],
+            ),
+        )
+        == name
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, runner.ARCH152_PM2D_B1_BRANCH, "pull_request"
+        )
+        is None
+    )
+    assert runner._arch152_pm2d_b1_authority_check(repo) == ()
+
+
+def test_current_commit_changed_paths_uses_nul_delimited_no_rename_diff(
+    monkeypatch,
+):
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return runner.subprocess.CompletedProcess(
+            argv,
+            0,
+            stdout=b"space name.py\0line\nbreak.py\0",
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    assert runner._current_commit_changed_paths(Path("repo")) == (
+        "space name.py",
+        "line\nbreak.py",
+    )
+    assert calls[0][0] == (
+        "git",
+        "diff",
+        "--name-only",
+        "--no-renames",
+        "-z",
+        "HEAD^",
+        "HEAD",
+        "--",
+    )
+    assert calls[0][1]["env"]["GIT_OPTIONAL_LOCKS"] == "0"
+
+
+@pytest.mark.parametrize(
+    "completed",
+    [
+        (1, b"path.py\0"),
+        (0, b"path.py"),
+        (0, b"path.py\0\0"),
+        (0, b"\xff\0"),
+    ],
+)
+def test_current_commit_changed_paths_fails_closed_on_invalid_git_output(
+    monkeypatch, completed
+):
+    def run(argv, **kwargs):
+        return runner.subprocess.CompletedProcess(
+            argv, completed[0], stdout=completed[1], stderr=b"secret diagnostic"
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    with pytest.raises(RuntimeError, match="current commit path diff"):
+        runner._current_commit_changed_paths(Path("repo"))
+
+
 def test_arch150_d1_data_custody_route_is_source_only_and_diff_selected():
     repo = Path(runner.__file__).resolve().parents[1]
     specs = runner._checkpoint_specs()

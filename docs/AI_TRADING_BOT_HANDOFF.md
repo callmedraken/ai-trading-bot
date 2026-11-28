@@ -1,13 +1,13 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: PM2D-A design checkpoint; source acceptance/integration pending
+## Current milestone: PM2D-B1 SEC/Sharadar source foundation
 
-Architecture 152-PM2D-A is a documentation-only source-capability and
-provenance design checkpoint. Independent exact-source acceptance and develop
-integration are pending. The predecessor `develop` and persistent Portfolio
-Manager feature branch were HEAD
-`facc9efb9ecfcf5b5177a21e7e5cf73551e4b449` / tree
-`4c8c393c69321b0c250b2ad53fbf412d93b549ae`. The feature worktree is
+PM2D-A is accepted and integrated at HEAD
+`9b9f5e0c7f0f5ab7addbe2c291c20df4b4d2903b` / tree
+`1b42c70df8a686dcd231b6dd563640ad18f1b200`. Feature documentation run
+`46105978117` and develop documentation run `46106912628` are terminal
+SUCCESS. The persistent Portfolio Manager feature branch is
+`feature/robinhood-portfolio-manager-current`; its worktree is
 `F:\AI\worktrees\ai-trading-bot-portfolio-manager-current`, origin
 `https://github.com/callmedraken/ai-trading-bot.git`. The canonical develop
 checkout retained its exact 17 pre-existing untracked artifacts.
@@ -19,39 +19,47 @@ PM2C implementation was accepted at HEAD
 terminal SUCCESS. PM2C closeout docs runs `46088679818` and `46101847732`
 (feature and develop) are terminal SUCCESS.
 
-The PM2D-A design identifies SEC EDGAR as a raw filing/provenance witness;
-existing Alpaca as the first price candidate and its separate Corporate Actions
-REST + Market Data SSE as the first action candidate; and Sharadar SF1 ARQ/ARY
-as a conditional normalized-fundamentals candidate. Sharadar TICKERS+ACTIONS
-and SP500 plus S&P DJI announcements are separate identity/ticker and
-benchmark-membership references. No source is accepted for implementation.
+PM2D-B1 is a source-only/fake-only checkpoint with exact-source acceptance and
+mapped FULL evidence pending. It prepares one bounded comparison between an
+exact SEC accession/fact and one selected Sharadar SF1 As Reported
+revenue/version. The source has no real provider transport or default
+provider, credentials, API key, acquisition, adapter, account/AI/broker effect,
+or Arch149 access. **NO REAL PROVIDER OBSERVATION AUTHORIZED.**
 
-The four intended documentation paths are:
-
-1. `docs/architecture/152-pm2d-data-source-capability-and-provenance-qualification.md`
-2. `docs/validation/arch152-pm2d-data-source-capability-and-provenance-qualification.md`
-3. `docs/PROJECT_STATUS.md`
-4. `docs/AI_TRADING_BOT_HANDOFF.md`
+The narrow candidate is USD revenue on SF1 ARY, plus requested ARQ Q1 only if a
+separate exact grain witness matches the parsed SEC and SF1 facts; an SF1 row
+alone is insufficient. B1 does not implement Q2/Q3/Q4 quarterization, so those
+roles remain unavailable. Any later support requires compatible same-FY YTD
+component lineage for Q2/Q3 and annual minus same-FY Q3 YTD with both exact
+components bound for Q4. ART and MRQ/MRY/MRT are rejected for historical PM2C
+facts. SEC period end/filing date, Sharadar `datekey`, `lastupdated`, and local
+observation time remain distinct; no one inherits another source's
+availability. Amendment and early-8-K lineage require exact fact identity.
 
 Still unqualified are regular-session close mapping and immutable corrections,
-complete point-in-time action history, selected SF1 field/grain/YTD/Q4 mappings,
-fixed NTM and 21-session estimate history, exact eligible shares, and historical
-peer/sector membership. FMP is rejected for historical analyst estimates because
-its internal revision timestamps cannot be queried by date. Current provider
-values, classifications, or index membership cannot be projected backward.
+complete point-in-time action history, selected SF1 field/grain/YTD/Q4 mappings
+beyond the narrow B1 candidate, fixed NTM and 21-session estimate history,
+exact eligible shares, and historical peer/sector membership. FMP is rejected
+for historical analyst estimates because its internal revision timestamps
+cannot be queried by date. Current provider values, classifications, or index
+membership cannot be projected backward.
 
 See [Architecture 152-PM2D-A](architecture/152-pm2d-data-source-capability-and-provenance-qualification.md)
-and its [validation record](validation/arch152-pm2d-data-source-capability-and-provenance-qualification.md).
+and its [validation record](validation/arch152-pm2d-data-source-capability-and-provenance-qualification.md),
+the [PM2D-B1 source contract](architecture/152-pm2d-b1-sec-sharadar-bounded-qualification-source.md),
+and its [validation record](validation/arch152-pm2d-b1-sec-sharadar-bounded-qualification-source.md).
 
-This checkpoint added no code, tests, dependency, workflow, secret/config file,
-credential, subscription, provider/API call, bulk data, account read, AI call,
-broker/order effect, or Arch149 access. PM1 remains disarmed and preview-only;
-PM2A real read-only qualification is **NOT YET AUTHORIZED**; Arch149 remains
-sealed. **Next step:** independently review the exact feature source and its
-terminal CI result. If accepted, ChatGPT determines integration readiness and
-the next transition. PM2D-B follows only after PM2D-A source acceptance and
-develop integration, with separate bounds for each finite schema/sample
-observation. A real provider adapter is a later milestone.
+PM1 remains disarmed and preview-only; PM2A real read-only qualification is
+**NOT YET AUTHORIZED**; Arch149 remains sealed. **Next step:** complete the
+exact-source review and terminal mapped feature FULL. Return the exact feature
+HEAD/tree, workflow run ID and attempt, source-static/active-tests results,
+all seven lane results, and any authority or source-contract failure. If
+accepted, ChatGPT reviews exact-source integration readiness. Only after
+acceptance and develop integration, plus separately reviewed real-observation
+wiring, may ChatGPT consider a bounded one-attempt PM2D-B1-O observation. The
+B1 operator accepts only exact offline fake providers and is not a real
+transport. No automatic retry or expanded search is allowed. Alpaca
+price/corporate-action qualification remains separate PM2D-B2.
 
 ### Historical PM2B design checkpoint
 

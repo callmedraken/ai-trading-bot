@@ -752,6 +752,7 @@ def test_ci_certification_profile_mapping_is_explicit_and_bounded():
         runner.ARCH151_INTRADAY_WALKFORWARD_NAME: "full",
         runner.ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME: "full",
         runner.ARCH152_PM1_NAME: "full",
+        runner.ARCH152_PM2D_B1_NAME: "full",
         runner.AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
         runner.AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
         runner.ARCH147_P5A_NAME: "full",
@@ -827,6 +828,27 @@ def test_arch152_pm1_route_is_in_the_current_active_workflow_projection():
     assert runner.CI_CERTIFICATION_PROFILES[name] == "full"
     assert runner._arch147_current_batch_workflow_is_reviewed(workflow)
     assert runner._arch147_batch_workflow_is_reviewed(workflow)
+
+
+def test_arch152_pm2d_b1_route_is_in_the_current_active_workflow_projection():
+    repo = Path(runner.__file__).resolve().parents[1]
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    name = runner.ARCH152_PM2D_B1_NAME
+    row = f"              {name} {chr(96)}\n"
+
+    assert workflow.count(row) == 1
+    assert name in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CERTIFICATION_PROFILES[name] == "full"
+    selector = "runner._current_commit_changed_paths(Path.cwd())"
+    assert workflow.count(selector) == 1
+    assert runner._arch147_current_batch_workflow_is_reviewed(workflow)
+    assert runner._arch147_batch_workflow_is_reviewed(workflow)
+    assert not runner._arch147_current_batch_workflow_is_reviewed(
+        workflow.replace(selector, "runner.unreviewed_changed_paths()", 1)
+    )
 
 
 def test_arch151_evaluator_successor_is_in_current_workflow_projection():
@@ -2865,9 +2887,10 @@ def _docs_admission_execution_fixture(monkeypatch):
             _outcome(step.name, context.get("range_exit", 0)), argv=step.argv
         )
 
-    def evaluate(repo, *, publication_context):
+    def evaluate(repo, *, publication_context, changed_paths=None):
         assert repo == root
         contexts.append(publication_context)
+        assert changed_paths is None
         return AuthorityResult(
             publication_context,
             "a" * 40,
@@ -3017,7 +3040,7 @@ def test_full_admission_executes_combined_checks_both_authorities_and_test_bundl
     contexts = []
     commands = []
 
-    def evaluate(repo, *, publication_context, checkpoints=None):
+    def evaluate(repo, *, publication_context, checkpoints=None, changed_paths=None):
         if checkpoints is not None:
             assert len(checkpoints) == 1
             failures = checkpoints[0].authority_check(repo)
@@ -3094,8 +3117,9 @@ def test_docs_only_admission_real_git_range_never_launches_python(
     )
     contexts = []
 
-    def evaluate(repo, *, publication_context):
+    def evaluate(repo, *, publication_context, changed_paths=None):
         contexts.append(publication_context)
+        assert changed_paths is None
         return AuthorityResult(publication_context, head, tree, ("current",), ())
 
     monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)

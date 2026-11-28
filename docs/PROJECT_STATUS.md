@@ -1,13 +1,14 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - PM2D-A data-source qualification; PM2C closed
+## Current milestone - PM2D-B1 SEC/Sharadar source foundation; PM2C closed
 
-Architecture 152-PM2D-A — Data-Source Capability and Provenance Qualification
-is the current documentation-only design checkpoint. Independent source
-acceptance and develop integration are pending. Its predecessor is HEAD
-`facc9efb9ecfcf5b5177a21e7e5cf73551e4b449` / tree
-`4c8c393c69321b0c250b2ad53fbf412d93b549ae` on both `develop` and the persistent
-Portfolio Manager feature branch.
+Architecture 152-PM2D-A is accepted and integrated at HEAD
+`9b9f5e0c7f0f5ab7addbe2c291c20df4b4d2903b` / tree
+`1b42c70df8a686dcd231b6dd563640ad18f1b200`. PM2D-A feature documentation
+run `46105978117` and develop documentation run `46106912628` are terminal
+SUCCESS. The current PM2D-B1 source-only/fake-only checkpoint builds on that
+accepted design; exact-source acceptance and its mapped FULL result are
+pending.
 
 PM2C implementation was accepted at HEAD
 `13e5981548ad3c072ff43f641b5eaa5ed909f0b1` / tree
@@ -33,14 +34,30 @@ FMP is rejected for historical estimate PIT. PM1 remains disarmed and
 preview-only; PM2A real read-only qualification is **NOT YET AUTHORIZED**;
 Arch149 remains sealed.
 
-PM2D-A caused no credential, subscription, provider call, data acquisition,
-account read, AI call, broker effect, or sealed-data access. **Next milestone:**
-after independent PM2D-A source acceptance and integration, PM2D-B may perform
-only separately reviewed finite schema/sample qualifications. No bulk
-acquisition or adapter implementation is included in that milestone.
+**NO REAL PROVIDER OBSERVATION AUTHORIZED.** PM2D-B1 supports only synthetic
+fixture bytes and exact fake providers. It adds no real transport, credential,
+provider dependency, acquisition, production adapter, account read, AI call,
+broker effect, or sealed-data access. It cannot qualify SEC or Sharadar by
+implementation alone. The planned comparison is narrowly limited to USD
+revenue on SF1 ARY, with an ARQ Q1 candidate only if a separate exact grain
+witness matches the parsed SEC and SF1 facts; an SF1 row alone is insufficient.
+B1 does not implement Q2/Q3/Q4 quarterization, so those roles remain
+unavailable in this checkpoint. Any later support needs exact same-FY YTD
+lineage for Q2/Q3 and annual plus same-FY Q3 YTD lineage for Q4. ART and
+MRQ/MRY/MRT remain rejected.
+
+PM1 remains disarmed and preview-only; PM2A real read-only qualification is
+**NOT YET AUTHORIZED**; Arch149 remains sealed. **Next step:** complete the
+exact-source review and terminal mapped feature FULL. Only after independent
+source acceptance and develop integration, plus separately reviewed real-
+observation wiring, may ChatGPT consider the bounded one-attempt PM2D-B1-O
+observation. The B1 fake-only operator is not a real transport. Alpaca price/corporate-action
+qualification remains a separate PM2D-B2 transition.
 
 See [Architecture 152-PM2D-A](architecture/152-pm2d-data-source-capability-and-provenance-qualification.md),
 its [validation record](validation/arch152-pm2d-data-source-capability-and-provenance-qualification.md),
+the [PM2D-B1 source contract](architecture/152-pm2d-b1-sec-sharadar-bounded-qualification-source.md),
+its [validation record](validation/arch152-pm2d-b1-sec-sharadar-bounded-qualification-source.md),
 and the predecessor [PM2C contract](architecture/152-pm2c-synthetic-research-evidence-contracts.md).
 
 ### Historical PM2B design checkpoint

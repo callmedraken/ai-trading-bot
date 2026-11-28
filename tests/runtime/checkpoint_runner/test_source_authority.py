@@ -79,9 +79,17 @@ def test_classification_has_one_current_owner_and_preserves_security_evidence():
         "ARCH152_PM1_PATHS",
         "ARCH152_PM1_TESTS",
         "ARCH152_PM1_RUFF",
+        "ARCH152_PM2D_B1_NAME",
+        "ARCH152_PM2D_B1_BRANCH",
+        "ARCH152_PM2D_B1_SOURCE_PATHS",
+        "ARCH152_PM2D_B1_TEST_PATHS",
+        "ARCH152_PM2D_B1_PATHS",
+        "ARCH152_PM2D_B1_TESTS",
+        "ARCH152_PM2D_B1_RUFF",
         "_arch151_intraday_walkforward_authority_check",
         "_arch151_intraday_walkforward_evaluator_authority_check",
         "_arch152_pm1_authority_check",
+        "_arch152_pm2d_b1_authority_check",
         "_prepublication_admission_tests",
         "_prepublication_requires_infrastructure_coherence",
     ):
@@ -521,9 +529,104 @@ def _contexts(monkeypatch, *, develop_red=False):
     )
     specs = {s.name: s for s in (feature, historical)}
     monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
-    monkeypatch.setattr(runner, "resolve_ci_checkpoint", lambda *_: "feature")
+    monkeypatch.setattr(runner, "resolve_ci_checkpoint", lambda *_, **__: "feature")
     monkeypatch.setattr(current, "develop_static_checkpoints", lambda _: tuple(specs))
     return state
+
+
+def test_feature_authority_selects_b1_from_exact_changed_paths_and_keeps_pm1_fallback(
+    monkeypatch,
+):
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": runner.ARCH152_PM2D_B1_BRANCH,
+        "porcelain": "",
+    }
+    monkeypatch.setattr(runner, "_git_state", lambda _: state.copy())
+    monkeypatch.setattr(current, "current_authority_check", lambda _: ())
+    registered = runner._checkpoint_specs()
+
+    def inert(_repo):
+        return ()
+
+    selected_specs = {
+        name: replace(registered[name], authority_check=inert)
+        for name in (runner.ARCH152_PM1_NAME, runner.ARCH152_PM2D_B1_NAME)
+    }
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: selected_specs)
+
+    selected = current.evaluate_source_authority(
+        ROOT,
+        publication_context=current.PublicationContext.FEATURE,
+        changed_paths=runner.ARCH152_PM2D_B1_SOURCE_PATHS,
+    )
+    fallback = current.evaluate_source_authority(
+        ROOT, publication_context=current.PublicationContext.FEATURE
+    )
+
+    assert selected.passed
+    assert selected.checkpoints == (runner.ARCH152_PM2D_B1_NAME,)
+    assert fallback.passed
+    assert fallback.checkpoints == (runner.ARCH152_PM1_NAME,)
+
+
+def test_prepublication_authority_results_uses_last_commit_paths_only_for_pm_branch(
+    monkeypatch,
+):
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": runner.ARCH152_PM2D_B1_BRANCH,
+        "porcelain": "",
+    }
+    changed_paths = runner.ARCH152_PM2D_B1_SOURCE_PATHS
+    seen = []
+    monkeypatch.setattr(runner, "_git_state", lambda _: state.copy())
+    monkeypatch.setattr(
+        runner, "_current_commit_changed_paths", lambda _: changed_paths
+    )
+
+    def evaluate(_root, *, publication_context, changed_paths=None):
+        seen.append((publication_context, changed_paths))
+        return current.AuthorityResult(publication_context, "a" * 40, "b" * 40, (), ())
+
+    monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)
+    results = runner._prepublication_authority_results(ROOT)
+    assert len(results) == 2
+    assert seen == [
+        (current.PublicationContext.FEATURE, changed_paths),
+        (current.PublicationContext.PROSPECTIVE_DEVELOP, None),
+    ]
+
+
+def test_prepublication_authority_results_preserves_other_branch_fallbacks(
+    monkeypatch,
+):
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": runner.ARCH150_INTRADAY_AI_BRANCH,
+        "porcelain": "",
+    }
+    seen = []
+    monkeypatch.setattr(runner, "_git_state", lambda _: state.copy())
+
+    def forbidden(_):
+        pytest.fail("non-PM branches should retain their existing no-diff route")
+
+    monkeypatch.setattr(runner, "_current_commit_changed_paths", forbidden)
+
+    def evaluate(_root, *, publication_context, changed_paths=None):
+        seen.append((publication_context, changed_paths))
+        return current.AuthorityResult(publication_context, "a" * 40, "b" * 40, (), ())
+
+    monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)
+    runner._prepublication_authority_results(ROOT)
+    assert seen == [
+        (current.PublicationContext.FEATURE, None),
+        (current.PublicationContext.PROSPECTIVE_DEVELOP, None),
+    ]
 
 
 def test_feature_green_prospective_develop_red_is_rejected_by_general_admission(

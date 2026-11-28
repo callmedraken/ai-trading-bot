@@ -599,6 +599,51 @@ ARCH152_PM1_TEST_SUPPORT_PATHS: Final = (
     "tests/portfolio_manager/__init__.py",
     "tests/portfolio_manager/conftest.py",
 )
+ARCH152_PM2D_B1_NAME: Final = (
+    "arch152-pm2d-b1-sec-sharadar-bounded-qualification-source"
+)
+ARCH152_PM2D_B1_BRANCH: Final = ARCH152_PM1_BRANCH
+ARCH152_PM2D_B1_SOURCE_PATHS: Final = (
+    "src/trading_bot/portfolio_manager/source_qualification.py",
+    "src/trading_bot/portfolio_manager/sec_sharadar_qualification.py",
+)
+ARCH152_PM2D_B1_TEST_PATHS: Final = (
+    "tests/portfolio_manager/test_source_qualification.py",
+    "tests/portfolio_manager/test_sec_sharadar_qualification.py",
+)
+ARCH152_PM2D_B1_PATHS: Final = (
+    *ARCH152_PM2D_B1_SOURCE_PATHS,
+    *ARCH152_PM2D_B1_TEST_PATHS,
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "scripts/checkpoint_runner.py",
+    "scripts/current_source_authority.py",
+    "scripts/source_authority.py",
+    ".github/workflows/checkpoint-source-gates.yml",
+    "docs/architecture/152-pm2d-b1-sec-sharadar-bounded-qualification-source.md",
+    "docs/validation/arch152-pm2d-b1-sec-sharadar-bounded-qualification-source.md",
+    "docs/PROJECT_STATUS.md",
+    "docs/AI_TRADING_BOT_HANDOFF.md",
+)
+ARCH152_PM2D_B1_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    *ARCH152_PM2D_B1_TEST_PATHS,
+)
+ARCH152_PM2D_B1_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "scripts/current_source_authority.py",
+    "scripts/source_authority.py",
+    "scripts/run_test_certification.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    *ARCH152_PM2D_B1_SOURCE_PATHS,
+    *ARCH152_PM2D_B1_TEST_PATHS,
+)
 ARCH152_PM1_PATHS: Final = (
     *ARCH152_PM1_SOURCE_PATHS,
     *ARCH152_PM1_TEST_PATHS,
@@ -963,6 +1008,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH151_INTRADAY_WALKFORWARD_NAME,
     ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME,
     ARCH152_PM1_NAME,
+    ARCH152_PM2D_B1_NAME,
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
@@ -984,6 +1030,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH151_INTRADAY_WALKFORWARD_NAME: "full",
     ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME: "full",
     ARCH152_PM1_NAME: "full",
+    ARCH152_PM2D_B1_NAME: "full",
     AI_STRATEGY_DISCOVERY_FOUNDATION_NAME: "full",
     AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME: "full",
     ARCH147_P5A_NAME: "full",
@@ -1185,6 +1232,38 @@ def _prepublication_admission_tests(changed_paths: Sequence[str]) -> tuple[str, 
     return tuple(dict.fromkeys(tests))
 
 
+def _current_commit_changed_paths(repo_root: Path) -> tuple[str, ...]:
+    """Read exact last-commit paths with unambiguous NUL-delimited Git output."""
+    completed = subprocess.run(
+        (
+            "git",
+            "diff",
+            "--name-only",
+            "--no-renames",
+            "-z",
+            "HEAD^",
+            "HEAD",
+            "--",
+        ),
+        cwd=repo_root,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
+    )
+    if completed.returncode:
+        raise RuntimeError("current commit path diff unavailable")
+    try:
+        raw = completed.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        raise RuntimeError("current commit path diff encoding unavailable") from None
+    if raw and not raw.endswith("\0"):
+        raise RuntimeError("current commit path diff is truncated")
+    paths = tuple(raw.removesuffix("\0").split("\0")) if raw else ()
+    if any(not path for path in paths):
+        raise RuntimeError("current commit path diff contains an empty path")
+    return paths
+
+
 def resolve_ci_checkpoint(
     specs: Mapping[str, CheckpointSpec],
     branch: str,
@@ -1192,7 +1271,7 @@ def resolve_ci_checkpoint(
     *,
     changed_paths: Iterable[str] | None = None,
 ) -> str | None:
-    """Resolve a registered push route, selecting shared Arch150 branch by diff."""
+    """Resolve a registered push route, selecting shared branches by diff."""
     if event_name != "push" or type(branch) is not str or not branch:
         return None
     if branch == "feature/test-suite-current-authority-historical-decoupling-current":
@@ -1243,6 +1322,20 @@ def resolve_ci_checkpoint(
                 else None
             )
         return None
+    if branch == ARCH152_PM2D_B1_BRANCH and set(matches) == {
+        ARCH152_PM1_NAME,
+        ARCH152_PM2D_B1_NAME,
+    }:
+        if changed_paths is None:
+            # Preserve PM1 as the established fallback for callers without a diff.
+            return ARCH152_PM1_NAME
+        changed = {path.replace("\\", "/").removeprefix("./") for path in changed_paths}
+        pm2d_b1_changed = bool(
+            changed
+            & (set(ARCH152_PM2D_B1_SOURCE_PATHS) | set(ARCH152_PM2D_B1_TEST_PATHS))
+        )
+        selected = ARCH152_PM2D_B1_NAME if pm2d_b1_changed else ARCH152_PM1_NAME
+        return selected if selected in specs else None
     if len(matches) != 1 or matches[0] not in (
         *CURRENT_ACTIVE_CI_CHECKPOINTS,
         ACTIVE_CI_CHECKPOINTS[0],
@@ -27166,6 +27259,17 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         remote_branch=ARCH152_PM1_BRANCH,
         remote_head_env=None,
     )
+    values[ARCH152_PM2D_B1_NAME] = CheckpointSpec(
+        ARCH152_PM2D_B1_NAME,
+        "Source-only Architecture 152-PM2D-B1 SEC/Sharadar bounded qualification",
+        ARCH152_PM2D_B1_TESTS,
+        ARCH152_PM2D_B1_RUFF,
+        _arch152_pm2d_b1_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH152_PM2D_B1_BRANCH,
+        remote_head_env=None,
+    )
     values[AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME] = CheckpointSpec(
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         "Source-only G1 daily evaluator and analysis; no campaign authority",
@@ -27785,6 +27889,40 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         predecessor = predecessor_workflow(workflow)
     except ValueError:
         return False
+    # Normalize only the reviewed current selector before reconstructing its
+    # exact historical predecessor; current CI uses the shared NUL-safe reader.
+    current_selector = (
+        "          import os\n"
+        "          from pathlib import Path\n"
+        "          from scripts import checkpoint_runner as runner\n"
+        "\n"
+        "          changed_paths = runner._current_commit_changed_paths(Path.cwd())\n"
+        "          checkpoint = runner.resolve_ci_checkpoint(\n"
+        "              runner._checkpoint_specs(),\n"
+        '              os.environ.get("GITHUB_REF_NAME", ""),\n'
+        '              os.environ.get("GITHUB_EVENT_NAME", ""),\n'
+        "              changed_paths=changed_paths,\n"
+        "          )\n"
+    )
+    predecessor_selector = (
+        "          import os\n"
+        "          import subprocess\n"
+        "          from scripts import checkpoint_runner as runner\n"
+        "\n"
+        "          changed_paths = subprocess.check_output(\n"
+        '              ("git", "diff", "--name-only", "HEAD^", "HEAD", "--"), '
+        "text=True\n"
+        "          ).splitlines()\n"
+        "          checkpoint = runner.resolve_ci_checkpoint(\n"
+        "              runner._checkpoint_specs(),\n"
+        '              os.environ.get("GITHUB_REF_NAME", ""),\n'
+        '              os.environ.get("GITHUB_EVENT_NAME", ""),\n'
+        "              changed_paths=changed_paths,\n"
+        "          )\n"
+    )
+    if predecessor.count(current_selector) != 1:
+        return False
+    predecessor = predecessor.replace(current_selector, predecessor_selector, 1)
     triggers = (
         "name: Checkpoint Source Gates\n\non:\n  push:\n    branches:\n"
         "      - develop\n"
@@ -27828,6 +27966,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH151_INTRADAY_WALKFORWARD_NAME,
         ARCH151_INTRADAY_WALKFORWARD_EVALUATOR_NAME,
         ARCH152_PM1_NAME,
+        ARCH152_PM2D_B1_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -27873,6 +28012,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME,
         ARCH151_INTRADAY_WALKFORWARD_NAME,
         ARCH152_PM1_NAME,
+        ARCH152_PM2D_B1_NAME,
         AI_STRATEGY_DISCOVERY_FOUNDATION_NAME,
         AI_STRATEGY_DISCOVERY_G1_ENGINE_NAME,
         ARCH147_PROTOTYPE_NAME,
@@ -28080,10 +28220,24 @@ def _arch134_r3n_prepublication_authority_check(repo_root: Path) -> tuple[str, .
 
 
 def _prepublication_authority_results(repo_root: Path) -> tuple[AuthorityResult, ...]:
-    results = tuple(
-        evaluate_source_authority(repo_root, publication_context=context)
-        for context in PublicationContext
-    )
+    branch = _git_state(repo_root)["branch"]
+    if branch == ARCH152_PM2D_B1_BRANCH:
+        changed_paths = _current_commit_changed_paths(repo_root)
+        results = tuple(
+            evaluate_source_authority(
+                repo_root,
+                publication_context=context,
+                changed_paths=(
+                    changed_paths if context is PublicationContext.FEATURE else None
+                ),
+            )
+            for context in PublicationContext
+        )
+    else:
+        results = tuple(
+            evaluate_source_authority(repo_root, publication_context=context)
+            for context in PublicationContext
+        )
     for result in results:
         print(
             f"{result.context.value}_AUTHORITY={'PASS' if result.passed else 'FAIL'} "
@@ -29101,7 +29255,7 @@ def _arch150_d1_intraday_data_custody_authority_check(
     row = f"              {ARCH150_D1_INTRADAY_DATA_CUSTODY_SOURCE_NAME} {chr(96)}\n"
     if (
         workflow.count(row) != 1
-        or 'git", "diff", "--name-only", "HEAD^", "HEAD"' not in workflow
+        or "runner._current_commit_changed_paths(Path.cwd())" not in workflow
         or "changed_paths=changed_paths" not in workflow
         or not _arch147_current_batch_workflow_is_reviewed(workflow)
     ):
@@ -29317,6 +29471,107 @@ def _arch152_pm1_authority_check(repo_root: Path) -> tuple[str, ...]:
         or not _arch147_batch_workflow_is_reviewed(workflow)
     ):
         failures.append("Architecture 152-PM1 active CI projection drift")
+    return tuple(failures)
+
+
+def _arch152_pm2d_b1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Register PM2D-B1 as a fake-only source route with mapped FULL coverage."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH152_PM2D_B1_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or spec.tests != ARCH152_PM2D_B1_TESTS
+        or spec.ruff_paths != ARCH152_PM2D_B1_RUFF
+        or spec.authority_check is not _arch152_pm2d_b1_authority_check
+        or spec.remote_branch != ARCH152_PM2D_B1_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH152_PM2D_B1_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH152_PM2D_B1_NAME) != 1
+        or ARCH152_PM2D_B1_NAME in ACTIVE_CI_CHECKPOINTS
+        or resolve_ci_checkpoint(specs, ARCH152_PM2D_B1_BRANCH, "push")
+        != ARCH152_PM1_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=ARCH152_PM2D_B1_SOURCE_PATHS,
+        )
+        != ARCH152_PM2D_B1_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=ARCH152_PM2D_B1_TEST_PATHS,
+        )
+        != ARCH152_PM2D_B1_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=ARCH152_PM1_SOURCE_PATHS,
+        )
+        != ARCH152_PM1_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=("README.md",),
+        )
+        != ARCH152_PM1_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=("src/trading_bot/portfolio_manager/research_snapshot.py",),
+        )
+        != ARCH152_PM1_NAME
+        or resolve_ci_checkpoint(
+            specs,
+            ARCH152_PM2D_B1_BRANCH,
+            "push",
+            changed_paths=(
+                ARCH152_PM1_SOURCE_PATHS[0],
+                ARCH152_PM2D_B1_SOURCE_PATHS[0],
+            ),
+        )
+        != ARCH152_PM2D_B1_NAME
+        or resolve_ci_checkpoint(specs, ARCH152_PM2D_B1_BRANCH, "pull_request")
+        is not None
+    ):
+        failures.append("Architecture 152-PM2D-B1 source-only registration drift")
+    if "tests/portfolio_manager" not in certification.FULL_DIRECTORIES:
+        failures.append("Architecture 152-PM2D-B1 tests are not FULL-owned")
+    try:
+        inventory = certification.discover_inventory(repo_root)
+        profiles = certification.classify_inventory(inventory)
+        pm2d_b1_modules = set(ARCH152_PM2D_B1_TEST_PATHS) & set(inventory)
+        if (
+            pm2d_b1_modules != set(ARCH152_PM2D_B1_TEST_PATHS)
+            or not pm2d_b1_modules <= set(profiles["full"])
+            or pm2d_b1_modules & set(profiles["legacy"])
+        ):
+            failures.append("Architecture 152-PM2D-B1 test ownership drift")
+    except (OSError, ValueError, certification.CertificationError):
+        failures.append("Architecture 152-PM2D-B1 test ownership unavailable")
+    for relative in ARCH152_PM2D_B1_PATHS:
+        if not (repo_root / relative).is_file():
+            failures.append("Architecture 152-PM2D-B1 route is missing " + relative)
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    row = f"              {ARCH152_PM2D_B1_NAME} {chr(96)}\n"
+    if (
+        workflow.count(row) != 1
+        or "runner._current_commit_changed_paths(Path.cwd())" not in workflow
+        or not _arch147_current_batch_workflow_is_reviewed(workflow)
+        or not _arch147_batch_workflow_is_reviewed(workflow)
+    ):
+        failures.append("Architecture 152-PM2D-B1 active CI projection drift")
     return tuple(failures)
 
 

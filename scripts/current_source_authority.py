@@ -307,6 +307,7 @@ def evaluate_source_authority(
     *,
     publication_context: PublicationContext,
     checkpoints: Sequence | None = None,
+    changed_paths: Sequence[str] | None = None,
 ) -> AuthorityResult:
     """Apply FEATURE or PROSPECTIVE_DEVELOP to the same static implementation.
 
@@ -334,7 +335,10 @@ def evaluate_source_authority(
     if checkpoints is None:
         if context is PublicationContext.FEATURE:
             checkpoint = runner.resolve_ci_checkpoint(
-                specs, str(before["branch"]), "push"
+                specs,
+                str(before["branch"]),
+                "push",
+                changed_paths=changed_paths,
             )
             names = (
                 (checkpoint,)
